@@ -3,11 +3,31 @@
 import asyncio
 from pathlib import Path
 
-from git import Repo
+from git import InvalidGitRepositoryError, Repo
 
 
 def _get_repo(repo_path: str | Path) -> Repo:
     return Repo(repo_path)
+
+
+def is_git_repo(path: str | Path) -> bool:
+    """Check if path is inside a git repository."""
+    try:
+        Repo(path)
+        return True
+    except InvalidGitRepositoryError:
+        return False
+
+
+def init_repo(path: str | Path) -> Repo:
+    """Initialize a new git repository at path."""
+    return Repo.init(path)
+
+
+def has_branch(repo_path: str | Path, branch: str = "ganban") -> bool:
+    """Check if a branch exists in the repository."""
+    repo = _get_repo(repo_path)
+    return branch in [h.name for h in repo.heads]
 
 
 async def get_remotes(repo_path: str | Path) -> list[str]:

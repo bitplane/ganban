@@ -14,6 +14,9 @@ dependencies = [
     "pyyaml"
 ]
 
+[project.scripts]
+ganban = "ganban.__main__:main"
+
 [project.optional-dependencies]
 dev = [
     "pre-commit",

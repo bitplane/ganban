@@ -3,7 +3,15 @@
 import pytest
 from git import Repo
 
-from ganban.git import create_orphan_branch, fetch, get_remotes, push
+from ganban.git import (
+    create_orphan_branch,
+    fetch,
+    get_remotes,
+    has_branch,
+    init_repo,
+    is_git_repo,
+    push,
+)
 
 
 @pytest.fixture
@@ -103,3 +111,42 @@ async def test_create_orphan_branch(temp_repo):
     # Working tree should be unchanged (still on master with README)
     assert repo.active_branch.name == "master"
     assert (temp_repo / "README.md").exists()
+
+
+def test_is_git_repo_true(temp_repo):
+    """Returns True for a git repository."""
+    assert is_git_repo(temp_repo) is True
+
+
+def test_is_git_repo_false(tmp_path):
+    """Returns False for a non-git directory."""
+    assert is_git_repo(tmp_path) is False
+
+
+def test_init_repo(tmp_path):
+    """Initialize a new git repository."""
+    new_repo_path = tmp_path / "new_repo"
+    new_repo_path.mkdir()
+
+    repo = init_repo(new_repo_path)
+
+    assert repo is not None
+    assert is_git_repo(new_repo_path)
+
+
+def test_has_branch_true(temp_repo):
+    """Returns True when branch exists."""
+    assert has_branch(temp_repo, "master") is True
+
+
+def test_has_branch_false(temp_repo):
+    """Returns False when branch doesn't exist."""
+    assert has_branch(temp_repo, "ganban") is False
+
+
+@pytest.mark.asyncio
+async def test_has_branch_after_create(temp_repo):
+    """has_branch returns True after creating orphan branch."""
+    assert has_branch(temp_repo, "ganban") is False
+    await create_orphan_branch(temp_repo)
+    assert has_branch(temp_repo, "ganban") is True
