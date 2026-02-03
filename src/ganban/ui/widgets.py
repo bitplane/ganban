@@ -58,10 +58,11 @@ class EditableLabel(Container):
             self.old_value = old_value
             self.new_value = new_value
 
-    def __init__(self, value: str = "", **kwargs) -> None:
+    def __init__(self, value: str = "", click_to_edit: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self._value = self._clean(value)
         self._editing = False
+        self._click_to_edit = click_to_edit
 
     @staticmethod
     def _clean(text: str) -> str:
@@ -82,18 +83,27 @@ class EditableLabel(Container):
         yield Static(self._value)
 
     def on_click(self, event) -> None:
-        if not self._editing:
-            self._start_editing(event.x)
+        if self._click_to_edit and not self._editing:
+            self.start_editing(cursor_col=event.x)
 
-    def _start_editing(self, click_x: int = 0) -> None:
+    def start_editing(self, text: str | None = None, cursor_col: int = 0) -> None:
+        """Start editing the label.
+
+        Args:
+            text: Initial text for editor, or None to use current value
+            cursor_col: Column position for cursor
+        """
+        if self._editing:
+            return
         self._editing = True
+        edit_text = self._value if text is None else text
         static = self.query_one(Static)
         static.remove()
-        text_area = _EditArea(self._value, soft_wrap=True, compact=True)
+        text_area = _EditArea(edit_text, soft_wrap=True, compact=True)
         text_area.cursor_type = "line"
         self.mount(text_area)
         text_area.focus()
-        col = min(click_x, len(self._value))
+        col = min(cursor_col, len(edit_text))
         text_area.cursor_location = (0, col)
 
     def _stop_editing(self, save: bool) -> None:

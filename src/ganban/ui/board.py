@@ -99,7 +99,10 @@ class AddColumnWidget(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel("+", classes="column-header")
+        yield EditableLabel("+", click_to_edit=False, classes="column-header")
+
+    def on_click(self) -> None:
+        self.query_one(EditableLabel).start_editing(text="")
 
     def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
         event.stop()
