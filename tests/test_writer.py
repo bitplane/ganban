@@ -1,11 +1,19 @@
 """Tests for board writer."""
 
+from pathlib import Path
+
 import pytest
 from git import Repo
 
 from ganban.loader import load_board
 from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
-from ganban.writer import MergeRequired, check_for_merge, save_board, try_auto_merge
+from ganban.writer import (
+    MergeRequired,
+    check_for_merge,
+    check_remote_for_merge,
+    save_board,
+    try_auto_merge,
+)
 
 
 @pytest.fixture
@@ -376,6 +384,46 @@ def test_check_for_merge_new_branch(empty_repo):
     assert result is None
 
 
+def test_check_for_merge_no_board_commit(repo_with_ganban):
+    """No merge check when board has no commit (fresh board)."""
+    board = Board(repo_path=str(repo_with_ganban))
+    # board.commit is empty string (default)
+
+    result = check_for_merge(board)
+
+    assert result is None
+
+
+def test_check_for_merge_unrelated_histories(repo_with_ganban):
+    """No merge when histories have no common ancestor."""
+    # Load board from existing ganban branch
+    board = load_board(repo_with_ganban)
+
+    # Create a new orphan branch (unrelated history)
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("--orphan", "unrelated")
+    repo.git.rm("-rf", ".", "--cached")
+    repo.git.clean("-fd")
+
+    all_dir = repo_with_ganban / ".all"
+    all_dir.mkdir()
+    (all_dir / "999.md").write_text("# Unrelated ticket\n")
+    backlog = repo_with_ganban / "1.backlog"
+    backlog.mkdir()
+
+    repo.git.add("-A")
+    repo.index.commit("Unrelated commit")
+
+    # Update ganban ref to point to unrelated branch
+    unrelated_commit = repo.head.commit.hexsha
+    repo.git.update_ref("refs/heads/ganban", unrelated_commit)
+
+    # Now check_for_merge should find no common ancestor
+    result = check_for_merge(board)
+
+    assert result is None  # No common ancestor
+
+
 # --- Auto-merge tests ---
 
 
@@ -481,3 +529,203 @@ def test_manual_merge_after_conflict(repo_with_ganban):
 
     loaded = load_board(repo_with_ganban)
     assert loaded.tickets["001"].content.body == "Manually resolved."
+
+
+# --- Remote merge tests ---
+
+
+@pytest.fixture
+def repo_with_remote(tmp_path):
+    """Create a repo with a ganban branch and a 'remote' repo."""
+    # Create the "remote" repo (bare)
+    remote_path = tmp_path / "remote.git"
+    Repo.init(remote_path, bare=True)
+
+    # Create local repo
+    local_path = tmp_path / "local"
+    local_path.mkdir()
+    local_repo = Repo.init(local_path)
+
+    # Initial commit on main
+    (local_path / ".gitkeep").write_text("")
+    local_repo.index.add([".gitkeep"])
+    local_repo.index.commit("Initial commit")
+
+    # Create ganban branch with content
+    local_repo.git.checkout("--orphan", "ganban")
+    local_repo.git.rm("-rf", ".", "--cached")
+    local_repo.git.clean("-fd")
+
+    all_dir = local_path / ".all"
+    all_dir.mkdir()
+    (all_dir / "001.md").write_text("# First ticket\n\nDescription.\n")
+
+    backlog = local_path / "1.backlog"
+    backlog.mkdir()
+    (backlog / "01.first-ticket.md").symlink_to("../.all/001.md")
+
+    local_repo.git.add("-A")
+    local_repo.index.commit("Initial board")
+
+    # Add remote and push
+    local_repo.create_remote("origin", str(remote_path))
+    local_repo.git.push("origin", "ganban")
+
+    return local_path, remote_path
+
+
+def test_check_remote_no_changes(repo_with_remote):
+    """No merge needed when remote hasn't changed."""
+    local_path, _ = repo_with_remote
+    board = load_board(local_path)
+
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is None
+
+
+def test_check_remote_no_board_commit(repo_with_remote):
+    """No merge check when board has no commit."""
+    local_path, _ = repo_with_remote
+    board = Board(repo_path=str(local_path))
+    # board.commit is empty
+
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is None
+
+
+def test_check_remote_tracking_branch_missing(repo_with_ganban):
+    """No merge when remote tracking branch doesn't exist."""
+    board = load_board(repo_with_ganban)
+
+    # No remote configured, so origin/ganban doesn't exist
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is None
+
+
+def test_check_remote_unrelated_histories(repo_with_remote):
+    """No merge when remote has unrelated history."""
+    local_path, remote_path = repo_with_remote
+    board = load_board(local_path)
+
+    # Create unrelated history on remote by creating a fresh repo,
+    # adding content, and pushing to the remote
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as other_path:
+        # Initialize fresh repo (unrelated history)
+        other_repo = Repo.init(other_path)
+
+        all_dir = Path(other_path) / ".all"
+        all_dir.mkdir()
+        (all_dir / "999.md").write_text("# Unrelated\n")
+        backlog = Path(other_path) / "1.backlog"
+        backlog.mkdir()
+        (backlog / ".gitkeep").write_text("")
+
+        other_repo.git.add("-A")
+        other_repo.index.commit("Unrelated history")
+
+        # Add remote and force push to replace ganban branch
+        other_repo.create_remote("origin", str(remote_path))
+        other_repo.git.push("origin", "HEAD:ganban", "--force")
+
+    # Fetch the new unrelated history
+    local_repo = Repo(local_path)
+    local_repo.remotes.origin.fetch()
+
+    # Now check_remote_for_merge should find no common ancestor
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is None
+
+
+def test_check_remote_has_changes(repo_with_remote):
+    """Merge needed when remote has new commits."""
+    local_path, remote_path = repo_with_remote
+    board = load_board(local_path)
+    original_commit = board.commit
+
+    # Simulate someone else pushing to the remote
+    # Clone to a temp location, make changes, push
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as other_path:
+        other_repo = Repo.clone_from(str(remote_path), other_path)
+        other_repo.git.checkout("ganban")
+
+        all_dir = Path(other_path) / ".all"
+        (all_dir / "002.md").write_text("# Remote ticket\n\nAdded by someone else.\n")
+        other_repo.git.add("-A")
+        other_repo.index.commit("Add ticket from remote")
+        other_repo.git.push("origin", "ganban")
+
+    # Fetch in local repo
+    local_repo = Repo(local_path)
+    local_repo.remotes.origin.fetch()
+
+    # Check for remote merge
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is not None
+    assert isinstance(result, MergeRequired)
+    assert result.ours == original_commit
+    assert result.theirs != original_commit
+    assert result.base == original_commit
+
+
+def test_check_remote_we_are_ahead(repo_with_remote):
+    """No merge needed when we are ahead of remote."""
+    local_path, _ = repo_with_remote
+    board = load_board(local_path)
+
+    # Make a local change (don't push)
+    board.tickets["001"].content.body = "Local change."
+    save_board(board)
+
+    # Reload and check
+    board = load_board(local_path)
+    result = check_remote_for_merge(board, remote="origin")
+
+    assert result is None  # Remote is behind, nothing to merge
+
+
+def test_remote_auto_merge(repo_with_remote):
+    """Full flow: fetch, check, auto-merge from remote."""
+    local_path, remote_path = repo_with_remote
+    board = load_board(local_path)
+
+    # Make local change
+    board.tickets["001"].content.body = "Local edit."
+
+    # Simulate remote change (different file)
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as other_path:
+        other_repo = Repo.clone_from(str(remote_path), other_path)
+        other_repo.git.checkout("ganban")
+
+        all_dir = Path(other_path) / ".all"
+        (all_dir / "002.md").write_text("# Remote ticket\n")
+        other_repo.git.add("-A")
+        other_repo.index.commit("Add ticket from remote")
+        other_repo.git.push("origin", "ganban")
+
+    # Fetch
+    local_repo = Repo(local_path)
+    local_repo.remotes.origin.fetch()
+
+    # Check for merge
+    merge_info = check_remote_for_merge(board, remote="origin")
+    assert merge_info is not None
+
+    # Auto-merge should succeed (different files)
+    new_commit = try_auto_merge(board, merge_info, message="Merge remote")
+    assert new_commit is not None
+
+    # Both changes present
+    loaded = load_board(local_path)
+    assert loaded.tickets["001"].content.body == "Local edit."
+    assert "002" in loaded.tickets

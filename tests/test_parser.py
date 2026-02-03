@@ -85,6 +85,19 @@ invalid: yaml: content: [
     assert doc.title == "Title"
 
 
+def test_parse_unclosed_front_matter():
+    """Front-matter that starts with --- but has no closing --- is ignored."""
+    text = """---
+key: value
+# Title
+"""
+    doc = parse_markdown(text)
+    # The unclosed front-matter becomes body content
+    assert doc.meta == {}
+    assert doc.title == "Title"
+    assert "key: value" in doc.body
+
+
 def test_serialize_empty():
     doc = MarkdownDoc()
     assert serialize_markdown(doc) == "\n"

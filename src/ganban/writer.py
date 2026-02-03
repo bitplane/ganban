@@ -56,6 +56,63 @@ def check_for_merge(board: Board, branch: str = BRANCH_NAME) -> MergeRequired | 
     )
 
 
+def check_remote_for_merge(board: Board, remote: str = "origin", branch: str = BRANCH_NAME) -> MergeRequired | None:
+    """Check if a remote has changes that need merging.
+
+    Call this after fetching to see if the remote tracking branch has diverged
+    from the board's current commit.
+
+    Args:
+        board: The current board state
+        remote: Remote name (e.g., "origin")
+        branch: Branch name on the remote
+
+    Returns:
+        MergeRequired if remote has diverged, None if up to date.
+    """
+    repo_path = Path(board.repo_path)
+
+    if not board.commit:
+        return None  # No base commit
+
+    # Get remote tracking branch commit
+    remote_ref = f"refs/remotes/{remote}/{branch}"
+    remote_tip = _get_ref(repo_path, remote_ref)
+
+    if remote_tip is None:
+        return None  # Remote tracking branch doesn't exist
+
+    if remote_tip == board.commit:
+        return None  # Already up to date
+
+    # Find merge base
+    merge_base = _get_merge_base(repo_path, board.commit, remote_tip)
+
+    if merge_base is None:
+        return None  # No common ancestor
+
+    if merge_base == remote_tip:
+        return None  # Remote is behind us, nothing to merge
+
+    return MergeRequired(
+        base=merge_base,
+        ours=board.commit,
+        theirs=remote_tip,
+    )
+
+
+def _get_ref(repo_path: Path, ref: str) -> str | None:
+    """Get the commit hash for any ref, or None if it doesn't exist."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", ref],
+        cwd=repo_path,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.decode("utf-8").strip()
+
+
 def save_board(
     board: Board,
     message: str = "Update board",

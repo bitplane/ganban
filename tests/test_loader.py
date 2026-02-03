@@ -189,3 +189,64 @@ def test_load_board_missing_branch(tmp_path):
 
     with pytest.raises(ValueError, match="Branch 'ganban' not found"):
         load_board(tmp_path)
+
+
+def test_load_board_ignores_non_md_in_all(sample_board):
+    """Non-.md files and subdirs in .all/ are ignored."""
+    repo = Repo(sample_board)
+    all_dir = sample_board / ".all"
+
+    # Add a non-.md file
+    (all_dir / "readme.txt").write_text("ignored")
+    # Add a subdirectory
+    (all_dir / "subdir").mkdir()
+    (all_dir / "subdir" / "nested.md").write_text("# Nested\n")
+
+    repo.git.add("-A")
+    repo.index.commit("Add non-ticket items")
+
+    board = load_board(sample_board)
+
+    # Should still only have the original 3 tickets
+    assert len(board.tickets) == 3
+    assert "readme" not in board.tickets
+    assert "subdir" not in board.tickets
+
+
+def test_load_board_ignores_non_symlinks_in_column(sample_board):
+    """Regular files, subdirs, and non-.md symlinks in columns are ignored."""
+    repo = Repo(sample_board)
+    backlog = sample_board / "1.backlog"
+
+    # Add a regular file (not a symlink)
+    (backlog / "02.regular-file.md").write_text("# Not a symlink\n")
+    # Add a symlink without .md extension
+    (backlog / "03.no-extension").symlink_to("../.all/002.md")
+    # Add a subdirectory (Tree in git)
+    (backlog / "subdir").mkdir()
+    (backlog / "subdir" / "nested.md").write_text("# Nested\n")
+
+    repo.git.add("-A")
+    repo.index.commit("Add non-symlink items")
+
+    board = load_board(sample_board)
+
+    # Backlog should only have the original symlink
+    assert len(board.columns[0].links) == 1
+
+
+def test_load_board_ignores_invalid_link_names(sample_board):
+    """Symlinks without position prefix are ignored."""
+    repo = Repo(sample_board)
+    backlog = sample_board / "1.backlog"
+
+    # Add symlink without position prefix
+    (backlog / "no-position.md").symlink_to("../.all/002.md")
+
+    repo.git.add("-A")
+    repo.index.commit("Add invalid link name")
+
+    board = load_board(sample_board)
+
+    # Backlog should only have the original symlink
+    assert len(board.columns[0].links) == 1
