@@ -51,7 +51,10 @@ class ColumnWidget(Vertical):
     }
     .column-header {
         width: 100%;
-        height: 1;
+        height: auto;
+    }
+    .column-header > Static {
+        width: 100%;
         text-align: center;
         text-style: bold;
     }
@@ -67,7 +70,7 @@ class ColumnWidget(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield Static(self.column.name, classes="column-header")
+        yield EditableLabel(self.column.name, classes="column-header")
         with VerticalScroll(classes="column-body"):
             for link in self.column.links:
                 ticket = self.board.tickets.get(link.ticket_id)
@@ -86,8 +89,11 @@ class BoardScreen(Screen):
     }
     #board-header {
         width: 100%;
-        height: 1;
+        height: auto;
         background: $primary;
+    }
+    #board-header > Static {
+        width: 100%;
         text-align: center;
         text-style: bold;
     }
@@ -109,7 +115,7 @@ class BoardScreen(Screen):
 
     def compose(self) -> ComposeResult:
         title = self.board.content.title or "ganban"
-        yield Static(title, id="board-header")
+        yield EditableLabel(title, id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
 

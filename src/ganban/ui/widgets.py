@@ -3,7 +3,32 @@
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
-from textual.widgets import Input, Static
+from textual.widgets import Static, TextArea
+
+
+class _EditArea(TextArea):
+    """TextArea that emits Submit on Enter instead of inserting newline."""
+
+    class Submit(Message):
+        """Emitted when Enter is pressed."""
+
+    class Cancel(Message):
+        """Emitted when Escape is pressed."""
+
+    def _on_key(self, event) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            event.stop()
+            self.post_message(self.Submit())
+        elif event.key == "escape":
+            event.prevent_default()
+            event.stop()
+            self.post_message(self.Cancel())
+        else:
+            super()._on_key(event)
+
+    def on_blur(self) -> None:
+        self.post_message(self.Submit())
 
 
 class EditableLabel(Container):
@@ -17,8 +42,9 @@ class EditableLabel(Container):
     EditableLabel > Static {
         width: 100%;
     }
-    EditableLabel > Input {
+    EditableLabel > TextArea {
         width: 100%;
+        height: auto;
         border: none;
         padding: 0;
     }
@@ -55,25 +81,28 @@ class EditableLabel(Container):
     def compose(self) -> ComposeResult:
         yield Static(self._value)
 
-    def on_click(self) -> None:
+    def on_click(self, event) -> None:
         if not self._editing:
-            self._start_editing()
+            self._start_editing(event.x)
 
-    def _start_editing(self) -> None:
+    def _start_editing(self, click_x: int = 0) -> None:
         self._editing = True
         static = self.query_one(Static)
         static.remove()
-        input_widget = Input(value=self._value, compact=True)
-        self.mount(input_widget)
-        input_widget.focus()
+        text_area = _EditArea(self._value, soft_wrap=True, compact=True)
+        text_area.cursor_type = "line"
+        self.mount(text_area)
+        text_area.focus()
+        col = min(click_x, len(self._value))
+        text_area.cursor_location = (0, col)
 
     def _stop_editing(self, save: bool) -> None:
         if not self._editing:
             return
         self._editing = False
-        input_widget = self.query_one(Input)
-        new_value = self._clean(input_widget.value)
-        input_widget.remove()
+        text_area = self.query_one(_EditArea)
+        new_value = self._clean(text_area.text)
+        text_area.remove()
         self.mount(Static(self._value if not save else new_value))
 
         if save and new_value != self._value:
@@ -81,13 +110,8 @@ class EditableLabel(Container):
             self._value = new_value
             self.post_message(self.Changed(old_value, new_value))
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        event.stop()
+    def on__edit_area_submit(self) -> None:
         self._stop_editing(save=True)
 
-    def on_input_blurred(self, event: Input.Blurred) -> None:
-        self._stop_editing(save=True)
-
-    def key_escape(self) -> None:
-        if self._editing:
-            self._stop_editing(save=False)
+    def on__edit_area_cancel(self) -> None:
+        self._stop_editing(save=False)
