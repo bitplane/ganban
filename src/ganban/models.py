@@ -13,7 +13,6 @@ class MarkdownDoc:
     sections: dict[str, str] = field(default_factory=dict)
     meta: dict[str, Any] = field(default_factory=dict)
     raw: str = ""
-    mtime: float = 0.0
     conflict: bool = False
 
 
@@ -54,6 +53,7 @@ class Board:
     """The full board state."""
 
     repo_path: str = ""
+    commit: str = ""
     columns: list[Column] = field(default_factory=list)
     tickets: dict[str, Ticket] = field(default_factory=dict)
     content: MarkdownDoc = field(default_factory=MarkdownDoc)
