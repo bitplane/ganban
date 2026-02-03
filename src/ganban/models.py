@@ -13,6 +13,8 @@ class MarkdownDoc:
     sections: dict[str, str] = field(default_factory=dict)
     meta: dict[str, Any] = field(default_factory=dict)
     raw: str = ""
+    mtime: float = 0.0
+    conflict: bool = False
 
 
 @dataclass
