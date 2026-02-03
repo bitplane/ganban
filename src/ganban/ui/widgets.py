@@ -6,6 +6,12 @@ from textual.message import Message
 from textual.widgets import Static, TextArea
 
 
+class _NonSelectableStatic(Static):
+    """Static that doesn't allow text selection."""
+
+    ALLOW_SELECT = False
+
+
 class _EditArea(TextArea):
     """TextArea that emits Submit on Enter instead of inserting newline."""
 
@@ -80,7 +86,7 @@ class EditableLabel(Container):
             self.query_one(Static).update(self._value)
 
     def compose(self) -> ComposeResult:
-        yield Static(self._value)
+        yield _NonSelectableStatic(self._value)
 
     def on_click(self, event) -> None:
         if self._click_to_edit and not self._editing:
@@ -113,7 +119,7 @@ class EditableLabel(Container):
         text_area = self.query_one(_EditArea)
         new_value = self._clean(text_area.text)
         text_area.remove()
-        self.mount(Static(self._value if not save else new_value))
+        self.mount(_NonSelectableStatic(self._value if not save else new_value))
 
         if save and new_value != self._value:
             old_value = self._value
