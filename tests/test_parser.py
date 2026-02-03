@@ -1,6 +1,7 @@
 """Tests for markdown parser."""
 
-from ganban.parser import parse_markdown
+from ganban.models import MarkdownDoc
+from ganban.parser import parse_markdown, serialize_markdown
 
 
 def test_parse_empty():
@@ -82,3 +83,73 @@ invalid: yaml: content: [
     doc = parse_markdown(text)
     assert doc.meta == {}
     assert doc.title == "Title"
+
+
+def test_serialize_empty():
+    doc = MarkdownDoc()
+    assert serialize_markdown(doc) == "\n"
+
+
+def test_serialize_title_only():
+    doc = MarkdownDoc(title="My Title")
+    assert serialize_markdown(doc) == "# My Title\n"
+
+
+def test_serialize_title_and_body():
+    doc = MarkdownDoc(title="My Title", body="Some body text.")
+    assert serialize_markdown(doc) == "# My Title\n\nSome body text.\n"
+
+
+def test_serialize_sections():
+    doc = MarkdownDoc(
+        title="Title",
+        body="Body.",
+        sections={"Notes": "Some notes.", "Comments": "A comment."},
+    )
+    result = serialize_markdown(doc)
+    assert "# Title" in result
+    assert "Body." in result
+    assert "## Notes" in result
+    assert "Some notes." in result
+    assert "## Comments" in result
+
+
+def test_serialize_front_matter():
+    doc = MarkdownDoc(
+        title="Title",
+        body="Body.",
+        meta={"tags": ["one", "two"], "color": "red"},
+    )
+    result = serialize_markdown(doc)
+    assert result.startswith("---\n")
+    assert "tags:" in result
+    assert "- one" in result
+    assert "color: red" in result
+
+
+def test_roundtrip():
+    original = """---
+tags:
+- alpha
+- beta
+---
+# Test Title
+
+This is the body.
+
+## Notes
+
+Some notes here.
+
+## Links
+
+- link one
+"""
+    doc = parse_markdown(original)
+    result = serialize_markdown(doc)
+    doc2 = parse_markdown(result)
+
+    assert doc2.title == doc.title
+    assert doc2.body == doc.body
+    assert doc2.sections == doc.sections
+    assert doc2.meta == doc.meta

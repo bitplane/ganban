@@ -61,6 +61,38 @@ def parse_markdown(text: str) -> MarkdownDoc:
     )
 
 
+def serialize_markdown(doc: MarkdownDoc) -> str:
+    """Serialize a MarkdownDoc back to markdown text."""
+    parts: list[str] = []
+
+    # Front-matter
+    if doc.meta:
+        parts.append("---")
+        parts.append(yaml.dump(doc.meta, default_flow_style=False, sort_keys=False).rstrip())
+        parts.append("---")
+        parts.append("")
+
+    # Title
+    if doc.title:
+        parts.append(f"# {doc.title}")
+        parts.append("")
+
+    # Body
+    if doc.body:
+        parts.append(doc.body)
+        parts.append("")
+
+    # Sections
+    for heading, content in doc.sections.items():
+        parts.append(f"## {heading}")
+        parts.append("")
+        if content:
+            parts.append(content)
+            parts.append("")
+
+    return "\n".join(parts).rstrip() + "\n"
+
+
 def _extract_front_matter(text: str) -> tuple[str, dict]:
     """Extract YAML front-matter from text. Returns (remaining_text, meta)."""
     if not text.startswith("---"):
