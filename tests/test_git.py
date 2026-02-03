@@ -3,7 +3,7 @@
 import pytest
 from git import Repo
 
-from ganban.git import fetch, get_remotes, push
+from ganban.git import create_orphan_branch, fetch, get_remotes, push
 
 
 @pytest.fixture
@@ -79,3 +79,27 @@ async def test_push(temp_repo_with_remote):
     remote_repo = repo.remotes.origin
     remote_repo.fetch()
     assert "origin/ganban" in [ref.name for ref in repo.refs]
+
+
+@pytest.mark.asyncio
+async def test_create_orphan_branch(temp_repo):
+    """Create an orphan branch without touching working tree."""
+    repo = Repo(temp_repo)
+
+    # Verify ganban branch doesn't exist yet
+    assert "ganban" not in [h.name for h in repo.heads]
+
+    # Create the orphan branch
+    commit = await create_orphan_branch(temp_repo)
+
+    # Branch should exist now
+    assert "ganban" in [h.name for h in repo.heads]
+    assert len(commit) == 40
+
+    # Should be an orphan (no parents)
+    ganban_commit = repo.commit("ganban")
+    assert ganban_commit.parents == ()
+
+    # Working tree should be unchanged (still on master with README)
+    assert repo.active_branch.name == "master"
+    assert (temp_repo / "README.md").exists()

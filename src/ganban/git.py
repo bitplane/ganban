@@ -40,3 +40,26 @@ async def push(repo_path: str | Path, remote_name: str, branch: str = "ganban") 
         remote.push(branch)
 
     await asyncio.to_thread(_push)
+
+
+async def create_orphan_branch(repo_path: str | Path, branch: str = "ganban") -> str:
+    """Create an orphan branch with an empty commit.
+
+    Does not touch the working tree. Returns the commit hash.
+    """
+
+    def _create():
+        repo = _get_repo(repo_path)
+
+        # Create empty tree
+        empty_tree = repo.git.hash_object("-t", "tree", "/dev/null")
+
+        # Create commit with no parents
+        commit = repo.git.commit_tree(empty_tree, m="Initialize ganban board")
+
+        # Create the branch ref
+        repo.git.update_ref(f"refs/heads/{branch}", commit)
+
+        return commit
+
+    return await asyncio.to_thread(_create)
