@@ -3,7 +3,7 @@
 import pytest
 from git import Repo
 
-from ganban.git import fetch, get_remotes
+from ganban.git import fetch, get_remotes, push
 
 
 @pytest.fixture
@@ -59,3 +59,23 @@ async def test_get_remotes_with_remotes(temp_repo_with_remote):
 async def test_fetch(temp_repo_with_remote):
     # Just verify it doesn't raise - the remote is empty but valid
     await fetch(temp_repo_with_remote, "origin")
+
+
+@pytest.mark.asyncio
+async def test_push(temp_repo_with_remote):
+    """Push a branch to a remote."""
+    repo = Repo(temp_repo_with_remote)
+
+    # Create a branch to push
+    repo.git.checkout("-b", "ganban")
+    (temp_repo_with_remote / "board.md").write_text("# Board")
+    repo.index.add(["board.md"])
+    repo.index.commit("Add board")
+
+    # Push the branch
+    await push(temp_repo_with_remote, "origin", "ganban")
+
+    # Verify it was pushed by fetching and checking ref exists
+    remote_repo = repo.remotes.origin
+    remote_repo.fetch()
+    assert "origin/ganban" in [ref.name for ref in repo.refs]

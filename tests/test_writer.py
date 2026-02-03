@@ -11,6 +11,8 @@ from ganban.writer import (
     MergeRequired,
     check_for_merge,
     check_remote_for_merge,
+    create_column,
+    create_ticket,
     save_board,
     try_auto_merge,
 )
@@ -729,3 +731,131 @@ def test_remote_auto_merge(repo_with_remote):
     loaded = load_board(local_path)
     assert loaded.tickets["001"].content.body == "Local edit."
     assert "002" in loaded.tickets
+
+
+# --- create_ticket tests ---
+
+
+def test_create_ticket_basic(repo_with_ganban):
+    """Create a ticket with default options."""
+    board = load_board(repo_with_ganban)
+    original_count = len(board.tickets)
+
+    ticket = create_ticket(board, "New ticket", "Description here")
+
+    assert ticket.id == "2"  # Next after 001
+    assert ticket.content.title == "New ticket"
+    assert ticket.content.body == "Description here"
+    assert ticket.id in board.tickets
+    assert len(board.tickets) == original_count + 1
+
+    # Should be added to first column
+    assert board.columns[0].links[-1].ticket_id == "2"
+
+
+def test_create_ticket_specific_column(repo_with_ganban):
+    """Create a ticket in a specific column."""
+    board = load_board(repo_with_ganban)
+    # Add a second column first
+    doing_column = create_column(board, "Doing")
+
+    ticket = create_ticket(board, "In progress task", column=doing_column)
+
+    assert ticket.id in board.tickets
+    assert doing_column.links[-1].ticket_id == ticket.id
+
+
+def test_create_ticket_specific_position(repo_with_ganban):
+    """Create a ticket at a specific position in column."""
+    board = load_board(repo_with_ganban)
+    backlog = board.columns[0]
+    original_first = backlog.links[0].ticket_id
+
+    ticket = create_ticket(board, "Top priority", column=backlog, position=0)
+
+    assert backlog.links[0].ticket_id == ticket.id
+    assert backlog.links[1].ticket_id == original_first
+
+
+def test_create_ticket_empty_board(empty_repo):
+    """Create a ticket on an empty board."""
+    board = Board(repo_path=str(empty_repo))
+    board.columns = [Column(order="1", name="Backlog", path="1.backlog")]
+
+    ticket = create_ticket(board, "First ticket")
+
+    assert ticket.id == "001"
+    assert ticket.id in board.tickets
+    assert board.columns[0].links[0].ticket_id == "001"
+
+
+def test_create_ticket_saves(repo_with_ganban):
+    """Created tickets persist after save."""
+    board = load_board(repo_with_ganban)
+
+    ticket = create_ticket(board, "Persistent ticket", "Will be saved")
+    save_board(board)
+
+    loaded = load_board(repo_with_ganban)
+    assert ticket.id in loaded.tickets
+    assert loaded.tickets[ticket.id].content.title == "Persistent ticket"
+
+
+# --- create_column tests ---
+
+
+def test_create_column_basic(repo_with_ganban):
+    """Create a column with default order."""
+    board = load_board(repo_with_ganban)
+    original_count = len(board.columns)
+
+    column = create_column(board, "Archive")
+
+    assert column.name == "Archive"
+    assert column.order == "2"  # After 1 (backlog)
+    assert column.path == "2.archive"
+    assert column.hidden is False
+    assert len(board.columns) == original_count + 1
+
+
+def test_create_column_specific_order(repo_with_ganban):
+    """Create a column with specific order."""
+    board = load_board(repo_with_ganban)
+
+    column = create_column(board, "Priority", order="0")
+
+    assert column.order == "0"
+    assert column.path == "0.priority"
+    # Should be sorted to first position
+    assert board.columns[0].order == "0"
+
+
+def test_create_column_hidden(repo_with_ganban):
+    """Create a hidden column."""
+    board = load_board(repo_with_ganban)
+
+    column = create_column(board, "Hidden", hidden=True)
+
+    assert column.hidden is True
+    assert column.path.startswith(".")
+
+
+def test_create_column_empty_board(empty_repo):
+    """Create first column on empty board."""
+    board = Board(repo_path=str(empty_repo))
+
+    column = create_column(board, "Backlog")
+
+    assert column.order == "1"
+    assert len(board.columns) == 1
+
+
+def test_create_column_saves(repo_with_ganban):
+    """Created columns persist after save."""
+    board = load_board(repo_with_ganban)
+
+    create_column(board, "Archive")
+    save_board(board)
+
+    loaded = load_board(repo_with_ganban)
+    assert any(c.name == "Archive" for c in loaded.columns)

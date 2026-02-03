@@ -1,11 +1,13 @@
 """Save a ganban board to git without touching the working tree."""
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from ganban.ids import max_id, next_id
 from ganban.loader import BRANCH_NAME
-from ganban.models import Board, Column, Ticket
+from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
 from ganban.parser import serialize_markdown
 
 
@@ -357,3 +359,95 @@ def _git(repo_path: Path, args: list[str]) -> str:
         check=True,
     )
     return result.stdout.decode("utf-8").strip()
+
+
+# --- Board manipulation helpers ---
+
+
+def create_ticket(
+    board: Board,
+    title: str,
+    body: str = "",
+    column: Column | None = None,
+    position: int | None = None,
+) -> Ticket:
+    """Create a new ticket and add it to the board.
+
+    Args:
+        board: The board to add the ticket to
+        title: Ticket title
+        body: Ticket body text
+        column: Column to add the ticket to (default: first column)
+        position: Position in column (default: end of column)
+
+    Returns:
+        The created Ticket
+    """
+    ticket_id = next_id(max_id(list(board.tickets.keys())))
+    ticket = Ticket(
+        id=ticket_id,
+        path=f".all/{ticket_id}.md",
+        content=MarkdownDoc(title=title, body=body),
+    )
+    board.tickets[ticket_id] = ticket
+
+    # Add to column
+    target_column = column or (board.columns[0] if board.columns else None)
+    if target_column:
+        slug = _slugify(title)
+        link = TicketLink(
+            ticket_id=ticket_id,
+            position=position if position is not None else len(target_column.links) + 1,
+            slug=slug,
+        )
+        if position is not None:
+            target_column.links.insert(position, link)
+        else:
+            target_column.links.append(link)
+
+    return ticket
+
+
+def create_column(
+    board: Board,
+    name: str,
+    order: str | None = None,
+    hidden: bool = False,
+) -> Column:
+    """Create a new column and add it to the board.
+
+    Args:
+        board: The board to add the column to
+        name: Column display name
+        order: Sort order prefix (default: auto-increment from highest)
+        hidden: Whether column is hidden (prefix with .)
+
+    Returns:
+        The created Column
+    """
+    if order is None:
+        existing_orders = [c.order for c in board.columns]
+        order = next_id(max_id(existing_orders)) if existing_orders else "1"
+
+    slug = _slugify(name)
+    path = f".{order}.{slug}" if hidden else f"{order}.{slug}"
+
+    column = Column(
+        order=order,
+        name=name,
+        path=path,
+        hidden=hidden,
+        content=MarkdownDoc(),
+    )
+    board.columns.append(column)
+    board.columns.sort(key=lambda c: c.order.zfill(10))
+
+    return column
+
+
+def _slugify(text: str) -> str:
+    """Convert text to a URL-friendly slug."""
+    slug = text.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "untitled"

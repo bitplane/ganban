@@ -29,3 +29,14 @@ async def fetch(repo_path: str | Path, remote_name: str) -> None:
         remote.fetch()
 
     await asyncio.to_thread(_fetch)
+
+
+async def push(repo_path: str | Path, remote_name: str, branch: str = "ganban") -> None:
+    """Push a branch to a remote."""
+
+    def _push():
+        repo = _get_repo(repo_path)
+        remote = repo.remote(remote_name)
+        remote.push(branch)
+
+    await asyncio.to_thread(_push)
