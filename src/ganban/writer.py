@@ -1,5 +1,6 @@
 """Save a ganban board to git without touching the working tree."""
 
+import asyncio
 import re
 import subprocess
 from dataclasses import dataclass
@@ -115,7 +116,7 @@ def _get_ref(repo_path: Path, ref: str) -> str | None:
     return result.stdout.decode("utf-8").strip()
 
 
-def save_board(
+async def save_board(
     board: Board,
     message: str = "Update board",
     branch: str = BRANCH_NAME,
@@ -135,6 +136,16 @@ def save_board(
     Returns:
         The new commit hash
     """
+    return await asyncio.to_thread(_save_board_sync, board, message, branch, parents)
+
+
+def _save_board_sync(
+    board: Board,
+    message: str,
+    branch: str,
+    parents: list[str] | None,
+) -> str:
+    """Synchronous implementation of save_board."""
     repo_path = Path(board.repo_path)
 
     # Build tree from board state

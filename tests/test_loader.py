@@ -117,8 +117,9 @@ def test_parse_link_name_no_prefix():
     assert position is None
 
 
-def test_load_board_tickets(sample_board):
-    board = load_board(sample_board)
+@pytest.mark.asyncio
+async def test_load_board_tickets(sample_board):
+    board = await load_board(sample_board)
 
     assert len(board.tickets) == 3
     assert "001" in board.tickets
@@ -129,8 +130,9 @@ def test_load_board_tickets(sample_board):
     assert board.tickets["003"].content.meta.get("tags") == ["urgent"]
 
 
-def test_load_board_columns(sample_board):
-    board = load_board(sample_board)
+@pytest.mark.asyncio
+async def test_load_board_columns(sample_board):
+    board = await load_board(sample_board)
 
     assert len(board.columns) == 3
     assert board.columns[0].name == "Backlog"
@@ -138,8 +140,9 @@ def test_load_board_columns(sample_board):
     assert board.columns[2].name == "Done"
 
 
-def test_load_board_links(sample_board):
-    board = load_board(sample_board)
+@pytest.mark.asyncio
+async def test_load_board_links(sample_board):
+    board = await load_board(sample_board)
 
     backlog = board.columns[0]
     assert len(backlog.links) == 1
@@ -151,7 +154,8 @@ def test_load_board_links(sample_board):
     assert doing.links[1].ticket_id == "003"
 
 
-def test_load_board_broken_link(sample_board):
+@pytest.mark.asyncio
+async def test_load_board_broken_link(sample_board):
     # Add a broken symlink to the repo
     repo = Repo(sample_board)
     backlog = sample_board / "1.backlog"
@@ -159,7 +163,7 @@ def test_load_board_broken_link(sample_board):
     repo.git.add("-A")
     repo.index.commit("Add broken link")
 
-    board = load_board(sample_board)
+    board = await load_board(sample_board)
 
     backlog_col = board.columns[0]
     broken = [link for link in backlog_col.links if link.broken]
@@ -167,31 +171,35 @@ def test_load_board_broken_link(sample_board):
     assert broken[0].ticket_id == "999"
 
 
-def test_load_board_root_content(sample_board):
-    board = load_board(sample_board)
+@pytest.mark.asyncio
+async def test_load_board_root_content(sample_board):
+    board = await load_board(sample_board)
 
     assert board.content.title == "My Project Board"
     assert board.content.body == "Board description."
 
 
-def test_load_board_commit_set(sample_board):
-    board = load_board(sample_board)
+@pytest.mark.asyncio
+async def test_load_board_commit_set(sample_board):
+    board = await load_board(sample_board)
 
     assert board.commit != ""
     assert len(board.commit) == 40  # SHA length
 
 
-def test_load_board_missing_branch(tmp_path):
+@pytest.mark.asyncio
+async def test_load_board_missing_branch(tmp_path):
     repo = Repo.init(tmp_path)
     (tmp_path / ".gitkeep").write_text("")
     repo.index.add([".gitkeep"])
     repo.index.commit("Initial")
 
     with pytest.raises(ValueError, match="Branch 'ganban' not found"):
-        load_board(tmp_path)
+        await load_board(tmp_path)
 
 
-def test_load_board_ignores_non_md_in_all(sample_board):
+@pytest.mark.asyncio
+async def test_load_board_ignores_non_md_in_all(sample_board):
     """Non-.md files and subdirs in .all/ are ignored."""
     repo = Repo(sample_board)
     all_dir = sample_board / ".all"
@@ -205,7 +213,7 @@ def test_load_board_ignores_non_md_in_all(sample_board):
     repo.git.add("-A")
     repo.index.commit("Add non-ticket items")
 
-    board = load_board(sample_board)
+    board = await load_board(sample_board)
 
     # Should still only have the original 3 tickets
     assert len(board.tickets) == 3
@@ -213,7 +221,8 @@ def test_load_board_ignores_non_md_in_all(sample_board):
     assert "subdir" not in board.tickets
 
 
-def test_load_board_ignores_non_symlinks_in_column(sample_board):
+@pytest.mark.asyncio
+async def test_load_board_ignores_non_symlinks_in_column(sample_board):
     """Regular files, subdirs, and non-.md symlinks in columns are ignored."""
     repo = Repo(sample_board)
     backlog = sample_board / "1.backlog"
@@ -229,13 +238,14 @@ def test_load_board_ignores_non_symlinks_in_column(sample_board):
     repo.git.add("-A")
     repo.index.commit("Add non-symlink items")
 
-    board = load_board(sample_board)
+    board = await load_board(sample_board)
 
     # Backlog should only have the original symlink
     assert len(board.columns[0].links) == 1
 
 
-def test_load_board_ignores_invalid_link_names(sample_board):
+@pytest.mark.asyncio
+async def test_load_board_ignores_invalid_link_names(sample_board):
     """Symlinks without position prefix are ignored."""
     repo = Repo(sample_board)
     backlog = sample_board / "1.backlog"
@@ -246,7 +256,7 @@ def test_load_board_ignores_invalid_link_names(sample_board):
     repo.git.add("-A")
     repo.index.commit("Add invalid link name")
 
-    board = load_board(sample_board)
+    board = await load_board(sample_board)
 
     # Backlog should only have the original symlink
     assert len(board.columns[0].links) == 1

@@ -52,7 +52,8 @@ def repo_with_ganban(empty_repo):
     return empty_repo
 
 
-def test_save_new_board(empty_repo):
+@pytest.mark.asyncio
+async def test_save_new_board(empty_repo):
     """Save a board to a fresh repo creates the branch."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -73,21 +74,22 @@ def test_save_new_board(empty_repo):
         ),
     ]
 
-    new_commit = save_board(board, message="Create board")
+    new_commit = await save_board(board, message="Create board")
 
     assert len(new_commit) == 40
 
     # Verify we can load it back
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     assert len(loaded.tickets) == 1
     assert loaded.tickets["001"].content.title == "Test ticket"
     assert len(loaded.columns) == 1
     assert loaded.columns[0].links[0].ticket_id == "001"
 
 
-def test_save_updates_existing_board(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_save_updates_existing_board(repo_with_ganban):
     """Save modifications to an existing board."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     original_commit = board.commit
 
     # Add a new ticket
@@ -109,7 +111,7 @@ def test_save_updates_existing_board(repo_with_ganban):
         )
     )
 
-    new_commit = save_board(board, message="Add ticket and column")
+    new_commit = await save_board(board, message="Add ticket and column")
 
     assert new_commit != original_commit
 
@@ -119,7 +121,8 @@ def test_save_updates_existing_board(repo_with_ganban):
     assert commit.parents[0].hexsha == original_commit
 
 
-def test_save_board_with_root_index(empty_repo):
+@pytest.mark.asyncio
+async def test_save_board_with_root_index(empty_repo):
     """Board with root index.md is saved correctly."""
     board = Board(
         repo_path=str(empty_repo),
@@ -135,14 +138,15 @@ def test_save_board_with_root_index(empty_repo):
         Column(order="1", name="Backlog", path="1.backlog"),
     ]
 
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     assert loaded.content.title == "My Board"
     assert loaded.content.body == "Board description."
 
 
-def test_save_board_with_column_index(empty_repo):
+@pytest.mark.asyncio
+async def test_save_board_with_column_index(empty_repo):
     """Column with index.md is saved correctly."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -157,14 +161,15 @@ def test_save_board_with_column_index(empty_repo):
         ),
     ]
 
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     assert loaded.columns[0].content.title == "Backlog"
     assert loaded.columns[0].content.body == "Column description."
 
 
-def test_save_preserves_ticket_metadata(empty_repo):
+@pytest.mark.asyncio
+async def test_save_preserves_ticket_metadata(empty_repo):
     """Ticket front-matter is preserved through save/load cycle."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -181,16 +186,17 @@ def test_save_preserves_ticket_metadata(empty_repo):
         Column(order="1", name="Backlog", path="1.backlog"),
     ]
 
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     assert loaded.tickets["001"].content.meta["tags"] == ["urgent", "bug"]
     assert loaded.tickets["001"].content.meta["priority"] == 1
 
 
-def test_save_move_ticket_between_columns(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_save_move_ticket_between_columns(repo_with_ganban):
     """Moving a ticket between columns shows up correctly."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     # Move ticket from backlog to a new done column
     link = board.columns[0].links.pop(0)
@@ -205,30 +211,32 @@ def test_save_move_ticket_between_columns(repo_with_ganban):
         )
     )
 
-    save_board(board, message="Move ticket to done")
+    await save_board(board, message="Move ticket to done")
 
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert len(loaded.columns[0].links) == 0  # Backlog empty
     assert len(loaded.columns[1].links) == 1  # Done has the ticket
     assert loaded.columns[1].links[0].ticket_id == "001"
 
 
-def test_save_delete_ticket(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_save_delete_ticket(repo_with_ganban):
     """Deleting a ticket removes it from .all/"""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     assert "001" in board.tickets
 
     # Remove ticket and its link
     del board.tickets["001"]
     board.columns[0].links = []
 
-    save_board(board, message="Delete ticket")
+    await save_board(board, message="Delete ticket")
 
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert "001" not in loaded.tickets
 
 
-def test_save_reorder_tickets_in_column(empty_repo):
+@pytest.mark.asyncio
+async def test_save_reorder_tickets_in_column(empty_repo):
     """Reordering tickets updates their position prefixes."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -249,23 +257,24 @@ def test_save_reorder_tickets_in_column(empty_repo):
         ),
     ]
 
-    save_board(board)
+    await save_board(board)
 
     # Reorder: move third to first position
-    board = load_board(empty_repo)
+    board = await load_board(empty_repo)
     links = board.columns[0].links
     links[0].position = "02"
     links[1].position = "03"
     links[2].position = "01"
 
-    save_board(board, message="Reorder tickets")
+    await save_board(board, message="Reorder tickets")
 
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     positions = [(link.position, link.ticket_id) for link in loaded.columns[0].links]
     assert positions == [("01", "003"), ("02", "001"), ("03", "002")]
 
 
-def test_save_empty_column(empty_repo):
+@pytest.mark.asyncio
+async def test_save_empty_column(empty_repo):
     """Empty columns are saved correctly."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {}
@@ -274,14 +283,15 @@ def test_save_empty_column(empty_repo):
         Column(order="2", name="Done", path="2.done"),
     ]
 
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(empty_repo)
+    loaded = await load_board(empty_repo)
     assert len(loaded.columns) == 2
     assert all(len(c.links) == 0 for c in loaded.columns)
 
 
-def test_save_returns_valid_commit(empty_repo):
+@pytest.mark.asyncio
+async def test_save_returns_valid_commit(empty_repo):
     """The returned commit hash is valid and points to correct tree."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -291,7 +301,7 @@ def test_save_returns_valid_commit(empty_repo):
         Column(order="1", name="Backlog", path="1.backlog"),
     ]
 
-    commit_sha = save_board(board)
+    commit_sha = await save_board(board)
 
     repo = Repo(empty_repo)
     commit = repo.commit(commit_sha)
@@ -300,7 +310,8 @@ def test_save_returns_valid_commit(empty_repo):
     assert "1.backlog" in commit.tree
 
 
-def test_save_custom_branch(empty_repo):
+@pytest.mark.asyncio
+async def test_save_custom_branch(empty_repo):
     """Can save to a custom branch name."""
     board = Board(repo_path=str(empty_repo))
     board.tickets = {
@@ -310,30 +321,31 @@ def test_save_custom_branch(empty_repo):
         Column(order="1", name="Backlog", path="1.backlog"),
     ]
 
-    save_board(board, branch="my-board")
+    await save_board(board, branch="my-board")
 
     # Should fail on default branch
     with pytest.raises(ValueError, match="Branch 'ganban' not found"):
-        load_board(empty_repo)
+        await load_board(empty_repo)
 
     # Should load from custom branch
-    loaded = load_board(empty_repo, branch="my-board")
+    loaded = await load_board(empty_repo, branch="my-board")
     assert len(loaded.tickets) == 1
 
 
-def test_save_with_explicit_parents(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_save_with_explicit_parents(repo_with_ganban):
     """Can save with explicit parent commits for merge."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     first_commit = board.commit
 
     # Make a change and save
     board.tickets["001"].content.body = "Changed"
-    second_commit = save_board(board)
+    second_commit = await save_board(board)
 
     # Now create a "merge" commit with both as parents
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     board.tickets["001"].content.body = "Merged"
-    merge_commit = save_board(board, message="Merge", parents=[first_commit, second_commit])
+    merge_commit = await save_board(board, message="Merge", parents=[first_commit, second_commit])
 
     repo = Repo(repo_with_ganban)
     commit = repo.commit(merge_commit)
@@ -343,18 +355,20 @@ def test_save_with_explicit_parents(repo_with_ganban):
 # --- Merge detection tests ---
 
 
-def test_check_for_merge_no_changes(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_check_for_merge_no_changes(repo_with_ganban):
     """No merge needed when branch hasn't moved."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     result = check_for_merge(board)
 
     assert result is None
 
 
-def test_check_for_merge_branch_moved(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_check_for_merge_branch_moved(repo_with_ganban):
     """Merge needed when branch has moved."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     original_commit = board.commit
 
     # External change moves the branch
@@ -396,10 +410,11 @@ def test_check_for_merge_no_board_commit(repo_with_ganban):
     assert result is None
 
 
-def test_check_for_merge_unrelated_histories(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_check_for_merge_unrelated_histories(repo_with_ganban):
     """No merge when histories have no common ancestor."""
     # Load board from existing ganban branch
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     # Create a new orphan branch (unrelated history)
     repo = Repo(repo_with_ganban)
@@ -429,9 +444,10 @@ def test_check_for_merge_unrelated_histories(repo_with_ganban):
 # --- Auto-merge tests ---
 
 
-def test_auto_merge_clean(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_auto_merge_clean(repo_with_ganban):
     """Auto-merge succeeds when different files changed."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     original_commit = board.commit
 
     # External change: add new ticket
@@ -460,14 +476,15 @@ def test_auto_merge_clean(repo_with_ganban):
     assert external_commit in parent_shas
 
     # Both changes should be present
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert loaded.tickets["001"].content.body == "Modified description."
     assert "002" in loaded.tickets
 
 
-def test_auto_merge_conflict(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_auto_merge_conflict(repo_with_ganban):
     """Auto-merge fails when same file changed."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     # External change: edit ticket 001
     repo = Repo(repo_with_ganban)
@@ -488,9 +505,10 @@ def test_auto_merge_conflict(repo_with_ganban):
     assert result is None  # Conflict, auto-merge failed
 
 
-def test_manual_merge_after_conflict(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_manual_merge_after_conflict(repo_with_ganban):
     """Manual merge resolution flow."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     ours_commit = board.commit
 
     # External change
@@ -512,14 +530,14 @@ def test_manual_merge_after_conflict(repo_with_ganban):
     assert try_auto_merge(board, merge_info) is None
 
     # Manual resolution: UI would load all 3 boards and let user resolve
-    # base_board = load_board(repo_with_ganban, commit=merge_info.base)
-    # ours_board = load_board(repo_with_ganban, commit=merge_info.ours)
-    # theirs_board = load_board(repo_with_ganban, commit=merge_info.theirs)
+    # base_board = await load_board(repo_with_ganban, commit=merge_info.base)
+    # ours_board = await load_board(repo_with_ganban, commit=merge_info.ours)
+    # theirs_board = await load_board(repo_with_ganban, commit=merge_info.theirs)
     # ... user picks resolution ...
 
     # Save resolved board with both parents
     board.tickets["001"].content.body = "Manually resolved."
-    new_commit = save_board(
+    new_commit = await save_board(
         board,
         message="Resolve conflict",
         parents=[ours_commit, theirs_commit],
@@ -529,7 +547,7 @@ def test_manual_merge_after_conflict(repo_with_ganban):
     commit = repo.commit(new_commit)
     assert len(commit.parents) == 2
 
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert loaded.tickets["001"].content.body == "Manually resolved."
 
 
@@ -576,10 +594,11 @@ def repo_with_remote(tmp_path):
     return local_path, remote_path
 
 
-def test_check_remote_no_changes(repo_with_remote):
+@pytest.mark.asyncio
+async def test_check_remote_no_changes(repo_with_remote):
     """No merge needed when remote hasn't changed."""
     local_path, _ = repo_with_remote
-    board = load_board(local_path)
+    board = await load_board(local_path)
 
     result = check_remote_for_merge(board, remote="origin")
 
@@ -597,9 +616,10 @@ def test_check_remote_no_board_commit(repo_with_remote):
     assert result is None
 
 
-def test_check_remote_tracking_branch_missing(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_check_remote_tracking_branch_missing(repo_with_ganban):
     """No merge when remote tracking branch doesn't exist."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     # No remote configured, so origin/ganban doesn't exist
     result = check_remote_for_merge(board, remote="origin")
@@ -607,10 +627,11 @@ def test_check_remote_tracking_branch_missing(repo_with_ganban):
     assert result is None
 
 
-def test_check_remote_unrelated_histories(repo_with_remote):
+@pytest.mark.asyncio
+async def test_check_remote_unrelated_histories(repo_with_remote):
     """No merge when remote has unrelated history."""
     local_path, remote_path = repo_with_remote
-    board = load_board(local_path)
+    board = await load_board(local_path)
 
     # Create unrelated history on remote by creating a fresh repo,
     # adding content, and pushing to the remote
@@ -644,10 +665,11 @@ def test_check_remote_unrelated_histories(repo_with_remote):
     assert result is None
 
 
-def test_check_remote_has_changes(repo_with_remote):
+@pytest.mark.asyncio
+async def test_check_remote_has_changes(repo_with_remote):
     """Merge needed when remote has new commits."""
     local_path, remote_path = repo_with_remote
-    board = load_board(local_path)
+    board = await load_board(local_path)
     original_commit = board.commit
 
     # Simulate someone else pushing to the remote
@@ -678,26 +700,28 @@ def test_check_remote_has_changes(repo_with_remote):
     assert result.base == original_commit
 
 
-def test_check_remote_we_are_ahead(repo_with_remote):
+@pytest.mark.asyncio
+async def test_check_remote_we_are_ahead(repo_with_remote):
     """No merge needed when we are ahead of remote."""
     local_path, _ = repo_with_remote
-    board = load_board(local_path)
+    board = await load_board(local_path)
 
     # Make a local change (don't push)
     board.tickets["001"].content.body = "Local change."
-    save_board(board)
+    await save_board(board)
 
     # Reload and check
-    board = load_board(local_path)
+    board = await load_board(local_path)
     result = check_remote_for_merge(board, remote="origin")
 
     assert result is None  # Remote is behind, nothing to merge
 
 
-def test_remote_auto_merge(repo_with_remote):
+@pytest.mark.asyncio
+async def test_remote_auto_merge(repo_with_remote):
     """Full flow: fetch, check, auto-merge from remote."""
     local_path, remote_path = repo_with_remote
-    board = load_board(local_path)
+    board = await load_board(local_path)
 
     # Make local change
     board.tickets["001"].content.body = "Local edit."
@@ -728,7 +752,7 @@ def test_remote_auto_merge(repo_with_remote):
     assert new_commit is not None
 
     # Both changes present
-    loaded = load_board(local_path)
+    loaded = await load_board(local_path)
     assert loaded.tickets["001"].content.body == "Local edit."
     assert "002" in loaded.tickets
 
@@ -736,9 +760,10 @@ def test_remote_auto_merge(repo_with_remote):
 # --- create_ticket tests ---
 
 
-def test_create_ticket_basic(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_ticket_basic(repo_with_ganban):
     """Create a ticket with default options."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     original_count = len(board.tickets)
 
     ticket = create_ticket(board, "New ticket", "Description here")
@@ -753,9 +778,10 @@ def test_create_ticket_basic(repo_with_ganban):
     assert board.columns[0].links[-1].ticket_id == "2"
 
 
-def test_create_ticket_specific_column(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_ticket_specific_column(repo_with_ganban):
     """Create a ticket in a specific column."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     # Add a second column first
     doing_column = create_column(board, "Doing")
 
@@ -765,9 +791,10 @@ def test_create_ticket_specific_column(repo_with_ganban):
     assert doing_column.links[-1].ticket_id == ticket.id
 
 
-def test_create_ticket_specific_position(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_ticket_specific_position(repo_with_ganban):
     """Create a ticket at a specific position in column."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     backlog = board.columns[0]
     original_first = backlog.links[0].ticket_id
 
@@ -789,14 +816,15 @@ def test_create_ticket_empty_board(empty_repo):
     assert board.columns[0].links[0].ticket_id == "001"
 
 
-def test_create_ticket_saves(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_ticket_saves(repo_with_ganban):
     """Created tickets persist after save."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     ticket = create_ticket(board, "Persistent ticket", "Will be saved")
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert ticket.id in loaded.tickets
     assert loaded.tickets[ticket.id].content.title == "Persistent ticket"
 
@@ -804,9 +832,10 @@ def test_create_ticket_saves(repo_with_ganban):
 # --- create_column tests ---
 
 
-def test_create_column_basic(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_column_basic(repo_with_ganban):
     """Create a column with default order."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
     original_count = len(board.columns)
 
     column = create_column(board, "Archive")
@@ -818,9 +847,10 @@ def test_create_column_basic(repo_with_ganban):
     assert len(board.columns) == original_count + 1
 
 
-def test_create_column_specific_order(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_column_specific_order(repo_with_ganban):
     """Create a column with specific order."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     column = create_column(board, "Priority", order="0")
 
@@ -830,9 +860,10 @@ def test_create_column_specific_order(repo_with_ganban):
     assert board.columns[0].order == "0"
 
 
-def test_create_column_hidden(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_column_hidden(repo_with_ganban):
     """Create a hidden column."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     column = create_column(board, "Hidden", hidden=True)
 
@@ -850,12 +881,13 @@ def test_create_column_empty_board(empty_repo):
     assert len(board.columns) == 1
 
 
-def test_create_column_saves(repo_with_ganban):
+@pytest.mark.asyncio
+async def test_create_column_saves(repo_with_ganban):
     """Created columns persist after save."""
-    board = load_board(repo_with_ganban)
+    board = await load_board(repo_with_ganban)
 
     create_column(board, "Archive")
-    save_board(board)
+    await save_board(board)
 
-    loaded = load_board(repo_with_ganban)
+    loaded = await load_board(repo_with_ganban)
     assert any(c.name == "Archive" for c in loaded.columns)

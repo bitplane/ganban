@@ -1,5 +1,6 @@
 """Load a ganban board from git tree."""
 
+import asyncio
 import re
 
 from git import Repo
@@ -23,8 +24,13 @@ def _tree_get(tree: Tree, name: str) -> Blob | Tree | None:
         return None
 
 
-def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Board:
+async def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Board:
     """Load a complete board from a git branch."""
+    return await asyncio.to_thread(_load_board_sync, repo_path, branch)
+
+
+def _load_board_sync(repo_path: str, branch: str) -> Board:
+    """Synchronous implementation of load_board."""
     repo = Repo(repo_path)
 
     # Get the branch commit

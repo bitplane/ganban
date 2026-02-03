@@ -134,19 +134,21 @@ def test_init_repo(tmp_path):
     assert is_git_repo(new_repo_path)
 
 
-def test_has_branch_true(temp_repo):
+@pytest.mark.asyncio
+async def test_has_branch_true(temp_repo):
     """Returns True when branch exists."""
-    assert has_branch(temp_repo, "master") is True
+    assert await has_branch(temp_repo, "master") is True
 
 
-def test_has_branch_false(temp_repo):
+@pytest.mark.asyncio
+async def test_has_branch_false(temp_repo):
     """Returns False when branch doesn't exist."""
-    assert has_branch(temp_repo, "ganban") is False
+    assert await has_branch(temp_repo, "ganban") is False
 
 
 @pytest.mark.asyncio
 async def test_has_branch_after_create(temp_repo):
     """has_branch returns True after creating orphan branch."""
-    assert has_branch(temp_repo, "ganban") is False
+    assert await has_branch(temp_repo, "ganban") is False
     await create_orphan_branch(temp_repo)
-    assert has_branch(temp_repo, "ganban") is True
+    assert await has_branch(temp_repo, "ganban") is True
