@@ -7,7 +7,9 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
-from ganban.git import init_repo, is_git_repo
+from ganban.git import create_orphan_branch, has_branch, init_repo, is_git_repo
+from ganban.loader import load_board
+from ganban.ui.board import BoardScreen
 
 
 class ConfirmInitScreen(ModalScreen[bool]):
@@ -62,19 +64,23 @@ class GanbanApp(App):
         super().__init__()
         self.repo_path = repo_path
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         if not is_git_repo(self.repo_path):
             self.push_screen(ConfirmInitScreen(self.repo_path), self._on_init_response)
         else:
-            self._load_board()
+            await self._load_board()
 
-    def _on_init_response(self, result: bool) -> None:
+    async def _on_init_response(self, result: bool) -> None:
         if result:
             init_repo(self.repo_path)
-            self._load_board()
+            await self._load_board()
         else:
             self.exit()
 
-    def _load_board(self) -> None:
-        """Load or create the board."""
-        pass  # TODO: load/create ganban branch and board widget
+    async def _load_board(self) -> None:
+        """Load or create the board and show it."""
+        if not has_branch(self.repo_path):
+            await create_orphan_branch(self.repo_path)
+
+        board = load_board(str(self.repo_path))
+        self.push_screen(BoardScreen(board))
