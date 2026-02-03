@@ -6,6 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board, Column, TicketLink
+from ganban.writer import create_column
 from ganban.ui.widgets import EditableLabel
 
 
@@ -43,11 +44,9 @@ class ColumnWidget(Vertical):
         width: 1fr;
         height: 100%;
         min-width: 20;
+        max-width: 25;
         padding: 0 1;
         border-right: tall $surface-lighten-1;
-    }
-    ColumnWidget:last-of-type {
-        border-right: none;
     }
     .column-header {
         width: 100%;
@@ -78,6 +77,40 @@ class ColumnWidget(Vertical):
                 yield TicketCard(link, title)
 
 
+class AddColumnWidget(Vertical):
+    """Widget to add a new column."""
+
+    DEFAULT_CSS = """
+    AddColumnWidget {
+        width: 1fr;
+        height: 100%;
+        min-width: 20;
+        max-width: 25;
+        padding: 0 1;
+    }
+    AddColumnWidget .column-header > Static {
+        text-align: center;
+        text-style: bold;
+    }
+    """
+
+    def __init__(self, board: Board):
+        super().__init__()
+        self.board = board
+
+    def compose(self) -> ComposeResult:
+        yield EditableLabel("+", classes="column-header")
+
+    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+        event.stop()
+        if event.new_value and event.new_value != "+":
+            new_column = create_column(self.board, event.new_value)
+            new_widget = ColumnWidget(new_column, self.board)
+            self.parent.mount(new_widget, before=self)
+        label = self.query_one(EditableLabel)
+        label.value = "+"
+
+
 class BoardScreen(Screen):
     """Main board screen showing all columns."""
 
@@ -100,12 +133,7 @@ class BoardScreen(Screen):
     #columns {
         width: 100%;
         height: 1fr;
-    }
-    #empty-message {
-        width: 100%;
-        height: 1fr;
-        align: center middle;
-        text-align: center;
+        overflow-x: auto;
     }
     """
 
@@ -119,9 +147,7 @@ class BoardScreen(Screen):
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
 
-        if visible_columns:
-            with Horizontal(id="columns"):
-                for column in visible_columns:
-                    yield ColumnWidget(column, self.board)
-        else:
-            yield Static("No columns yet. Press 'c' to create a column.", id="empty-message")
+        with Horizontal(id="columns"):
+            for column in visible_columns:
+                yield ColumnWidget(column, self.board)
+            yield AddColumnWidget(self.board)
