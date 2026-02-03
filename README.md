@@ -4,7 +4,7 @@ TUI for git-based Trello replacement.
 
 ## Overview
 
-Open a repo with ganban and it reads from a `tasks` orphan branch. The board
+Open a repo with ganban and it reads from a `ganban` orphan branch. The board
 is just directories (columns) containing symlinks (tickets) pointing to
 canonical ticket files. Everything is plain markdown, works with any text
 editor, and syncs via git.
@@ -101,8 +101,8 @@ hex or base64 if needed, but integers are the default.
 
 ### Reading/Writing Without Checkout
 
-Operates on the `tasks` branch without checking it out, using git plumbing:
-- `git show tasks:path` to read
+Operates on the `ganban` branch without checking it out, using git plumbing:
+- `git show ganban:path` to read
 - `git hash-object`, `git mktree`, `git commit-tree` to write
 - Or GitPython equivalents
 

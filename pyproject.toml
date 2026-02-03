@@ -17,6 +17,7 @@ dependencies = [
 dev = [
     "pre-commit",
     "pytest",
+    "pytest-asyncio",
     "coverage",
     "pytest-cov",
     "build",
