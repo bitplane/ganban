@@ -11,6 +11,18 @@ from ganban.parser import parse_markdown
 BRANCH_NAME = "ganban"
 
 
+def _tree_get(tree: Tree, name: str) -> Blob | Tree | None:
+    """Get an item from a tree by name, returning None if not found.
+
+    GitPython's `in` operator doesn't work reliably on subtrees,
+    so we use direct access with exception handling.
+    """
+    try:
+        return tree[name]
+    except KeyError:
+        return None
+
+
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Board:
     """Load a complete board from a git branch."""
     repo = Repo(repo_path)
@@ -26,14 +38,14 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Board:
     board = Board(repo_path=repo_path, commit=commit.hexsha)
 
     # Load root index.md if present
-    if "index.md" in tree:
-        board.content = _load_markdown_doc(tree["index.md"])
+    index_blob = _tree_get(tree, "index.md")
+    if index_blob is not None:
+        board.content = _load_markdown_doc(index_blob)
 
     # Load all tickets from .all/
-    if ".all" in tree:
-        all_tree = tree[".all"]
-        if isinstance(all_tree, Tree):
-            board.tickets = _load_tickets(all_tree)
+    all_tree = _tree_get(tree, ".all")
+    if isinstance(all_tree, Tree):
+        board.tickets = _load_tickets(all_tree)
 
     # Load columns
     board.columns = _load_columns(tree, board.tickets)
@@ -90,8 +102,9 @@ def _load_columns(tree: Tree, tickets: dict[str, Ticket]) -> list[Column]:
         )
 
         # Load index.md if present
-        if "index.md" in item:
-            column.content = _load_markdown_doc(item["index.md"])
+        index_blob = _tree_get(item, "index.md")
+        if index_blob is not None:
+            column.content = _load_markdown_doc(index_blob)
             if column.content.title:
                 column.name = column.content.title
 
