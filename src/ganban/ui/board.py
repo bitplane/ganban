@@ -50,11 +50,9 @@ class ColumnWidget(Vertical):
     }
     .column-header {
         width: 100%;
-        height: 3;
+        height: 1;
         text-align: center;
         text-style: bold;
-        border-bottom: solid $primary;
-        margin-bottom: 1;
     }
     .column-body {
         width: 100%;
