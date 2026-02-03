@@ -6,7 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board, Column, TicketLink
-from ganban.writer import create_column
+from ganban.writer import create_column, create_ticket
 from ganban.ui.widgets import EditableLabel
 
 
@@ -34,6 +34,44 @@ class TicketCard(Static):
 
     def compose(self) -> ComposeResult:
         yield EditableLabel(self.title or self.link.slug)
+
+
+class AddTicketWidget(Static):
+    """Widget to add a new ticket to a column."""
+
+    DEFAULT_CSS = """
+    AddTicketWidget {
+        width: 100%;
+        height: auto;
+        padding: 0 1;
+        margin-bottom: 1;
+        border: dashed $surface-lighten-2;
+    }
+    AddTicketWidget > EditableLabel > Static {
+        text-align: center;
+        color: $text-muted;
+    }
+    """
+
+    def __init__(self, column: Column, board: Board):
+        super().__init__()
+        self.column = column
+        self.board = board
+
+    def compose(self) -> ComposeResult:
+        yield EditableLabel("+", click_to_edit=False)
+
+    def on_click(self) -> None:
+        self.query_one(EditableLabel).start_editing(text="")
+
+    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+        event.stop()
+        if event.new_value and event.new_value != "+":
+            ticket = create_ticket(self.board, event.new_value, column=self.column)
+            link = self.column.links[-1]  # create_ticket adds link to end
+            card = TicketCard(link, ticket.content.title)
+            self.parent.mount(card, before=self)
+        self.query_one(EditableLabel).value = "+"
 
 
 class ColumnWidget(Vertical):
@@ -75,6 +113,7 @@ class ColumnWidget(Vertical):
                 ticket = self.board.tickets.get(link.ticket_id)
                 title = ticket.content.title if ticket else link.slug
                 yield TicketCard(link, title)
+            yield AddTicketWidget(self.column, self.board)
 
 
 class AddColumnWidget(Vertical):
