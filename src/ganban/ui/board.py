@@ -2,12 +2,46 @@
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.geometry import Offset
+from textual.message import Message
 from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board, Column, TicketLink
 from ganban.writer import create_column, create_ticket
 from ganban.ui.widgets import EditableLabel
+
+
+class DropPlaceholder(Static):
+    """Placeholder showing where a dragged card will drop."""
+
+    DEFAULT_CSS = """
+    DropPlaceholder {
+        width: 100%;
+        height: 3;
+        margin-bottom: 1;
+        border: dashed $primary;
+        background: $surface-darken-1;
+    }
+    """
+
+
+class DragOverlay(Static):
+    """Floating overlay showing the card being dragged."""
+
+    DEFAULT_CSS = """
+    DragOverlay {
+        layer: overlay;
+        width: 22;
+        height: auto;
+        padding: 0 1;
+        border: solid $primary;
+        background: $surface;
+    }
+    """
+
+    def __init__(self, title: str):
+        super().__init__(title)
 
 
 class TicketCard(Static):
@@ -25,15 +59,55 @@ class TicketCard(Static):
     TicketCard:hover {
         border: solid $primary;
     }
+    TicketCard.dragging {
+        display: none;
+    }
     """
+
+    class DragStart(Message):
+        """Posted when a card drag begins."""
+
+        def __init__(self, card: "TicketCard", mouse_offset: Offset) -> None:
+            super().__init__()
+            self.card = card
+            self.mouse_offset = mouse_offset
 
     def __init__(self, link: TicketLink, title: str):
         super().__init__()
         self.link = link
         self.title = title
+        self._drag_start_pos: Offset | None = None
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self.title or self.link.slug)
+        yield EditableLabel(self.title or self.link.slug, click_to_edit=False)
+
+    def on_mouse_down(self, event) -> None:
+        event.stop()
+        event.prevent_default()
+        self._drag_start_pos = Offset(event.screen_x, event.screen_y)
+        self.capture_mouse()
+
+    def on_mouse_move(self, event) -> None:
+        if self._drag_start_pos is None:
+            return
+        event.stop()
+        event.prevent_default()
+        # Start drag if moved more than 2 cells
+        dx = abs(event.screen_x - self._drag_start_pos.x)
+        dy = abs(event.screen_y - self._drag_start_pos.y)
+        if dx > 2 or dy > 2:
+            self.release_mouse()  # BoardScreen will capture instead
+            self.post_message(self.DragStart(self, self._drag_start_pos))
+            self._drag_start_pos = None
+
+    def on_mouse_up(self, event) -> None:
+        event.stop()
+        event.prevent_default()
+        self.release_mouse()
+        # If drag never started, treat as click - start editing
+        if self._drag_start_pos is not None:
+            self.query_one(EditableLabel).start_editing()
+        self._drag_start_pos = None
 
 
 class AddTicketWidget(Static):
@@ -156,11 +230,14 @@ class AddColumnWidget(Vertical):
 class BoardScreen(Screen):
     """Main board screen showing all columns."""
 
+    BINDINGS = [("escape", "cancel_drag", "Cancel drag")]
+
     DEFAULT_CSS = """
     BoardScreen {
         width: 100%;
         height: 100%;
         layout: vertical;
+        layers: base overlay;
     }
     #board-header {
         width: 100%;
@@ -182,6 +259,13 @@ class BoardScreen(Screen):
     def __init__(self, board: Board):
         super().__init__()
         self.board = board
+        self._dragging: TicketCard | None = None
+        self._drag_overlay: DragOverlay | None = None
+        self._placeholder: DropPlaceholder | None = None
+        self._drag_offset: Offset = Offset(0, 0)
+        # Drop target state (independent of placeholder DOM position)
+        self._target_scroll: VerticalScroll | None = None
+        self._insert_before: Static | None = None
 
     def compose(self) -> ComposeResult:
         title = self.board.content.title or "ganban"
@@ -193,3 +277,178 @@ class BoardScreen(Screen):
             for column in visible_columns:
                 yield ColumnWidget(column, self.board)
             yield AddColumnWidget(self.board)
+
+    def on_ticket_card_drag_start(self, event: TicketCard.DragStart) -> None:
+        """Handle the start of a card drag."""
+        event.stop()
+        self._dragging = event.card
+        self._dragging.add_class("dragging")
+
+        # Calculate offset from mouse to card top-left
+        card_region = event.card.region
+        self._drag_offset = Offset(
+            event.mouse_offset.x - card_region.x,
+            event.mouse_offset.y - card_region.y,
+        )
+
+        # Create overlay at current position
+        self._drag_overlay = DragOverlay(event.card.title)
+        self._drag_overlay.styles.offset = (card_region.x, card_region.y)
+        self.mount(self._drag_overlay)
+
+        # Create placeholder where card was
+        self._placeholder = DropPlaceholder()
+        event.card.parent.mount(self._placeholder, after=event.card)
+
+        self.capture_mouse()
+
+    def on_mouse_move(self, event) -> None:
+        """Update drag overlay position."""
+        if not self._dragging or not self._drag_overlay:
+            return
+
+        # Move overlay to follow mouse
+        new_x = event.screen_x - self._drag_offset.x
+        new_y = event.screen_y - self._drag_offset.y
+        self._drag_overlay.styles.offset = (new_x, new_y)
+
+        # Find which column we're over and update placeholder position
+        self._update_placeholder_position(event.screen_x, event.screen_y)
+
+    def _update_placeholder_position(self, screen_x: int, screen_y: int) -> None:
+        """Move placeholder to show where card will drop."""
+        if not self._placeholder:
+            return
+
+        # Find nearest column by horizontal distance to cursor
+        columns = list(self.query(ColumnWidget))
+        if not columns:
+            return
+
+        def column_distance(col):
+            region = col.region
+            if screen_x < region.x:
+                return region.x - screen_x
+            if screen_x >= region.x + region.width:
+                return screen_x - (region.x + region.width - 1)
+            return 0  # Cursor is inside column
+
+        column_widget = min(columns, key=column_distance)
+        scroll = column_widget.query_one(VerticalScroll)
+        add_widget = scroll.query_one(AddTicketWidget)
+
+        # Get visible cards (excluding the one being dragged)
+        visible_cards = [c for c in scroll.children if isinstance(c, TicketCard) and c is not self._dragging]
+
+        # Find insert position based on y coordinate
+        insert_before = add_widget  # Default: insert at end
+        for card in visible_cards:
+            card_mid_y = card.region.y + card.region.height // 2
+            if screen_y < card_mid_y:
+                insert_before = card
+                break
+
+        # Store drop target state (independent of placeholder DOM)
+        self._target_scroll = scroll
+        self._insert_before = insert_before
+
+        # Only move placeholder if it needs to move
+        if self._placeholder.parent is scroll:
+            # Check if already in correct position
+            children = list(scroll.children)
+            placeholder_idx = children.index(self._placeholder)
+            insert_idx = children.index(insert_before)
+            if placeholder_idx + 1 == insert_idx:
+                return  # Already in correct position
+            scroll.move_child(self._placeholder, before=insert_before)
+        else:
+            # Moving to different column - mount handles reparenting
+            if self._placeholder.parent is not None:
+                self._placeholder.remove()
+
+            scroll.mount(self._placeholder, before=insert_before)
+
+    def on_mouse_up(self, event) -> None:
+        """Complete the drag operation."""
+        if not self._dragging:
+            return
+        self._finish_drag()
+
+    def action_cancel_drag(self) -> None:
+        """Cancel the current drag operation."""
+        if self._dragging:
+            self._cancel_drag()
+
+    def _finish_drag(self) -> None:
+        """Finalize the drop - move card to placeholder position."""
+        if not self._dragging or not self._target_scroll:
+            self._cancel_drag()
+            return
+
+        self.release_mouse()
+
+        card = self._dragging
+        placeholder = self._placeholder
+        overlay = self._drag_overlay
+        target_scroll = self._target_scroll
+        insert_before = self._insert_before
+
+        target_column_widget = target_scroll.parent
+        target_column = target_column_widget.column
+
+        # Get source column
+        source_column = None
+        for col in self.board.columns:
+            if any(link.ticket_id == card.link.ticket_id for link in col.links):
+                source_column = col
+                break
+
+        # Move the link in the model
+        if source_column and card.link in source_column.links:
+            source_column.links.remove(card.link)
+
+        # Find insert position in target column based on insert_before widget
+        actual_pos = 0
+        for c in target_scroll.children:
+            if c is insert_before:
+                break
+            if isinstance(c, TicketCard) and c is not card:
+                actual_pos += 1
+        target_column.links.insert(actual_pos, card.link)
+
+        # Clear state first
+        self._dragging = None
+        self._placeholder = None
+        self._drag_overlay = None
+        self._target_scroll = None
+        self._insert_before = None
+
+        # Remove old card and create fresh one at new position
+        card.remove()
+        new_card = TicketCard(card.link, card.title)
+        target_scroll.mount(new_card, before=insert_before)
+
+        # Cleanup overlay and placeholder
+        if placeholder and placeholder.parent is not None:
+            placeholder.remove()
+        if overlay:
+            overlay.remove()
+
+    def _cancel_drag(self) -> None:
+        """Cancel drag and restore card to original position."""
+        if not self._dragging:
+            return
+
+        self.release_mouse()
+        self._dragging.remove_class("dragging")
+
+        if self._placeholder and self._placeholder.parent is not None:
+            self._placeholder.remove()
+        if self._drag_overlay:
+            self._drag_overlay.remove()
+
+        self._dragging = None
+        self._placeholder = None
+        self._drag_overlay = None
+        self._target_scroll = None
+        self._insert_before = None
