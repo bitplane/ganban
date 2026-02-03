@@ -5,7 +5,7 @@ from git import Repo
 
 from ganban.loader import load_board
 from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
-from ganban.writer import save_board
+from ganban.writer import MergeRequired, check_for_merge, save_board, try_auto_merge
 
 
 @pytest.fixture
@@ -309,3 +309,175 @@ def test_save_custom_branch(empty_repo):
     # Should load from custom branch
     loaded = load_board(empty_repo, branch="my-board")
     assert len(loaded.tickets) == 1
+
+
+def test_save_with_explicit_parents(repo_with_ganban):
+    """Can save with explicit parent commits for merge."""
+    board = load_board(repo_with_ganban)
+    first_commit = board.commit
+
+    # Make a change and save
+    board.tickets["001"].content.body = "Changed"
+    second_commit = save_board(board)
+
+    # Now create a "merge" commit with both as parents
+    board = load_board(repo_with_ganban)
+    board.tickets["001"].content.body = "Merged"
+    merge_commit = save_board(board, message="Merge", parents=[first_commit, second_commit])
+
+    repo = Repo(repo_with_ganban)
+    commit = repo.commit(merge_commit)
+    assert len(commit.parents) == 2
+
+
+# --- Merge detection tests ---
+
+
+def test_check_for_merge_no_changes(repo_with_ganban):
+    """No merge needed when branch hasn't moved."""
+    board = load_board(repo_with_ganban)
+
+    result = check_for_merge(board)
+
+    assert result is None
+
+
+def test_check_for_merge_branch_moved(repo_with_ganban):
+    """Merge needed when branch has moved."""
+    board = load_board(repo_with_ganban)
+    original_commit = board.commit
+
+    # External change moves the branch
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "002.md").write_text("# External ticket\n")
+    repo.git.add("-A")
+    external_commit = repo.index.commit("External change").hexsha
+
+    # Check for merge
+    result = check_for_merge(board)
+
+    assert result is not None
+    assert isinstance(result, MergeRequired)
+    assert result.ours == original_commit
+    assert result.theirs == external_commit
+    assert result.base == original_commit  # base is the common ancestor
+
+
+def test_check_for_merge_new_branch(empty_repo):
+    """No merge needed for new branch."""
+    board = Board(repo_path=str(empty_repo))
+    board.tickets = {"001": Ticket(id="001", content=MarkdownDoc(title="Test"))}
+    board.columns = [Column(order="1", name="Backlog", path="1.backlog")]
+
+    result = check_for_merge(board)
+
+    assert result is None
+
+
+# --- Auto-merge tests ---
+
+
+def test_auto_merge_clean(repo_with_ganban):
+    """Auto-merge succeeds when different files changed."""
+    board = load_board(repo_with_ganban)
+    original_commit = board.commit
+
+    # External change: add new ticket
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "002.md").write_text("# External ticket\n\nAdded externally.\n")
+    repo.git.add("-A")
+    external_commit = repo.index.commit("Add external ticket").hexsha
+
+    # Our change: edit ticket 001
+    board.tickets["001"].content.body = "Modified description."
+
+    # Check and auto-merge
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    new_commit = try_auto_merge(board, merge_info, message="Auto-merge")
+    assert new_commit is not None
+
+    # Should be a merge commit with two parents
+    commit = repo.commit(new_commit)
+    assert len(commit.parents) == 2
+    parent_shas = {p.hexsha for p in commit.parents}
+    assert original_commit in parent_shas
+    assert external_commit in parent_shas
+
+    # Both changes should be present
+    loaded = load_board(repo_with_ganban)
+    assert loaded.tickets["001"].content.body == "Modified description."
+    assert "002" in loaded.tickets
+
+
+def test_auto_merge_conflict(repo_with_ganban):
+    """Auto-merge fails when same file changed."""
+    board = load_board(repo_with_ganban)
+
+    # External change: edit ticket 001
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "001.md").write_text("# First ticket\n\nExternal edit.\n")
+    repo.git.add("-A")
+    repo.index.commit("External edit")
+
+    # Our change: also edit ticket 001
+    board.tickets["001"].content.body = "Our edit."
+
+    # Check and try auto-merge
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    result = try_auto_merge(board, merge_info)
+    assert result is None  # Conflict, auto-merge failed
+
+
+def test_manual_merge_after_conflict(repo_with_ganban):
+    """Manual merge resolution flow."""
+    board = load_board(repo_with_ganban)
+    ours_commit = board.commit
+
+    # External change
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "001.md").write_text("# First ticket\n\nExternal edit.\n")
+    repo.git.add("-A")
+    theirs_commit = repo.index.commit("External edit").hexsha
+
+    # Our change conflicts
+    board.tickets["001"].content.body = "Our edit."
+
+    # Check for merge
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    # Auto-merge fails
+    assert try_auto_merge(board, merge_info) is None
+
+    # Manual resolution: UI would load all 3 boards and let user resolve
+    # base_board = load_board(repo_with_ganban, commit=merge_info.base)
+    # ours_board = load_board(repo_with_ganban, commit=merge_info.ours)
+    # theirs_board = load_board(repo_with_ganban, commit=merge_info.theirs)
+    # ... user picks resolution ...
+
+    # Save resolved board with both parents
+    board.tickets["001"].content.body = "Manually resolved."
+    new_commit = save_board(
+        board,
+        message="Resolve conflict",
+        parents=[ours_commit, theirs_commit],
+    )
+
+    # Verify merge commit
+    commit = repo.commit(new_commit)
+    assert len(commit.parents) == 2
+
+    loaded = load_board(repo_with_ganban)
+    assert loaded.tickets["001"].content.body == "Manually resolved."

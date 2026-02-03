@@ -13,7 +13,6 @@ class MarkdownDoc:
     sections: dict[str, str] = field(default_factory=dict)
     meta: dict[str, Any] = field(default_factory=dict)
     raw: str = ""
-    conflict: bool = False
 
 
 @dataclass
