@@ -6,6 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board, Column, TicketLink
+from ganban.ui.widgets import EditableLabel
 
 
 class TicketCard(Static):
@@ -31,7 +32,7 @@ class TicketCard(Static):
         self.title = title
 
     def compose(self) -> ComposeResult:
-        yield Static(self.title or self.link.slug)
+        yield EditableLabel(self.title or self.link.slug)
 
 
 class ColumnWidget(Vertical):
