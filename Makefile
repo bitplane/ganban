@@ -3,7 +3,7 @@
 		pre-commit update-pre-commit
 
 
-PROJECT_NAME := tasgit
+PROJECT_NAME := ganban
 
 
 all: dev coverage  ## builds everything
