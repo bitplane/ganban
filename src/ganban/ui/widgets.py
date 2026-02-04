@@ -107,7 +107,7 @@ class EditableLabel(Container):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
             yield NonSelectableStatic(self._value, id="view")
-            yield _SubmittableTextArea(self._value, id="edit", soft_wrap=True, compact=True)
+            yield _SubmittableTextArea(self._value, id="edit", soft_wrap=True, compact=True, disabled=True)
 
     def on_click(self, event) -> None:
         if self._click_to_edit and not self._editing:
@@ -125,6 +125,7 @@ class EditableLabel(Container):
         self._editing = True
         edit_text = self._value if text is None else text
         text_area = self.query_one("#edit", _SubmittableTextArea)
+        text_area.disabled = False
         text_area.text = edit_text
         text_area.cursor_location = (0, min(cursor_col, len(edit_text)))
         self.query_one(ContentSwitcher).current = "edit"
@@ -144,6 +145,7 @@ class EditableLabel(Container):
             self.post_message(self.Changed(old_value, new_value))
 
         self.query_one(ContentSwitcher).current = "view"
+        text_area.disabled = True
 
     def on__submittable_text_area_submit(self) -> None:
         self._stop_editing(save=True)
@@ -214,7 +216,7 @@ class EditableMarkdown(Container):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
             yield Markdown(self._value, id="view")
-            yield _MarkdownTextArea(self._value, id="edit")
+            yield _MarkdownTextArea(self._value, id="edit", disabled=True)
 
     def on_click(self, event) -> None:
         if not self._editing:
@@ -230,6 +232,7 @@ class EditableMarkdown(Container):
             return
         self._editing = True
         text_area = self.query_one("#edit", _MarkdownTextArea)
+        text_area.disabled = False
         text_area.text = self._value
         lines = self._value.split("\n")
         row = min(row, len(lines) - 1) if lines else 0
@@ -252,6 +255,7 @@ class EditableMarkdown(Container):
             self.post_message(self.Changed(old_value, new_value))
 
         self.query_one(ContentSwitcher).current = "view"
+        text_area.disabled = True
 
     def on__submittable_text_area_submit(self) -> None:
         self._stop_editing(save=True)
