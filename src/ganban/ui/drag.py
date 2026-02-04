@@ -31,6 +31,8 @@ class DraggableMixin:
         self._drag_start_pos: Offset | None = None
 
     def on_mouse_down(self, event) -> None:
+        if self.query("TextArea:focus"):
+            return
         event.stop()
         event.prevent_default()
         self._drag_start_pos = Offset(event.screen_x, event.screen_y)
