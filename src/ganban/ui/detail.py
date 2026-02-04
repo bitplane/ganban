@@ -3,10 +3,9 @@
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Collapsible, Markdown
 
 from ganban.models import Card
-from ganban.ui.widgets import EditableLabel
+from ganban.ui.widgets import SectionEditor
 
 
 class CardDetailModal(ModalScreen[None]):
@@ -23,7 +22,7 @@ class CardDetailModal(ModalScreen[None]):
         height: 80%;
         background: $surface;
         border: solid $primary;
-        padding: 1 2;
+        padding: 1 1;
     }
 
     #detail-left {
@@ -39,34 +38,13 @@ class CardDetailModal(ModalScreen[None]):
         padding-left: 1;
     }
 
-    #card-title {
-        width: 100%;
-        height: auto;
-        text-style: bold;
-        padding-bottom: 1;
-    }
-
-    #card-title > Static {
-        text-style: bold;
-    }
-
-    #card-body {
-        width: 100%;
-        height: 1fr;
-    }
-
-    #card-body Markdown {
-        padding: 0;
+    #main-section {
+        height: 100%;
     }
 
     #sections-scroll {
         width: 100%;
         height: 100%;
-    }
-
-    .section-collapsible {
-        width: 100%;
-        margin-bottom: 1;
     }
     """
 
@@ -82,25 +60,40 @@ class CardDetailModal(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Horizontal(id="detail-container"):
             with Vertical(id="detail-left"):
-                yield EditableLabel(
+                yield SectionEditor(
                     self.card.content.title,
-                    click_to_edit=True,
-                    id="card-title",
+                    self.card.content.body,
+                    id="main-section",
                 )
-                with VerticalScroll(id="card-body"):
-                    yield Markdown(self.card.content.body)
 
             with Vertical(id="detail-right"):
                 with VerticalScroll(id="sections-scroll"):
-                    for heading, content in self.card.content.sections.items():
-                        with Collapsible(title=heading, classes="section-collapsible"):
-                            yield Markdown(content)
+                    for heading in self.card.content.sections:
+                        yield SectionEditor(
+                            heading,
+                            self.card.content.sections[heading],
+                            classes="subsection",
+                        )
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
-        """Update card title when edited."""
+    def on_section_editor_heading_changed(self, event: SectionEditor.HeadingChanged) -> None:
+        """Update card when a heading changes."""
         event.stop()
-        if event.new_value:
+        editor = event.control
+        if editor.id == "main-section":
             self.card.content.title = event.new_value
+        else:
+            # Rename section key
+            content = self.card.content.sections.pop(event.old_value, "")
+            self.card.content.sections[event.new_value] = content
+
+    def on_section_editor_body_changed(self, event: SectionEditor.BodyChanged) -> None:
+        """Update card when a body changes."""
+        event.stop()
+        editor = event.control
+        if editor.id == "main-section":
+            self.card.content.body = event.new_value
+        else:
+            self.card.content.sections[editor.heading] = event.new_value
 
     def on_click(self, event) -> None:
         """Dismiss modal when clicking outside the detail container."""
