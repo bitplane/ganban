@@ -126,6 +126,12 @@ def _load_columns(tree: Tree, tickets: dict[str, Ticket]) -> list[Column]:
     return columns
 
 
+def _split_prefixed_name(name: str) -> tuple[str, str] | None:
+    """Split 'prefix.rest' into (prefix, rest) or None if no dot."""
+    match = re.match(r"^([^.]+)\.(.+)$", name)
+    return (match.group(1), match.group(2)) if match else None
+
+
 def _load_ticket_links(column_tree: Tree, tickets: dict[str, Ticket]) -> list[TicketLink]:
     """Load ticket symlinks from a column tree."""
     links = []
@@ -177,12 +183,11 @@ def _parse_dirname(name: str) -> tuple[str | None, str, bool]:
     if hidden:
         name = name[1:]
 
-    match = re.match(r"^([^.]+)\.(.+)$", name)
-    if not match:
+    parts = _split_prefixed_name(name)
+    if not parts:
         return None, name, hidden
 
-    order = match.group(1)
-    slug = match.group(2)
+    order, slug = parts
 
     normalized = slug.replace("-", " ").replace("_", " ")
     normalized = normalized[0].upper() + normalized[1:] if normalized else ""
@@ -199,8 +204,8 @@ def _parse_link_name(name: str) -> tuple[str | None, str]:
     """
     stem = name[:-3] if name.endswith(".md") else name
 
-    match = re.match(r"^([^.]+)\.(.+)$", stem)
-    if not match:
+    parts = _split_prefixed_name(stem)
+    if not parts:
         return None, stem
 
-    return match.group(1), match.group(2)
+    return parts

@@ -4,9 +4,10 @@ import asyncio
 import re
 import subprocess
 from dataclasses import dataclass
+from functools import cmp_to_key
 from pathlib import Path
 
-from ganban.ids import max_id, next_id
+from ganban.ids import compare_ids, max_id, next_id
 from ganban.loader import BRANCH_NAME
 from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
 from ganban.parser import serialize_markdown
@@ -440,18 +441,15 @@ def create_column(
         existing_orders = [c.order for c in board.columns]
         order = next_id(max_id(existing_orders)) if existing_orders else "1"
 
-    slug = slugify(name)
-    path = f".{order}.{slug}" if hidden else f"{order}.{slug}"
-
     column = Column(
         order=order,
         name=name,
-        path=path,
+        path=build_column_path(order, name, hidden),
         hidden=hidden,
         content=MarkdownDoc(),
     )
     board.columns.append(column)
-    board.columns.sort(key=lambda c: c.order.zfill(10))
+    board.columns.sort(key=cmp_to_key(lambda a, b: compare_ids(a.order, b.order)))
 
     return column
 
@@ -462,3 +460,9 @@ def slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
     slug = slug.strip("-")
     return slug or "untitled"
+
+
+def build_column_path(order: str, name: str, hidden: bool = False) -> str:
+    """Build column directory path from components."""
+    prefix = "." if hidden else ""
+    return f"{prefix}{order}.{slugify(name)}"

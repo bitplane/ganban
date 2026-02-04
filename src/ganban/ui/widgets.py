@@ -69,7 +69,7 @@ class EditableLabel(Container):
             """The EditableLabel that changed."""
             return self._sender
 
-    def __init__(self, value: str = "", click_to_edit: bool = True, **kwargs) -> None:
+    def __init__(self, value: str = "", click_to_edit: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self._value = self._clean(value)
         self._editing = False

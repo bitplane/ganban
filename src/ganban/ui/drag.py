@@ -13,6 +13,11 @@ class DragStart(Message):
         self.widget = widget
         self.mouse_offset = mouse_offset
 
+    @property
+    def control(self) -> Widget:
+        """The widget being dragged."""
+        return self.widget
+
 
 class DraggableMixin:
     """Mixin for widgets that can be dragged.

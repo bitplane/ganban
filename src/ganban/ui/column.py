@@ -7,7 +7,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.models import Board, Column
-from ganban.writer import create_column, slugify
+from ganban.writer import build_column_path, create_column
 from ganban.ui.card import TicketCard, AddTicketWidget
 from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
@@ -51,7 +51,7 @@ class ColumnHeader(DraggableMixin, Static):
         self.column_name = column_name
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self.column_name)
+        yield EditableLabel(self.column_name, click_to_edit=True)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStart(self, mouse_pos))
@@ -91,6 +91,11 @@ class ColumnWidget(Vertical):
             self.column_widget = column_widget
             self.mouse_offset = mouse_offset
 
+        @property
+        def control(self) -> "ColumnWidget":
+            """The column widget being dragged."""
+            return self.column_widget
+
     def __init__(self, column: Column, board: Board):
         super().__init__()
         self.column = column
@@ -116,8 +121,7 @@ class ColumnWidget(Vertical):
         event.stop()
         if event.new_value:
             self.column.name = event.new_value
-            prefix = "." if self.column.hidden else ""
-            self.column.path = f"{prefix}{self.column.order}.{slugify(event.new_value)}"
+            self.column.path = build_column_path(self.column.order, event.new_value, self.column.hidden)
 
 
 class AddColumnWidget(Vertical):
@@ -142,7 +146,7 @@ class AddColumnWidget(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel("+", click_to_edit=False, classes="column-header")
+        yield EditableLabel("+", classes="column-header")
 
     def on_click(self) -> None:
         self.query_one(EditableLabel).start_editing(text="")

@@ -7,7 +7,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board
-from ganban.writer import save_board, slugify
+from ganban.writer import build_column_path, save_board
 from ganban.ui.card import TicketCard, AddTicketWidget
 from ganban.ui.column import ColumnWidget, AddColumnWidget, ColumnPlaceholder
 from ganban.ui.drag import DragStart
@@ -306,8 +306,7 @@ class ColumnDragManager:
 
         for i, col in enumerate(self.screen.board.columns):
             col.order = str(i + 1)
-            prefix = "." if col.hidden else ""
-            col.path = f"{prefix}{col.order}.{slugify(col.name)}"
+            col.path = build_column_path(col.order, col.name, col.hidden)
 
         column_widget.remove_class("dragging")
         column_widget.styles.offset = (0, 0)
@@ -382,7 +381,7 @@ class BoardScreen(Screen):
 
     def compose(self) -> ComposeResult:
         title = self.board.content.title or "ganban"
-        yield EditableLabel(title, id="board-header")
+        yield EditableLabel(title, click_to_edit=True, id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
 

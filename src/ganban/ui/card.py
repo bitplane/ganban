@@ -38,7 +38,7 @@ class TicketCard(DraggableMixin, Static):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self.title or self.link.slug, click_to_edit=False)
+        yield EditableLabel(self.title or self.link.slug)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStart(self, mouse_pos))
@@ -78,7 +78,7 @@ class AddTicketWidget(Static):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel("+", click_to_edit=False)
+        yield EditableLabel("+")
 
     def on_click(self) -> None:
         self.query_one(EditableLabel).start_editing(text="")
