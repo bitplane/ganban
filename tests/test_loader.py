@@ -30,11 +30,11 @@ def sample_board(tmp_path):
     with tempfile.TemporaryDirectory() as board_tmp:
         board_dir = Path(board_tmp)
 
-        # Create .all/ with tickets
+        # Create .all/ with cards
         all_dir = board_dir / ".all"
         all_dir.mkdir()
         (all_dir / "001.md").write_text("# Fix login bug\n\nDescription here.")
-        (all_dir / "002.md").write_text("# Add feature\n\nAnother ticket.")
+        (all_dir / "002.md").write_text("# Add feature\n\nAnother card.")
         (all_dir / "003.md").write_text("---\ntags:\n - urgent\n---\n# Refactor API\n\nWith meta.")
 
         # Create columns
@@ -118,16 +118,16 @@ def test_parse_link_name_no_prefix():
 
 
 @pytest.mark.asyncio
-async def test_load_board_tickets(sample_board):
+async def test_load_board_cards(sample_board):
     board = await load_board(sample_board)
 
-    assert len(board.tickets) == 3
-    assert "001" in board.tickets
-    assert "002" in board.tickets
-    assert "003" in board.tickets
+    assert len(board.cards) == 3
+    assert "001" in board.cards
+    assert "002" in board.cards
+    assert "003" in board.cards
 
-    assert board.tickets["001"].content.title == "Fix login bug"
-    assert board.tickets["003"].content.meta.get("tags") == ["urgent"]
+    assert board.cards["001"].content.title == "Fix login bug"
+    assert board.cards["003"].content.meta.get("tags") == ["urgent"]
 
 
 @pytest.mark.asyncio
@@ -146,12 +146,12 @@ async def test_load_board_links(sample_board):
 
     backlog = board.columns[0]
     assert len(backlog.links) == 1
-    assert backlog.links[0].ticket_id == "001"
+    assert backlog.links[0].card_id == "001"
 
     doing = board.columns[1]
     assert len(doing.links) == 2
-    assert doing.links[0].ticket_id == "002"
-    assert doing.links[1].ticket_id == "003"
+    assert doing.links[0].card_id == "002"
+    assert doing.links[1].card_id == "003"
 
 
 @pytest.mark.asyncio
@@ -168,7 +168,7 @@ async def test_load_board_broken_link(sample_board):
     backlog_col = board.columns[0]
     broken = [link for link in backlog_col.links if link.broken]
     assert len(broken) == 1
-    assert broken[0].ticket_id == "999"
+    assert broken[0].card_id == "999"
 
 
 @pytest.mark.asyncio
@@ -211,14 +211,14 @@ async def test_load_board_ignores_non_md_in_all(sample_board):
     (all_dir / "subdir" / "nested.md").write_text("# Nested\n")
 
     repo.git.add("-A")
-    repo.index.commit("Add non-ticket items")
+    repo.index.commit("Add non-card items")
 
     board = await load_board(sample_board)
 
-    # Should still only have the original 3 tickets
-    assert len(board.tickets) == 3
-    assert "readme" not in board.tickets
-    assert "subdir" not in board.tickets
+    # Should still only have the original 3 cards
+    assert len(board.cards) == 3
+    assert "readme" not in board.cards
+    assert "subdir" not in board.cards
 
 
 @pytest.mark.asyncio

@@ -1,20 +1,20 @@
-"""Ticket card widgets for ganban UI."""
+"""Card widgets for ganban UI."""
 
 from textual.app import ComposeResult
 from textual.geometry import Offset
 from textual.widgets import Static
 
-from ganban.models import Board, Column, TicketLink
-from ganban.writer import create_ticket
+from ganban.models import Board, CardLink, Column
+from ganban.writer import create_card
 from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
 
 
-class TicketCard(DraggableMixin, Static):
-    """A single ticket card in a column."""
+class CardWidget(DraggableMixin, Static):
+    """A single card in a column."""
 
     DEFAULT_CSS = """
-    TicketCard {
+    CardWidget {
         width: 100%;
         height: auto;
         padding: 0 1;
@@ -22,15 +22,15 @@ class TicketCard(DraggableMixin, Static):
         border: solid $primary-lighten-2;
         background: $surface;
     }
-    TicketCard:hover {
+    CardWidget:hover {
         border: solid $primary;
     }
-    TicketCard.dragging {
+    CardWidget.dragging {
         display: none;
     }
     """
 
-    def __init__(self, link: TicketLink, title: str, board: Board):
+    def __init__(self, link: CardLink, title: str, board: Board):
         Static.__init__(self)
         self._init_draggable()
         self.link = link
@@ -47,26 +47,26 @@ class TicketCard(DraggableMixin, Static):
         self.query_one(EditableLabel).start_editing()
 
     def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
-        """Update ticket title when edited."""
+        """Update card title when edited."""
         event.stop()
-        ticket = self.board.tickets.get(self.link.ticket_id)
-        if ticket and event.new_value:
-            ticket.content.title = event.new_value
+        card = self.board.cards.get(self.link.card_id)
+        if card and event.new_value:
+            card.content.title = event.new_value
             self.title = event.new_value
 
 
-class AddTicketWidget(Static):
-    """Widget to add a new ticket to a column."""
+class AddCardWidget(Static):
+    """Widget to add a new card to a column."""
 
     DEFAULT_CSS = """
-    AddTicketWidget {
+    AddCardWidget {
         width: 100%;
         height: auto;
         padding: 0 1;
         margin-bottom: 1;
         border: dashed $surface-lighten-2;
     }
-    AddTicketWidget > EditableLabel > Static {
+    AddCardWidget > EditableLabel > Static {
         text-align: center;
         color: $text-muted;
     }
@@ -86,8 +86,8 @@ class AddTicketWidget(Static):
     def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
         event.stop()
         if event.new_value and event.new_value != "+":
-            ticket = create_ticket(self.board, event.new_value, column=self.column)
-            link = self.column.links[-1]  # create_ticket adds link to end
-            card = TicketCard(link, ticket.content.title, self.board)
-            self.parent.mount(card, before=self)
+            new_card = create_card(self.board, event.new_value, column=self.column)
+            link = self.column.links[-1]  # create_card adds link to end
+            card_widget = CardWidget(link, new_card.content.title, self.board)
+            self.parent.mount(card_widget, before=self)
         self.query_one(EditableLabel).value = "+"

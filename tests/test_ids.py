@@ -1,4 +1,4 @@
-"""Tests for ticket ID comparison and generation."""
+"""Tests for card ID comparison and generation."""
 
 from ganban.ids import compare_ids, max_id, next_id
 

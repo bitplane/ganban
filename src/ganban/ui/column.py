@@ -8,7 +8,7 @@ from textual.widgets import Static
 
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
-from ganban.ui.card import TicketCard, AddTicketWidget
+from ganban.ui.card import AddCardWidget, CardWidget
 from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
 
@@ -105,10 +105,10 @@ class ColumnWidget(Vertical):
         yield ColumnHeader(self.column.name)
         with VerticalScroll(classes="column-body"):
             for link in self.column.links:
-                ticket = self.board.tickets.get(link.ticket_id)
-                title = ticket.content.title if ticket else link.slug
-                yield TicketCard(link, title, self.board)
-            yield AddTicketWidget(self.column, self.board)
+                card = self.board.cards.get(link.card_id)
+                title = card.content.title if card else link.slug
+                yield CardWidget(link, title, self.board)
+            yield AddCardWidget(self.column, self.board)
 
     def on_drag_start(self, event: DragStart) -> None:
         """Convert header DragStart to ColumnWidget.DragStart."""

@@ -9,7 +9,7 @@ from git import Repo
 from ganban.ids import compare_ids
 from git.objects import Blob, Tree
 
-from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
+from ganban.models import Board, Card, CardLink, Column, MarkdownDoc
 from ganban.parser import parse_markdown
 
 BRANCH_NAME = "ganban"
@@ -51,13 +51,13 @@ def _load_board_sync(repo_path: str, branch: str) -> Board:
     if index_blob is not None:
         board.content = _load_markdown_doc(index_blob)
 
-    # Load all tickets from .all/
+    # Load all cards from .all/
     all_tree = _tree_get(tree, ".all")
     if isinstance(all_tree, Tree):
-        board.tickets = _load_tickets(all_tree)
+        board.cards = _load_cards(all_tree)
 
     # Load columns
-    board.columns = _load_columns(tree, board.tickets)
+    board.columns = _load_columns(tree, board.cards)
 
     return board
 
@@ -68,9 +68,9 @@ def _load_markdown_doc(blob: Blob) -> MarkdownDoc:
     return parse_markdown(text)
 
 
-def _load_tickets(all_tree: Tree) -> dict[str, Ticket]:
-    """Load all tickets from the .all/ tree."""
-    tickets = {}
+def _load_cards(all_tree: Tree) -> dict[str, Card]:
+    """Load all cards from the .all/ tree."""
+    cards = {}
 
     for item in all_tree:
         if not isinstance(item, Blob):
@@ -78,18 +78,18 @@ def _load_tickets(all_tree: Tree) -> dict[str, Ticket]:
         if not item.name.endswith(".md"):
             continue
 
-        ticket_id = item.name[:-3]  # Remove .md
-        ticket = Ticket(
-            id=ticket_id,
+        card_id = item.name[:-3]  # Remove .md
+        card = Card(
+            id=card_id,
             path=f".all/{item.name}",
             content=_load_markdown_doc(item),
         )
-        tickets[ticket_id] = ticket
+        cards[card_id] = card
 
-    return tickets
+    return cards
 
 
-def _load_columns(tree: Tree, tickets: dict[str, Ticket]) -> list[Column]:
+def _load_columns(tree: Tree, cards: dict[str, Card]) -> list[Column]:
     """Load all column directories from the tree."""
     columns = []
 
@@ -117,8 +117,8 @@ def _load_columns(tree: Tree, tickets: dict[str, Ticket]) -> list[Column]:
             if column.content.title:
                 column.name = column.content.title
 
-        # Load ticket links (symlinks in git are blobs with mode 120000)
-        column.links = _load_ticket_links(item, tickets)
+        # Load card links (symlinks in git are blobs with mode 120000)
+        column.links = _load_card_links(item, cards)
 
         columns.append(column)
 
@@ -132,8 +132,8 @@ def _split_prefixed_name(name: str) -> tuple[str, str] | None:
     return (match.group(1), match.group(2)) if match else None
 
 
-def _load_ticket_links(column_tree: Tree, tickets: dict[str, Ticket]) -> list[TicketLink]:
-    """Load ticket symlinks from a column tree."""
+def _load_card_links(column_tree: Tree, cards: dict[str, Card]) -> list[CardLink]:
+    """Load card symlinks from a column tree."""
     links = []
 
     for item in column_tree:
@@ -151,17 +151,17 @@ def _load_ticket_links(column_tree: Tree, tickets: dict[str, Ticket]) -> list[Ti
 
         # Symlink target is the blob content
         target = item.data_stream.read().decode("utf-8")
-        # Extract ticket ID from target path like "../.all/001.md"
-        ticket_id = target.split("/")[-1]
-        if ticket_id.endswith(".md"):
-            ticket_id = ticket_id[:-3]
+        # Extract card ID from target path like "../.all/001.md"
+        card_id = target.split("/")[-1]
+        if card_id.endswith(".md"):
+            card_id = card_id[:-3]
 
-        broken = ticket_id not in tickets
+        broken = card_id not in cards
 
-        link = TicketLink(
+        link = CardLink(
             position=position,
             slug=slug,
-            ticket_id=ticket_id,
+            card_id=card_id,
             path=f"{column_tree.name}/{item.name}",
             broken=broken,
         )

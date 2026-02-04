@@ -1,4 +1,4 @@
-"""Ticket ID comparison and generation."""
+"""Card ID comparison and generation."""
 
 
 def compare_ids(left: str, right: str) -> int:

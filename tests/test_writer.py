@@ -6,13 +6,13 @@ import pytest
 from git import Repo
 
 from ganban.loader import load_board
-from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
+from ganban.models import Board, Card, CardLink, Column, MarkdownDoc
 from ganban.writer import (
     MergeRequired,
     check_for_merge,
     check_remote_for_merge,
+    create_card,
     create_column,
-    create_ticket,
     save_board,
     slugify,
     try_auto_merge,
@@ -41,11 +41,11 @@ def repo_with_ganban(empty_repo):
 
     all_dir = empty_repo / ".all"
     all_dir.mkdir()
-    (all_dir / "001.md").write_text("# First ticket\n\nDescription.\n")
+    (all_dir / "001.md").write_text("# First card\n\nDescription.\n")
 
     backlog = empty_repo / "1.backlog"
     backlog.mkdir()
-    (backlog / "01.first-ticket.md").symlink_to("../.all/001.md")
+    (backlog / "01.first-card.md").symlink_to("../.all/001.md")
 
     repo.git.add("-A")
     repo.index.commit("Initial board")
@@ -57,11 +57,11 @@ def repo_with_ganban(empty_repo):
 async def test_save_new_board(empty_repo):
     """Save a board to a fresh repo creates the branch."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(
+    board.cards = {
+        "001": Card(
             id="001",
             path=".all/001.md",
-            content=MarkdownDoc(title="Test ticket", body="Body text."),
+            content=MarkdownDoc(title="Test card", body="Body text."),
         ),
     }
     board.columns = [
@@ -70,7 +70,7 @@ async def test_save_new_board(empty_repo):
             name="Backlog",
             path="1.backlog",
             links=[
-                TicketLink(position="01", slug="test-ticket", ticket_id="001"),
+                CardLink(position="01", slug="test-card", card_id="001"),
             ],
         ),
     ]
@@ -81,10 +81,10 @@ async def test_save_new_board(empty_repo):
 
     # Verify we can load it back
     loaded = await load_board(empty_repo)
-    assert len(loaded.tickets) == 1
-    assert loaded.tickets["001"].content.title == "Test ticket"
+    assert len(loaded.cards) == 1
+    assert loaded.cards["001"].content.title == "Test card"
     assert len(loaded.columns) == 1
-    assert loaded.columns[0].links[0].ticket_id == "001"
+    assert loaded.columns[0].links[0].card_id == "001"
 
 
 @pytest.mark.asyncio
@@ -93,26 +93,26 @@ async def test_save_updates_existing_board(repo_with_ganban):
     board = await load_board(repo_with_ganban)
     original_commit = board.commit
 
-    # Add a new ticket
-    board.tickets["002"] = Ticket(
+    # Add a new card
+    board.cards["002"] = Card(
         id="002",
         path=".all/002.md",
-        content=MarkdownDoc(title="New ticket", body="New description."),
+        content=MarkdownDoc(title="New card", body="New description."),
     )
 
-    # Add a new column with the ticket
+    # Add a new column with the card
     board.columns.append(
         Column(
             order="2",
             name="Done",
             path="2.done",
             links=[
-                TicketLink(position="01", slug="new-ticket", ticket_id="002"),
+                CardLink(position="01", slug="new-card", card_id="002"),
             ],
         )
     )
 
-    new_commit = await save_board(board, message="Add ticket and column")
+    new_commit = await save_board(board, message="Add card and column")
 
     assert new_commit != original_commit
 
@@ -129,10 +129,10 @@ async def test_save_board_with_root_index(empty_repo):
         repo_path=str(empty_repo),
         content=MarkdownDoc(title="My Board", body="Board description."),
     )
-    board.tickets = {
-        "001": Ticket(
+    board.cards = {
+        "001": Card(
             id="001",
-            content=MarkdownDoc(title="Ticket"),
+            content=MarkdownDoc(title="Card"),
         ),
     }
     board.columns = [
@@ -150,8 +150,8 @@ async def test_save_board_with_root_index(empty_repo):
 async def test_save_board_with_column_index(empty_repo):
     """Column with index.md is saved correctly."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(id="001", content=MarkdownDoc(title="Ticket")),
+    board.cards = {
+        "001": Card(id="001", content=MarkdownDoc(title="Card")),
     }
     board.columns = [
         Column(
@@ -170,14 +170,14 @@ async def test_save_board_with_column_index(empty_repo):
 
 
 @pytest.mark.asyncio
-async def test_save_preserves_ticket_metadata(empty_repo):
-    """Ticket front-matter is preserved through save/load cycle."""
+async def test_save_preserves_card_metadata(empty_repo):
+    """Card front-matter is preserved through save/load cycle."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(
+    board.cards = {
+        "001": Card(
             id="001",
             content=MarkdownDoc(
-                title="Urgent ticket",
+                title="Urgent card",
                 body="Fix this ASAP.",
                 meta={"tags": ["urgent", "bug"], "priority": 1},
             ),
@@ -190,16 +190,16 @@ async def test_save_preserves_ticket_metadata(empty_repo):
     await save_board(board)
 
     loaded = await load_board(empty_repo)
-    assert loaded.tickets["001"].content.meta["tags"] == ["urgent", "bug"]
-    assert loaded.tickets["001"].content.meta["priority"] == 1
+    assert loaded.cards["001"].content.meta["tags"] == ["urgent", "bug"]
+    assert loaded.cards["001"].content.meta["priority"] == 1
 
 
 @pytest.mark.asyncio
-async def test_save_move_ticket_between_columns(repo_with_ganban):
-    """Moving a ticket between columns shows up correctly."""
+async def test_save_move_card_between_columns(repo_with_ganban):
+    """Moving a card between columns shows up correctly."""
     board = await load_board(repo_with_ganban)
 
-    # Move ticket from backlog to a new done column
+    # Move card from backlog to a new done column
     link = board.columns[0].links.pop(0)
     link.position = "01"
 
@@ -212,38 +212,38 @@ async def test_save_move_ticket_between_columns(repo_with_ganban):
         )
     )
 
-    await save_board(board, message="Move ticket to done")
+    await save_board(board, message="Move card to done")
 
     loaded = await load_board(repo_with_ganban)
     assert len(loaded.columns[0].links) == 0  # Backlog empty
-    assert len(loaded.columns[1].links) == 1  # Done has the ticket
-    assert loaded.columns[1].links[0].ticket_id == "001"
+    assert len(loaded.columns[1].links) == 1  # Done has the card
+    assert loaded.columns[1].links[0].card_id == "001"
 
 
 @pytest.mark.asyncio
-async def test_save_delete_ticket(repo_with_ganban):
-    """Deleting a ticket removes it from .all/"""
+async def test_save_delete_card(repo_with_ganban):
+    """Deleting a card removes it from .all/"""
     board = await load_board(repo_with_ganban)
-    assert "001" in board.tickets
+    assert "001" in board.cards
 
-    # Remove ticket and its link
-    del board.tickets["001"]
+    # Remove card and its link
+    del board.cards["001"]
     board.columns[0].links = []
 
-    await save_board(board, message="Delete ticket")
+    await save_board(board, message="Delete card")
 
     loaded = await load_board(repo_with_ganban)
-    assert "001" not in loaded.tickets
+    assert "001" not in loaded.cards
 
 
 @pytest.mark.asyncio
-async def test_save_reorder_tickets_in_column(empty_repo):
-    """Reordering tickets updates their position prefixes."""
+async def test_save_reorder_cards_in_column(empty_repo):
+    """Reordering cards updates their position prefixes."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(id="001", content=MarkdownDoc(title="First")),
-        "002": Ticket(id="002", content=MarkdownDoc(title="Second")),
-        "003": Ticket(id="003", content=MarkdownDoc(title="Third")),
+    board.cards = {
+        "001": Card(id="001", content=MarkdownDoc(title="First")),
+        "002": Card(id="002", content=MarkdownDoc(title="Second")),
+        "003": Card(id="003", content=MarkdownDoc(title="Third")),
     }
     board.columns = [
         Column(
@@ -251,9 +251,9 @@ async def test_save_reorder_tickets_in_column(empty_repo):
             name="Backlog",
             path="1.backlog",
             links=[
-                TicketLink(position="01", slug="first", ticket_id="001"),
-                TicketLink(position="02", slug="second", ticket_id="002"),
-                TicketLink(position="03", slug="third", ticket_id="003"),
+                CardLink(position="01", slug="first", card_id="001"),
+                CardLink(position="02", slug="second", card_id="002"),
+                CardLink(position="03", slug="third", card_id="003"),
             ],
         ),
     ]
@@ -267,10 +267,10 @@ async def test_save_reorder_tickets_in_column(empty_repo):
     links[1].position = "03"
     links[2].position = "01"
 
-    await save_board(board, message="Reorder tickets")
+    await save_board(board, message="Reorder cards")
 
     loaded = await load_board(empty_repo)
-    positions = [(link.position, link.ticket_id) for link in loaded.columns[0].links]
+    positions = [(link.position, link.card_id) for link in loaded.columns[0].links]
     assert positions == [("01", "003"), ("02", "001"), ("03", "002")]
 
 
@@ -278,7 +278,7 @@ async def test_save_reorder_tickets_in_column(empty_repo):
 async def test_save_empty_column(empty_repo):
     """Empty columns are saved correctly."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {}
+    board.cards = {}
     board.columns = [
         Column(order="1", name="Backlog", path="1.backlog"),
         Column(order="2", name="Done", path="2.done"),
@@ -295,8 +295,8 @@ async def test_save_empty_column(empty_repo):
 async def test_save_returns_valid_commit(empty_repo):
     """The returned commit hash is valid and points to correct tree."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(id="001", content=MarkdownDoc(title="Test")),
+    board.cards = {
+        "001": Card(id="001", content=MarkdownDoc(title="Test")),
     }
     board.columns = [
         Column(order="1", name="Backlog", path="1.backlog"),
@@ -315,8 +315,8 @@ async def test_save_returns_valid_commit(empty_repo):
 async def test_save_custom_branch(empty_repo):
     """Can save to a custom branch name."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {
-        "001": Ticket(id="001", content=MarkdownDoc(title="Test")),
+    board.cards = {
+        "001": Card(id="001", content=MarkdownDoc(title="Test")),
     }
     board.columns = [
         Column(order="1", name="Backlog", path="1.backlog"),
@@ -330,7 +330,7 @@ async def test_save_custom_branch(empty_repo):
 
     # Should load from custom branch
     loaded = await load_board(empty_repo, branch="my-board")
-    assert len(loaded.tickets) == 1
+    assert len(loaded.cards) == 1
 
 
 @pytest.mark.asyncio
@@ -340,12 +340,12 @@ async def test_save_with_explicit_parents(repo_with_ganban):
     first_commit = board.commit
 
     # Make a change and save
-    board.tickets["001"].content.body = "Changed"
+    board.cards["001"].content.body = "Changed"
     second_commit = await save_board(board)
 
     # Now create a "merge" commit with both as parents
     board = await load_board(repo_with_ganban)
-    board.tickets["001"].content.body = "Merged"
+    board.cards["001"].content.body = "Merged"
     merge_commit = await save_board(board, message="Merge", parents=[first_commit, second_commit])
 
     repo = Repo(repo_with_ganban)
@@ -376,7 +376,7 @@ async def test_check_for_merge_branch_moved(repo_with_ganban):
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
-    (all_dir / "002.md").write_text("# External ticket\n")
+    (all_dir / "002.md").write_text("# External card\n")
     repo.git.add("-A")
     external_commit = repo.index.commit("External change").hexsha
 
@@ -393,7 +393,7 @@ async def test_check_for_merge_branch_moved(repo_with_ganban):
 def test_check_for_merge_new_branch(empty_repo):
     """No merge needed for new branch."""
     board = Board(repo_path=str(empty_repo))
-    board.tickets = {"001": Ticket(id="001", content=MarkdownDoc(title="Test"))}
+    board.cards = {"001": Card(id="001", content=MarkdownDoc(title="Test"))}
     board.columns = [Column(order="1", name="Backlog", path="1.backlog")]
 
     result = check_for_merge(board)
@@ -425,7 +425,7 @@ async def test_check_for_merge_unrelated_histories(repo_with_ganban):
 
     all_dir = repo_with_ganban / ".all"
     all_dir.mkdir()
-    (all_dir / "999.md").write_text("# Unrelated ticket\n")
+    (all_dir / "999.md").write_text("# Unrelated card\n")
     backlog = repo_with_ganban / "1.backlog"
     backlog.mkdir()
 
@@ -451,16 +451,16 @@ async def test_auto_merge_clean(repo_with_ganban):
     board = await load_board(repo_with_ganban)
     original_commit = board.commit
 
-    # External change: add new ticket
+    # External change: add new card
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
-    (all_dir / "002.md").write_text("# External ticket\n\nAdded externally.\n")
+    (all_dir / "002.md").write_text("# External card\n\nAdded externally.\n")
     repo.git.add("-A")
-    external_commit = repo.index.commit("Add external ticket").hexsha
+    external_commit = repo.index.commit("Add external card").hexsha
 
-    # Our change: edit ticket 001
-    board.tickets["001"].content.body = "Modified description."
+    # Our change: edit card 001
+    board.cards["001"].content.body = "Modified description."
 
     # Check and auto-merge
     merge_info = check_for_merge(board)
@@ -478,8 +478,8 @@ async def test_auto_merge_clean(repo_with_ganban):
 
     # Both changes should be present
     loaded = await load_board(repo_with_ganban)
-    assert loaded.tickets["001"].content.body == "Modified description."
-    assert "002" in loaded.tickets
+    assert loaded.cards["001"].content.body == "Modified description."
+    assert "002" in loaded.cards
 
 
 @pytest.mark.asyncio
@@ -487,16 +487,16 @@ async def test_auto_merge_conflict(repo_with_ganban):
     """Auto-merge fails when same file changed."""
     board = await load_board(repo_with_ganban)
 
-    # External change: edit ticket 001
+    # External change: edit card 001
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
-    (all_dir / "001.md").write_text("# First ticket\n\nExternal edit.\n")
+    (all_dir / "001.md").write_text("# First card\n\nExternal edit.\n")
     repo.git.add("-A")
     repo.index.commit("External edit")
 
-    # Our change: also edit ticket 001
-    board.tickets["001"].content.body = "Our edit."
+    # Our change: also edit card 001
+    board.cards["001"].content.body = "Our edit."
 
     # Check and try auto-merge
     merge_info = check_for_merge(board)
@@ -516,12 +516,12 @@ async def test_manual_merge_after_conflict(repo_with_ganban):
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
-    (all_dir / "001.md").write_text("# First ticket\n\nExternal edit.\n")
+    (all_dir / "001.md").write_text("# First card\n\nExternal edit.\n")
     repo.git.add("-A")
     theirs_commit = repo.index.commit("External edit").hexsha
 
     # Our change conflicts
-    board.tickets["001"].content.body = "Our edit."
+    board.cards["001"].content.body = "Our edit."
 
     # Check for merge
     merge_info = check_for_merge(board)
@@ -537,7 +537,7 @@ async def test_manual_merge_after_conflict(repo_with_ganban):
     # ... user picks resolution ...
 
     # Save resolved board with both parents
-    board.tickets["001"].content.body = "Manually resolved."
+    board.cards["001"].content.body = "Manually resolved."
     new_commit = await save_board(
         board,
         message="Resolve conflict",
@@ -549,7 +549,7 @@ async def test_manual_merge_after_conflict(repo_with_ganban):
     assert len(commit.parents) == 2
 
     loaded = await load_board(repo_with_ganban)
-    assert loaded.tickets["001"].content.body == "Manually resolved."
+    assert loaded.cards["001"].content.body == "Manually resolved."
 
 
 # --- Remote merge tests ---
@@ -579,11 +579,11 @@ def repo_with_remote(tmp_path):
 
     all_dir = local_path / ".all"
     all_dir.mkdir()
-    (all_dir / "001.md").write_text("# First ticket\n\nDescription.\n")
+    (all_dir / "001.md").write_text("# First card\n\nDescription.\n")
 
     backlog = local_path / "1.backlog"
     backlog.mkdir()
-    (backlog / "01.first-ticket.md").symlink_to("../.all/001.md")
+    (backlog / "01.first-card.md").symlink_to("../.all/001.md")
 
     local_repo.git.add("-A")
     local_repo.index.commit("Initial board")
@@ -682,9 +682,9 @@ async def test_check_remote_has_changes(repo_with_remote):
         other_repo.git.checkout("ganban")
 
         all_dir = Path(other_path) / ".all"
-        (all_dir / "002.md").write_text("# Remote ticket\n\nAdded by someone else.\n")
+        (all_dir / "002.md").write_text("# Remote card\n\nAdded by someone else.\n")
         other_repo.git.add("-A")
-        other_repo.index.commit("Add ticket from remote")
+        other_repo.index.commit("Add card from remote")
         other_repo.git.push("origin", "ganban")
 
     # Fetch in local repo
@@ -708,7 +708,7 @@ async def test_check_remote_we_are_ahead(repo_with_remote):
     board = await load_board(local_path)
 
     # Make a local change (don't push)
-    board.tickets["001"].content.body = "Local change."
+    board.cards["001"].content.body = "Local change."
     await save_board(board)
 
     # Reload and check
@@ -725,7 +725,7 @@ async def test_remote_auto_merge(repo_with_remote):
     board = await load_board(local_path)
 
     # Make local change
-    board.tickets["001"].content.body = "Local edit."
+    board.cards["001"].content.body = "Local edit."
 
     # Simulate remote change (different file)
     import tempfile
@@ -735,9 +735,9 @@ async def test_remote_auto_merge(repo_with_remote):
         other_repo.git.checkout("ganban")
 
         all_dir = Path(other_path) / ".all"
-        (all_dir / "002.md").write_text("# Remote ticket\n")
+        (all_dir / "002.md").write_text("# Remote card\n")
         other_repo.git.add("-A")
-        other_repo.index.commit("Add ticket from remote")
+        other_repo.index.commit("Add card from remote")
         other_repo.git.push("origin", "ganban")
 
     # Fetch
@@ -754,80 +754,80 @@ async def test_remote_auto_merge(repo_with_remote):
 
     # Both changes present
     loaded = await load_board(local_path)
-    assert loaded.tickets["001"].content.body == "Local edit."
-    assert "002" in loaded.tickets
+    assert loaded.cards["001"].content.body == "Local edit."
+    assert "002" in loaded.cards
 
 
-# --- create_ticket tests ---
+# --- create_card tests ---
 
 
 @pytest.mark.asyncio
-async def test_create_ticket_basic(repo_with_ganban):
-    """Create a ticket with default options."""
+async def test_create_card_basic(repo_with_ganban):
+    """Create a card with default options."""
     board = await load_board(repo_with_ganban)
-    original_count = len(board.tickets)
+    original_count = len(board.cards)
 
-    ticket = create_ticket(board, "New ticket", "Description here")
+    card = create_card(board, "New card", "Description here")
 
-    assert ticket.id == "2"  # Next after 001
-    assert ticket.content.title == "New ticket"
-    assert ticket.content.body == "Description here"
-    assert ticket.id in board.tickets
-    assert len(board.tickets) == original_count + 1
+    assert card.id == "2"  # Next after 001
+    assert card.content.title == "New card"
+    assert card.content.body == "Description here"
+    assert card.id in board.cards
+    assert len(board.cards) == original_count + 1
 
     # Should be added to first column
-    assert board.columns[0].links[-1].ticket_id == "2"
+    assert board.columns[0].links[-1].card_id == "2"
 
 
 @pytest.mark.asyncio
-async def test_create_ticket_specific_column(repo_with_ganban):
-    """Create a ticket in a specific column."""
+async def test_create_card_specific_column(repo_with_ganban):
+    """Create a card in a specific column."""
     board = await load_board(repo_with_ganban)
     # Add a second column first
     doing_column = create_column(board, "Doing")
 
-    ticket = create_ticket(board, "In progress task", column=doing_column)
+    card = create_card(board, "In progress card", column=doing_column)
 
-    assert ticket.id in board.tickets
-    assert doing_column.links[-1].ticket_id == ticket.id
+    assert card.id in board.cards
+    assert doing_column.links[-1].card_id == card.id
 
 
 @pytest.mark.asyncio
-async def test_create_ticket_specific_position(repo_with_ganban):
-    """Create a ticket at a specific position in column."""
+async def test_create_card_specific_position(repo_with_ganban):
+    """Create a card at a specific position in column."""
     board = await load_board(repo_with_ganban)
     backlog = board.columns[0]
-    original_first = backlog.links[0].ticket_id
+    original_first = backlog.links[0].card_id
 
-    ticket = create_ticket(board, "Top priority", column=backlog, position=0)
+    card = create_card(board, "Top priority", column=backlog, position=0)
 
-    assert backlog.links[0].ticket_id == ticket.id
-    assert backlog.links[1].ticket_id == original_first
+    assert backlog.links[0].card_id == card.id
+    assert backlog.links[1].card_id == original_first
 
 
-def test_create_ticket_empty_board(empty_repo):
-    """Create a ticket on an empty board."""
+def test_create_card_empty_board(empty_repo):
+    """Create a card on an empty board."""
     board = Board(repo_path=str(empty_repo))
     board.columns = [Column(order="1", name="Backlog", path="1.backlog")]
 
-    ticket = create_ticket(board, "First ticket")
+    card = create_card(board, "First card")
 
-    assert ticket.id == "001"
-    assert ticket.id in board.tickets
-    assert board.columns[0].links[0].ticket_id == "001"
+    assert card.id == "001"
+    assert card.id in board.cards
+    assert board.columns[0].links[0].card_id == "001"
 
 
 @pytest.mark.asyncio
-async def test_create_ticket_saves(repo_with_ganban):
-    """Created tickets persist after save."""
+async def test_create_card_saves(repo_with_ganban):
+    """Created cards persist after save."""
     board = await load_board(repo_with_ganban)
 
-    ticket = create_ticket(board, "Persistent ticket", "Will be saved")
+    card = create_card(board, "Persistent card", "Will be saved")
     await save_board(board)
 
     loaded = await load_board(repo_with_ganban)
-    assert ticket.id in loaded.tickets
-    assert loaded.tickets[ticket.id].content.title == "Persistent ticket"
+    assert card.id in loaded.cards
+    assert loaded.cards[card.id].content.title == "Persistent card"
 
 
 # --- create_column tests ---

@@ -5,15 +5,15 @@ TUI for git-based Trello replacement.
 ## Overview
 
 Open a repo with ganban and it reads from a `ganban` orphan branch. The board
-is just directories (columns) containing symlinks (tickets) pointing to
-canonical ticket files. Everything is plain markdown, works with any text
+is just directories (columns) containing symlinks (cards) pointing to
+canonical card files. Everything is plain markdown, works with any text
 editor, and syncs via git.
 
 ## Data Model
 
-### Tickets
+### Cards
 
-Canonical ticket files live in `.all/` with 3-digit numeric IDs:
+Canonical card files live in `.all/` with 3-digit numeric IDs:
 
 ```
 .all/
@@ -22,10 +22,10 @@ Canonical ticket files live in `.all/` with 3-digit numeric IDs:
   003.md
 ```
 
-Ticket format:
+Card format:
 
 ```markdown
-# Title of the ticket
+# Title of the card
 
 Main description goes here, displayed in the body.
 
@@ -76,7 +76,7 @@ Directories with 1-digit numeric prefix for ordering:
 
 ### Board Layout
 
-Tickets appear in columns as symlinks with 2-digit position prefix:
+Cards appear in columns as symlinks with 2-digit position prefix:
 
 ```
 1.backlog/
@@ -86,11 +86,11 @@ Tickets appear in columns as symlinks with 2-digit position prefix:
   01.refactor-api.md -> ../.all/002.md
 ```
 
-- Symlink name = position + slug (derived from ticket title)
-- Moving ticket between columns = delete + create symlink
+- Symlink name = position + slug (derived from card title)
+- Moving card between columns = delete + create symlink
 - Reordering within column = rename symlinks
-- Archiving = just delete the symlink, ticket stays in `.all/`
-- Orphaned tickets (in `.all/` but not linked) accessible via TUI
+- Archiving = just delete the symlink, card stays in `.all/`
+- Orphaned cards (in `.all/` but not linked) accessible via TUI
 
 ### Numbering
 
@@ -117,7 +117,7 @@ Operates on the `ganban` branch without checking it out, using git plumbing:
 
 - **Content conflicts**: git markers show in markdown, user edits them out
 - **Broken symlinks**: highlight red, user picks destination or deletes
-- **Column renames**: broken links surface as red tickets, same fix
+- **Column renames**: broken links surface as red cards, same fix
 
 ### Multi-Remote Sync
 

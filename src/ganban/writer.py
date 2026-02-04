@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ganban.ids import compare_ids, max_id, next_id
 from ganban.loader import BRANCH_NAME
-from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
+from ganban.models import Board, Card, CardLink, Column, MarkdownDoc
 from ganban.parser import serialize_markdown
 
 
@@ -221,11 +221,11 @@ def try_auto_merge(
 
 def _build_board_tree(repo_path: Path, board: Board) -> str:
     """Build the complete tree for a board and return its hash."""
-    # Build ticket blobs and .all tree
-    ticket_blobs = _hash_tickets(repo_path, board.tickets)
+    # Build card blobs and .all tree
+    card_blobs = _hash_cards(repo_path, board.cards)
     all_tree = _mktree(
         repo_path,
-        [("100644", "blob", sha, f"{ticket_id}.md") for ticket_id, sha in ticket_blobs.items()],
+        [("100644", "blob", sha, f"{card_id}.md") for card_id, sha in card_blobs.items()],
     )
 
     # Build column trees
@@ -258,9 +258,9 @@ def _build_column_tree(repo_path: Path, column: Column) -> str:
         index_blob = _hash_object(repo_path, serialize_markdown(column.content))
         entries.append(("100644", "blob", index_blob, "index.md"))
 
-    # Add symlinks for ticket links
+    # Add symlinks for card links
     for link in column.links:
-        target = f"../.all/{link.ticket_id}.md"
+        target = f"../.all/{link.card_id}.md"
         symlink_blob = _hash_object(repo_path, target)
         filename = f"{link.position}.{link.slug}.md"
         entries.append(("120000", "blob", symlink_blob, filename))
@@ -325,11 +325,9 @@ def _merge_trees(repo_path: Path, base_commit: str, our_tree: str, their_commit:
     return tree_hash, has_conflicts
 
 
-def _hash_tickets(repo_path: Path, tickets: dict[str, Ticket]) -> dict[str, str]:
-    """Hash all ticket markdown files and return {ticket_id: blob_sha}."""
-    return {
-        ticket_id: _hash_object(repo_path, serialize_markdown(ticket.content)) for ticket_id, ticket in tickets.items()
-    }
+def _hash_cards(repo_path: Path, cards: dict[str, Card]) -> dict[str, str]:
+    """Hash all card markdown files and return {card_id: blob_sha}."""
+    return {card_id: _hash_object(repo_path, serialize_markdown(card.content)) for card_id, card in cards.items()}
 
 
 def _hash_object(repo_path: Path, content: str) -> str:
@@ -376,39 +374,39 @@ def _git(repo_path: Path, args: list[str]) -> str:
 # --- Board manipulation helpers ---
 
 
-def create_ticket(
+def create_card(
     board: Board,
     title: str,
     body: str = "",
     column: Column | None = None,
     position: int | None = None,
-) -> Ticket:
-    """Create a new ticket and add it to the board.
+) -> Card:
+    """Create a new card and add it to the board.
 
     Args:
-        board: The board to add the ticket to
-        title: Ticket title
-        body: Ticket body text
-        column: Column to add the ticket to (default: first column)
+        board: The board to add the card to
+        title: Card title
+        body: Card body text
+        column: Column to add the card to (default: first column)
         position: Position in column (default: end of column)
 
     Returns:
-        The created Ticket
+        The created Card
     """
-    ticket_id = next_id(max_id(list(board.tickets.keys())))
-    ticket = Ticket(
-        id=ticket_id,
-        path=f".all/{ticket_id}.md",
+    card_id = next_id(max_id(list(board.cards.keys())))
+    card = Card(
+        id=card_id,
+        path=f".all/{card_id}.md",
         content=MarkdownDoc(title=title, body=body),
     )
-    board.tickets[ticket_id] = ticket
+    board.cards[card_id] = card
 
     # Add to column
     target_column = column or (board.columns[0] if board.columns else None)
     if target_column:
         slug = slugify(title)
-        link = TicketLink(
-            ticket_id=ticket_id,
+        link = CardLink(
+            card_id=card_id,
             position=position if position is not None else len(target_column.links) + 1,
             slug=slug,
         )
@@ -417,7 +415,7 @@ def create_ticket(
         else:
             target_column.links.append(link)
 
-    return ticket
+    return card
 
 
 def create_column(

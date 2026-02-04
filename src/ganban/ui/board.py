@@ -1,4 +1,4 @@
-"""Board screen showing kanban columns and tickets."""
+"""Board screen showing kanban columns and cards."""
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
@@ -8,7 +8,7 @@ from textual.widgets import Static
 
 from ganban.models import Board
 from ganban.writer import build_column_path, save_board
-from ganban.ui.card import TicketCard, AddTicketWidget
+from ganban.ui.card import AddCardWidget, CardWidget
 from ganban.ui.column import ColumnWidget, AddColumnWidget, ColumnPlaceholder
 from ganban.ui.drag import DragStart
 from ganban.ui.widgets import EditableLabel
@@ -58,7 +58,7 @@ class CardDragManager:
 
     def __init__(self, screen: "BoardScreen"):
         self.screen = screen
-        self.dragging: TicketCard | None = None
+        self.dragging: CardWidget | None = None
         self.overlay: DragOverlay | None = None
         self.placeholder: DropPlaceholder | None = None
         self.drag_offset: Offset = Offset(0, 0)
@@ -69,7 +69,7 @@ class CardDragManager:
     def active(self) -> bool:
         return self.dragging is not None
 
-    def start(self, card: TicketCard, mouse_offset: Offset) -> None:
+    def start(self, card: CardWidget, mouse_offset: Offset) -> None:
         self.dragging = card
         card.add_class("dragging")
 
@@ -130,8 +130,8 @@ class CardDragManager:
         return min(columns, key=column_distance)
 
     def _calculate_insert_position(self, scroll: VerticalScroll, screen_y: int) -> Static:
-        add_widget = scroll.query_one(AddTicketWidget)
-        visible_cards = [c for c in scroll.children if isinstance(c, TicketCard) and c is not self.dragging]
+        add_widget = scroll.query_one(AddCardWidget)
+        visible_cards = [c for c in scroll.children if isinstance(c, CardWidget) and c is not self.dragging]
 
         for card in visible_cards:
             card_mid_y = card.region.y + card.region.height // 2
@@ -173,24 +173,24 @@ class CardDragManager:
         target_column.links.insert(actual_pos, card.link)
         _renumber_column_links(target_column)
 
-        new_card = TicketCard(card.link, card.title, self.screen.board)
+        new_card = CardWidget(card.link, card.title, self.screen.board)
         target_scroll.mount(new_card, before=insert_before)
         card.remove()
 
         self._cleanup()
 
-    def _find_source_column(self, card: TicketCard):
+    def _find_source_column(self, card: CardWidget):
         for col in self.screen.board.columns:
-            if any(link.ticket_id == card.link.ticket_id for link in col.links):
+            if any(link.card_id == card.link.card_id for link in col.links):
                 return col
         return None
 
-    def _calculate_model_position(self, scroll: VerticalScroll, insert_before: Static, card: TicketCard) -> int:
+    def _calculate_model_position(self, scroll: VerticalScroll, insert_before: Static, card: CardWidget) -> int:
         pos = 0
         for c in scroll.children:
             if c is insert_before:
                 break
-            if isinstance(c, TicketCard) and c is not card:
+            if isinstance(c, CardWidget) and c is not card:
                 pos += 1
         return pos
 
@@ -392,7 +392,7 @@ class BoardScreen(Screen):
 
     def on_drag_start(self, event: DragStart) -> None:
         """Handle drag start from a card."""
-        if isinstance(event.widget, TicketCard):
+        if isinstance(event.widget, CardWidget):
             event.stop()
             self._card_drag.start(event.widget, event.mouse_offset)
 

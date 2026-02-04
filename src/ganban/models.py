@@ -16,8 +16,8 @@ class MarkdownDoc:
 
 
 @dataclass
-class Ticket:
-    """A ticket file in .all/"""
+class Card:
+    """A card file in .all/"""
 
     id: str
     path: str = ""
@@ -25,12 +25,12 @@ class Ticket:
 
 
 @dataclass
-class TicketLink:
-    """A symlink in a column pointing to a ticket."""
+class CardLink:
+    """A symlink in a column pointing to a card."""
 
     position: str
     slug: str
-    ticket_id: str
+    card_id: str
     path: str = ""
     broken: bool = False
 
@@ -43,7 +43,7 @@ class Column:
     name: str
     path: str = ""
     hidden: bool = False
-    links: list[TicketLink] = field(default_factory=list)
+    links: list[CardLink] = field(default_factory=list)
     content: MarkdownDoc = field(default_factory=MarkdownDoc)
 
 
@@ -54,5 +54,5 @@ class Board:
     repo_path: str = ""
     commit: str = ""
     columns: list[Column] = field(default_factory=list)
-    tickets: dict[str, Ticket] = field(default_factory=dict)
+    cards: dict[str, Card] = field(default_factory=dict)
     content: MarkdownDoc = field(default_factory=MarkdownDoc)
