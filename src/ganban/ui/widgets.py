@@ -64,6 +64,11 @@ class EditableLabel(Container):
             self.old_value = old_value
             self.new_value = new_value
 
+        @property
+        def control(self) -> "EditableLabel":
+            """The EditableLabel that changed."""
+            return self._sender
+
     def __init__(self, value: str = "", click_to_edit: bool = True, **kwargs) -> None:
         super().__init__(**kwargs)
         self._value = self._clean(value)
