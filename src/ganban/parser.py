@@ -6,6 +6,13 @@ import yaml
 
 from ganban.models import MarkdownDoc
 
+_H1_OR_H2 = re.compile(r"^(#{1,2}) ", re.MULTILINE)
+
+
+def _demote_headings(text: str) -> str:
+    """Convert # and ## at start of lines to ### to prevent structural conflicts."""
+    return _H1_OR_H2.sub("### ", text)
+
 
 def parse_markdown(text: str) -> MarkdownDoc:
     """Parse a markdown document into a MarkdownDoc."""
@@ -79,7 +86,7 @@ def serialize_markdown(doc: MarkdownDoc) -> str:
 
     # Body
     if doc.body:
-        parts.append(doc.body)
+        parts.append(_demote_headings(doc.body))
         parts.append("")
 
     # Sections
@@ -87,7 +94,7 @@ def serialize_markdown(doc: MarkdownDoc) -> str:
         parts.append(f"## {heading}")
         parts.append("")
         if content:
-            parts.append(content)
+            parts.append(_demote_headings(content))
             parts.append("")
 
     return "\n".join(parts).rstrip() + "\n"
