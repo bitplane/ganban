@@ -3,7 +3,7 @@
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
-from textual.widgets import Markdown, Static, TextArea
+from textual.widgets import ContentSwitcher, Markdown, Static, TextArea
 
 
 class NonSelectableStatic(Static):
@@ -70,10 +70,14 @@ class EditableLabel(Container):
         width: 100%;
         height: auto;
     }
-    EditableLabel > Static {
+    EditableLabel > ContentSwitcher {
+        width: 100%;
+        height: auto;
+    }
+    EditableLabel #view {
         width: 100%;
     }
-    EditableLabel > TextArea {
+    EditableLabel #edit {
         width: 100%;
         height: auto;
         border: none;
@@ -112,11 +116,12 @@ class EditableLabel(Container):
     @value.setter
     def value(self, new_value: str) -> None:
         self._value = self._clean(new_value)
-        if not self._editing:
-            self.query_one(Static).update(self._value)
+        self.query_one("#view", Static).update(self._value)
 
     def compose(self) -> ComposeResult:
-        yield NonSelectableStatic(self._value)
+        with ContentSwitcher(initial="view"):
+            yield NonSelectableStatic(self._value, id="view")
+            yield _EditArea(self._value, id="edit", soft_wrap=True, compact=True)
 
     def on_click(self, event) -> None:
         if self._click_to_edit and not self._editing:
@@ -133,28 +138,26 @@ class EditableLabel(Container):
             return
         self._editing = True
         edit_text = self._value if text is None else text
-        static = self.query_one(Static)
-        static.remove()
-        text_area = _EditArea(edit_text, soft_wrap=True, compact=True)
-        text_area.cursor_type = "line"
-        self.mount(text_area)
+        text_area = self.query_one("#edit", _EditArea)
+        text_area.text = edit_text
+        text_area.cursor_location = (0, min(cursor_col, len(edit_text)))
+        self.query_one(ContentSwitcher).current = "edit"
         text_area.focus()
-        col = min(cursor_col, len(edit_text))
-        text_area.cursor_location = (0, col)
 
     def _stop_editing(self, save: bool) -> None:
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one(_EditArea)
+        text_area = self.query_one("#edit", _EditArea)
         new_value = self._clean(text_area.text)
-        text_area.remove()
-        self.mount(NonSelectableStatic(self._value if not save else new_value))
 
         if save and new_value != self._value:
             old_value = self._value
             self._value = new_value
+            self.query_one("#view", Static).update(self._value)
             self.post_message(self.Changed(old_value, new_value))
+
+        self.query_one(ContentSwitcher).current = "view"
 
     def on__edit_area_submit(self) -> None:
         self._stop_editing(save=True)
@@ -171,12 +174,16 @@ class EditableMarkdown(Container):
         width: 100%;
         height: 1fr;
     }
-    EditableMarkdown > Markdown {
+    EditableMarkdown > ContentSwitcher {
+        width: 100%;
+        height: 100%;
+    }
+    EditableMarkdown #view {
         width: 100%;
         height: 100%;
         padding: 0;
     }
-    EditableMarkdown > TextArea {
+    EditableMarkdown #edit {
         width: 100%;
         height: 100%;
         border: none;
@@ -209,11 +216,12 @@ class EditableMarkdown(Container):
     @value.setter
     def value(self, new_value: str) -> None:
         self._value = new_value
-        if not self._editing:
-            self.query_one(Markdown).update(self._value)
+        self.query_one("#view", Markdown).update(self._value)
 
     def compose(self) -> ComposeResult:
-        yield Markdown(self._value)
+        with ContentSwitcher(initial="view"):
+            yield Markdown(self._value, id="view")
+            yield _MarkdownEditArea(self._value, id="edit")
 
     def on_click(self, event) -> None:
         if not self._editing:
@@ -223,24 +231,25 @@ class EditableMarkdown(Container):
         if self._editing:
             return
         self._editing = True
-        self.query_one(Markdown).remove()
-        text_area = _MarkdownEditArea(self._value)
-        self.mount(text_area)
+        text_area = self.query_one("#edit", _MarkdownEditArea)
+        text_area.text = self._value
+        self.query_one(ContentSwitcher).current = "edit"
         text_area.focus()
 
     def _stop_editing(self, save: bool) -> None:
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one(_MarkdownEditArea)
+        text_area = self.query_one("#edit", _MarkdownEditArea)
         new_value = text_area.text
-        text_area.remove()
-        self.mount(Markdown(self._value if not save else new_value))
 
         if save and new_value != self._value:
             old_value = self._value
             self._value = new_value
+            self.query_one("#view", Markdown).update(self._value)
             self.post_message(self.Changed(old_value, new_value))
+
+        self.query_one(ContentSwitcher).current = "view"
 
     def on__markdown_edit_area_submit(self) -> None:
         self._stop_editing(save=True)
