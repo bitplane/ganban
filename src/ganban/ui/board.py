@@ -26,6 +26,21 @@ class DropPlaceholder(Static):
     """
 
 
+class ColumnPlaceholder(Static):
+    """Placeholder showing where a dragged column will drop."""
+
+    DEFAULT_CSS = """
+    ColumnPlaceholder {
+        width: 1fr;
+        min-width: 20;
+        max-width: 25;
+        height: 100%;
+        border: dashed $primary;
+        background: $surface-darken-1;
+    }
+    """
+
+
 class DragOverlay(Static):
     """Floating overlay showing the card being dragged."""
 
@@ -148,6 +163,65 @@ class AddTicketWidget(Static):
         self.query_one(EditableLabel).value = "+"
 
 
+class ColumnHeader(Static):
+    """Draggable column header."""
+
+    DEFAULT_CSS = """
+    ColumnHeader {
+        width: 100%;
+        height: auto;
+    }
+    ColumnHeader > Static {
+        width: 100%;
+        text-align: center;
+        text-style: bold;
+    }
+    """
+
+    class DragStart(Message):
+        """Posted when a column header drag begins."""
+
+        def __init__(self, header: "ColumnHeader", mouse_offset: Offset) -> None:
+            super().__init__()
+            self.header = header
+            self.mouse_offset = mouse_offset
+
+    def __init__(self, column_name: str):
+        super().__init__()
+        self.column_name = column_name
+        self._drag_start_pos: Offset | None = None
+
+    def compose(self) -> ComposeResult:
+        yield EditableLabel(self.column_name)
+
+    def on_mouse_down(self, event) -> None:
+        event.stop()
+        event.prevent_default()
+        self._drag_start_pos = Offset(event.screen_x, event.screen_y)
+        self.capture_mouse()
+
+    def on_mouse_move(self, event) -> None:
+        if self._drag_start_pos is None:
+            return
+        event.stop()
+        event.prevent_default()
+        # Start drag if moved more than 2 cells horizontally
+        dx = abs(event.screen_x - self._drag_start_pos.x)
+        if dx > 2:
+            self.release_mouse()
+            self.post_message(self.DragStart(self, self._drag_start_pos))
+            self._drag_start_pos = None
+
+    def on_mouse_up(self, event) -> None:
+        event.stop()
+        event.prevent_default()
+        self.release_mouse()
+        # If drag never started, treat as click - start editing
+        if self._drag_start_pos is not None:
+            self.query_one(EditableLabel).start_editing()
+        self._drag_start_pos = None
+
+
 class ColumnWidget(Vertical):
     """A single column on the board."""
 
@@ -160,14 +234,10 @@ class ColumnWidget(Vertical):
         padding: 0 1;
         border-right: tall $surface-lighten-1;
     }
-    .column-header {
-        width: 100%;
-        height: auto;
-    }
-    .column-header > Static {
-        width: 100%;
-        text-align: center;
-        text-style: bold;
+    ColumnWidget.dragging {
+        layer: overlay;
+        border: solid $primary;
+        opacity: 0.8;
     }
     .column-body {
         width: 100%;
@@ -175,19 +245,38 @@ class ColumnWidget(Vertical):
     }
     """
 
+    class DragStart(Message):
+        """Posted when a column drag begins."""
+
+        def __init__(self, column_widget: "ColumnWidget", mouse_offset: Offset) -> None:
+            super().__init__()
+            self.column_widget = column_widget
+            self.mouse_offset = mouse_offset
+
     def __init__(self, column: Column, board: Board):
         super().__init__()
         self.column = column
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self.column.name, classes="column-header")
+        yield ColumnHeader(self.column.name)
         with VerticalScroll(classes="column-body"):
             for link in self.column.links:
                 ticket = self.board.tickets.get(link.ticket_id)
                 title = ticket.content.title if ticket else link.slug
                 yield TicketCard(link, title)
             yield AddTicketWidget(self.column, self.board)
+
+    def on_column_header_drag_start(self, event: ColumnHeader.DragStart) -> None:
+        """Bubble up as ColumnWidget.DragStart."""
+        event.stop()
+        self.post_message(self.DragStart(self, event.mouse_offset))
+
+    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+        """Update column name when header is edited."""
+        event.stop()
+        if event.new_value:
+            self.column.name = event.new_value
 
 
 class AddColumnWidget(Vertical):
@@ -259,13 +348,18 @@ class BoardScreen(Screen):
     def __init__(self, board: Board):
         super().__init__()
         self.board = board
+        # Card drag state
         self._dragging: TicketCard | None = None
         self._drag_overlay: DragOverlay | None = None
         self._placeholder: DropPlaceholder | None = None
         self._drag_offset: Offset = Offset(0, 0)
-        # Drop target state (independent of placeholder DOM position)
         self._target_scroll: VerticalScroll | None = None
         self._insert_before: Static | None = None
+        # Column drag state
+        self._dragging_column: ColumnWidget | None = None
+        self._column_placeholder: ColumnPlaceholder | None = None
+        self._column_insert_before: Static | None = None
+        self._column_drag_offset: Offset = Offset(0, 0)
 
     def compose(self) -> ComposeResult:
         title = self.board.content.title or "ganban"
@@ -302,8 +396,40 @@ class BoardScreen(Screen):
 
         self.capture_mouse()
 
+    def on_column_widget_drag_start(self, event: ColumnWidget.DragStart) -> None:
+        """Handle the start of a column drag."""
+        event.stop()
+        self._dragging_column = event.column_widget
+        self._dragging_column.add_class("dragging")
+
+        # Calculate offset from mouse to column top-left
+        col_region = event.column_widget.region
+        self._column_drag_offset = Offset(
+            event.mouse_offset.x - col_region.x,
+            event.mouse_offset.y - col_region.y,
+        )
+
+        # Position the column absolutely (it's now on overlay layer via CSS)
+        self._dragging_column.styles.offset = (col_region.x, col_region.y)
+
+        # Create placeholder where column was
+        columns_container = self.query_one("#columns", Horizontal)
+        self._column_placeholder = ColumnPlaceholder()
+        columns_container.mount(self._column_placeholder, after=event.column_widget)
+
+        self.capture_mouse()
+
     def on_mouse_move(self, event) -> None:
         """Update drag overlay position."""
+        # Handle column drag
+        if self._dragging_column:
+            new_x = event.screen_x - self._column_drag_offset.x
+            new_y = event.screen_y - self._column_drag_offset.y
+            self._dragging_column.styles.offset = (new_x, new_y)
+            self._update_column_placeholder_position(event.screen_x)
+            return
+
+        # Handle card drag
         if not self._dragging or not self._drag_overlay:
             return
 
@@ -368,15 +494,54 @@ class BoardScreen(Screen):
 
             scroll.mount(self._placeholder, before=insert_before)
 
+    def _update_column_placeholder_position(self, screen_x: int) -> None:
+        """Move column placeholder to show where column will drop."""
+        if not self._column_placeholder:
+            return
+
+        columns_container = self.query_one("#columns", Horizontal)
+
+        # Get visible columns (excluding the one being dragged)
+        visible_columns = [
+            c for c in columns_container.children if isinstance(c, ColumnWidget) and c is not self._dragging_column
+        ]
+
+        if not visible_columns:
+            return
+
+        # Find insert position based on x coordinate (compare to column midpoints)
+        add_column = columns_container.query_one(AddColumnWidget)
+        insert_before = add_column  # Default: insert at end (before AddColumnWidget)
+
+        for col in visible_columns:
+            col_mid_x = col.region.x + col.region.width // 2
+            if screen_x < col_mid_x:
+                insert_before = col
+                break
+
+        self._column_insert_before = insert_before
+
+        # Only move placeholder if it needs to move
+        children = list(columns_container.children)
+        placeholder_idx = children.index(self._column_placeholder)
+        insert_idx = children.index(insert_before)
+        if placeholder_idx + 1 == insert_idx:
+            return  # Already in correct position
+        columns_container.move_child(self._column_placeholder, before=insert_before)
+
     def on_mouse_up(self, event) -> None:
         """Complete the drag operation."""
-        if not self._dragging:
+        if self._dragging_column:
+            self._finish_column_drag()
             return
-        self._finish_drag()
+        if self._dragging:
+            self._finish_drag()
 
     def action_cancel_drag(self) -> None:
         """Cancel the current drag operation."""
-        if self._dragging:
+        if self._dragging_column:
+            self._cancel_column_drag()
+        elif self._dragging:
             self._cancel_drag()
 
     def _finish_drag(self) -> None:
@@ -452,3 +617,64 @@ class BoardScreen(Screen):
         self._drag_overlay = None
         self._target_scroll = None
         self._insert_before = None
+
+    def _finish_column_drag(self) -> None:
+        """Finalize the column drop - move column to placeholder position."""
+        if not self._dragging_column:
+            self._cancel_column_drag()
+            return
+
+        self.release_mouse()
+
+        column_widget = self._dragging_column
+        column = column_widget.column
+        placeholder = self._column_placeholder
+        insert_before = self._column_insert_before
+
+        columns_container = self.query_one("#columns", Horizontal)
+
+        # Calculate new index in board.columns
+        new_index = 0
+        for child in columns_container.children:
+            if child is insert_before:
+                break
+            if isinstance(child, ColumnWidget) and child is not column_widget:
+                new_index += 1
+
+        # Reorder in model
+        self.board.columns.remove(column)
+        self.board.columns.insert(new_index, column)
+
+        # Reassign order values
+        for i, col in enumerate(self.board.columns):
+            col.order = str(i + 1)
+
+        # Clear state
+        self._dragging_column = None
+        self._column_placeholder = None
+        self._column_insert_before = None
+
+        # Reset column styles and move to new position
+        column_widget.remove_class("dragging")
+        column_widget.styles.offset = (0, 0)
+        columns_container.move_child(column_widget, before=insert_before)
+
+        # Cleanup placeholder
+        if placeholder and placeholder.parent is not None:
+            placeholder.remove()
+
+    def _cancel_column_drag(self) -> None:
+        """Cancel column drag and restore to original position."""
+        if not self._dragging_column:
+            return
+
+        self.release_mouse()
+        self._dragging_column.remove_class("dragging")
+        self._dragging_column.styles.offset = (0, 0)
+
+        if self._column_placeholder and self._column_placeholder.parent is not None:
+            self._column_placeholder.remove()
+
+        self._dragging_column = None
+        self._column_placeholder = None
+        self._column_insert_before = None
