@@ -1,9 +1,16 @@
 """Custom widgets for ganban UI."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
 from textual.widgets import ContentSwitcher, Markdown, Static, TextArea
+
+if TYPE_CHECKING:
+    from textual.events import Key
 
 
 class NonSelectableStatic(Static):
@@ -12,42 +19,26 @@ class NonSelectableStatic(Static):
     ALLOW_SELECT = False
 
 
-class _EditArea(TextArea):
-    """TextArea that emits Submit on Enter instead of inserting newline."""
+class ValueChanged(Message):
+    """Base message for value change events."""
+
+    def __init__(self, old_value: str, new_value: str) -> None:
+        super().__init__()
+        self.old_value = old_value
+        self.new_value = new_value
+
+
+class _SubmittableTextArea(TextArea):
+    """TextArea that submits on Enter and blur, cancels on Escape."""
 
     class Submit(Message):
-        """Emitted when Enter is pressed."""
+        """Emitted when Enter is pressed or focus lost."""
 
     class Cancel(Message):
         """Emitted when Escape is pressed."""
 
-    def _on_key(self, event) -> None:
+    def _on_key(self, event: Key) -> None:
         if event.key == "enter":
-            event.prevent_default()
-            event.stop()
-            self.post_message(self.Submit())
-        elif event.key == "escape":
-            event.prevent_default()
-            event.stop()
-            self.post_message(self.Cancel())
-        else:
-            super()._on_key(event)
-
-    def on_blur(self) -> None:
-        self.post_message(self.Submit())
-
-
-class _MarkdownEditArea(TextArea):
-    """TextArea for markdown editing - Ctrl+Enter saves, Escape/blur cancels."""
-
-    class Submit(Message):
-        """Emitted when Ctrl+Enter is pressed."""
-
-    class Cancel(Message):
-        """Emitted when Escape is pressed or focus lost."""
-
-    def _on_key(self, event) -> None:
-        if event.key == "ctrl+enter":
             event.prevent_default()
             event.stop()
             self.post_message(self.Submit())
@@ -85,16 +76,11 @@ class EditableLabel(Container):
     }
     """
 
-    class Changed(Message):
+    class Changed(ValueChanged):
         """Emitted when the label value changes."""
 
-        def __init__(self, old_value: str, new_value: str) -> None:
-            super().__init__()
-            self.old_value = old_value
-            self.new_value = new_value
-
         @property
-        def control(self) -> "EditableLabel":
+        def control(self) -> EditableLabel:
             """The EditableLabel that changed."""
             return self._sender
 
@@ -121,7 +107,7 @@ class EditableLabel(Container):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
             yield NonSelectableStatic(self._value, id="view")
-            yield _EditArea(self._value, id="edit", soft_wrap=True, compact=True)
+            yield _SubmittableTextArea(self._value, id="edit", soft_wrap=True, compact=True)
 
     def on_click(self, event) -> None:
         if self._click_to_edit and not self._editing:
@@ -138,7 +124,7 @@ class EditableLabel(Container):
             return
         self._editing = True
         edit_text = self._value if text is None else text
-        text_area = self.query_one("#edit", _EditArea)
+        text_area = self.query_one("#edit", _SubmittableTextArea)
         text_area.text = edit_text
         text_area.cursor_location = (0, min(cursor_col, len(edit_text)))
         self.query_one(ContentSwitcher).current = "edit"
@@ -148,7 +134,7 @@ class EditableLabel(Container):
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one("#edit", _EditArea)
+        text_area = self.query_one("#edit", _SubmittableTextArea)
         new_value = self._clean(text_area.text)
 
         if save and new_value != self._value:
@@ -159,11 +145,23 @@ class EditableLabel(Container):
 
         self.query_one(ContentSwitcher).current = "view"
 
-    def on__edit_area_submit(self) -> None:
+    def on__submittable_text_area_submit(self) -> None:
         self._stop_editing(save=True)
 
-    def on__edit_area_cancel(self) -> None:
+    def on__submittable_text_area_cancel(self) -> None:
         self._stop_editing(save=False)
+
+
+class _MarkdownTextArea(_SubmittableTextArea):
+    """TextArea for markdown - submits on blur only, Enter inserts newline."""
+
+    def _on_key(self, event: Key) -> None:
+        if event.key == "escape":
+            event.prevent_default()
+            event.stop()
+            self.post_message(self.Cancel())
+        else:
+            TextArea._on_key(self, event)
 
 
 class EditableMarkdown(Container):
@@ -191,16 +189,11 @@ class EditableMarkdown(Container):
     }
     """
 
-    class Changed(Message):
+    class Changed(ValueChanged):
         """Emitted when the markdown content changes."""
 
-        def __init__(self, old_value: str, new_value: str) -> None:
-            super().__init__()
-            self.old_value = old_value
-            self.new_value = new_value
-
         @property
-        def control(self) -> "EditableMarkdown":
+        def control(self) -> EditableMarkdown:
             """The EditableMarkdown that changed."""
             return self._sender
 
@@ -221,7 +214,7 @@ class EditableMarkdown(Container):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
             yield Markdown(self._value, id="view")
-            yield _MarkdownEditArea(self._value, id="edit")
+            yield _MarkdownTextArea(self._value, id="edit")
 
     def on_click(self, event) -> None:
         if not self._editing:
@@ -229,13 +222,14 @@ class EditableMarkdown(Container):
             view = self.query_one("#view", Markdown)
             row = event.screen_y - view.region.y
             col = event.screen_x - view.region.x
-            self._start_editing(row=row, col=col)
+            self.start_editing(row=row, col=col)
 
-    def _start_editing(self, row: int = 0, col: int = 0) -> None:
+    def start_editing(self, row: int = 0, col: int = 0) -> None:
+        """Start editing the markdown content."""
         if self._editing:
             return
         self._editing = True
-        text_area = self.query_one("#edit", _MarkdownEditArea)
+        text_area = self.query_one("#edit", _MarkdownTextArea)
         text_area.text = self._value
         lines = self._value.split("\n")
         row = min(row, len(lines) - 1) if lines else 0
@@ -248,7 +242,7 @@ class EditableMarkdown(Container):
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one("#edit", _MarkdownEditArea)
+        text_area = self.query_one("#edit", _MarkdownTextArea)
         new_value = text_area.text
 
         if save and new_value != self._value:
@@ -259,10 +253,10 @@ class EditableMarkdown(Container):
 
         self.query_one(ContentSwitcher).current = "view"
 
-    def on__markdown_edit_area_submit(self) -> None:
+    def on__submittable_text_area_submit(self) -> None:
         self._stop_editing(save=True)
 
-    def on__markdown_edit_area_cancel(self) -> None:
+    def on__submittable_text_area_cancel(self) -> None:
         self._stop_editing(save=False)
 
 
@@ -288,28 +282,18 @@ class SectionEditor(Container):
     }
     """
 
-    class HeadingChanged(Message):
+    class HeadingChanged(ValueChanged):
         """Emitted when the section heading changes."""
 
-        def __init__(self, old_value: str, new_value: str) -> None:
-            super().__init__()
-            self.old_value = old_value
-            self.new_value = new_value
-
         @property
-        def control(self) -> "SectionEditor":
+        def control(self) -> SectionEditor:
             return self._sender
 
-    class BodyChanged(Message):
+    class BodyChanged(ValueChanged):
         """Emitted when the section body changes."""
 
-        def __init__(self, old_value: str, new_value: str) -> None:
-            super().__init__()
-            self.old_value = old_value
-            self.new_value = new_value
-
         @property
-        def control(self) -> "SectionEditor":
+        def control(self) -> SectionEditor:
             return self._sender
 
     def __init__(self, heading: str, body: str = "", **kwargs) -> None:

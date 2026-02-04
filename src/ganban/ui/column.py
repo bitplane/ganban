@@ -13,21 +13,6 @@ from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
 
 
-class ColumnPlaceholder(Static):
-    """Placeholder showing where a dragged column will drop."""
-
-    DEFAULT_CSS = """
-    ColumnPlaceholder {
-        width: 1fr;
-        min-width: 20;
-        max-width: 25;
-        height: 100%;
-        border: dashed $primary;
-        background: $surface-darken-1;
-    }
-    """
-
-
 class ColumnHeader(DraggableMixin, Static):
     """Draggable column header."""
 

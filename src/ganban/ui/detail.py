@@ -2,6 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.events import Click
 from textual.screen import ModalScreen
 
 from ganban.models import Card
@@ -95,7 +96,7 @@ class CardDetailModal(ModalScreen[None]):
         else:
             self.card.content.sections[editor.heading] = event.new_value
 
-    def on_click(self, event) -> None:
+    def on_click(self, event: Click) -> None:
         """Dismiss modal when clicking outside the detail container."""
         container = self.query_one("#detail-container")
         if not container.region.contains(event.screen_x, event.screen_y):
