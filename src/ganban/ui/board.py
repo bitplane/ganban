@@ -21,7 +21,6 @@ class DropPlaceholder(Static):
     DropPlaceholder {
         width: 100%;
         height: 3;
-        margin-bottom: 1;
         border: dashed $primary;
         background: $surface-darken-1;
     }
@@ -363,7 +362,7 @@ class BoardScreen(Screen):
         height: auto;
         background: $primary;
     }
-    #board-header > Static {
+    #board-header #view {
         width: 100%;
         text-align: center;
         text-style: bold;

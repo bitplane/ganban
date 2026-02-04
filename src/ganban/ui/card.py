@@ -19,7 +19,6 @@ class CardWidget(DraggableMixin, Static):
         width: 100%;
         height: auto;
         padding: 0 1;
-        margin-bottom: 1;
         border: solid $primary-lighten-2;
         background: $surface;
     }
