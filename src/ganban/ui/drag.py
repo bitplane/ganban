@@ -38,6 +38,8 @@ class DraggableMixin:
     def on_mouse_down(self, event) -> None:
         if self.query("TextArea:focus"):
             return
+        if event.button != 1:  # Only handle left click for drag
+            return
         event.stop()
         event.prevent_default()
         self._drag_start_pos = Offset(event.screen_x, event.screen_y)

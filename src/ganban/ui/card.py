@@ -8,6 +8,7 @@ from ganban.models import Board, CardLink, Column
 from ganban.writer import create_card
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStart
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.widgets import EditableLabel, NonSelectableStatic
 
 
@@ -53,6 +54,38 @@ class CardWidget(DraggableMixin, Static):
         if card:
             self.title = card.content.title
             self.query_one(NonSelectableStatic).update(self.title or self.link.slug)
+
+    def on_click(self, event) -> None:
+        if event.button == 3:  # Right click
+            menu = ContextMenu(
+                [
+                    MenuItem("Edit", "edit"),
+                    MenuItem(
+                        "Move to",
+                        submenu=[
+                            MenuItem("Backlog", "move-backlog"),
+                            MenuItem("In Progress", "move-progress"),
+                            MenuItem("Done", "move-done"),
+                        ],
+                    ),
+                    MenuSeparator(),
+                    MenuItem("Delete", "delete"),
+                ],
+                event.screen_x,
+                event.screen_y,
+            )
+            self.app.push_screen(menu, self._on_menu_closed)
+
+    def _on_menu_closed(self, item: MenuItem | None) -> None:
+        if item is None:
+            return
+        match item.item_id:
+            case "edit":
+                card = self.board.cards.get(self.link.card_id)
+                if card:
+                    self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
+            case "delete":
+                self.app.bell()  # TODO: implement delete
 
 
 class AddCardWidget(Static):
