@@ -266,10 +266,12 @@ class ColumnDragManager:
             c for c in columns_container.children if isinstance(c, ColumnWidget) and c is not self.dragging
         ]
 
+        add_column = columns_container.query_one(AddColumnWidget)
+
         if not visible_columns:
+            self.insert_before = add_column
             return
 
-        add_column = columns_container.query_one(AddColumnWidget)
         insert_before = add_column
 
         for col in visible_columns:
