@@ -37,7 +37,7 @@ class _SubmittableTextArea(TextArea):
     class Cancel(Message):
         """Emitted when Escape is pressed."""
 
-    def _on_key(self, event: Key) -> None:
+    async def _on_key(self, event: Key) -> None:
         if event.key == "enter":
             event.prevent_default()
             event.stop()
@@ -47,7 +47,7 @@ class _SubmittableTextArea(TextArea):
             event.stop()
             self.post_message(self.Cancel())
         else:
-            super()._on_key(event)
+            await super()._on_key(event)
 
     def on_blur(self) -> None:
         self.post_message(self.Submit())
@@ -155,13 +155,13 @@ class EditableLabel(Container):
 class _MarkdownTextArea(_SubmittableTextArea):
     """TextArea for markdown - submits on blur only, Enter inserts newline."""
 
-    def _on_key(self, event: Key) -> None:
+    async def _on_key(self, event: Key) -> None:
         if event.key == "escape":
             event.prevent_default()
             event.stop()
             self.post_message(self.Cancel())
         else:
-            TextArea._on_key(self, event)
+            await TextArea._on_key(self, event)
 
 
 class EditableMarkdown(Container):
