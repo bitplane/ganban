@@ -56,8 +56,8 @@ class ColumnHeader(DraggableMixin, Static):
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStart(self, mouse_pos))
 
-    def draggable_clicked(self) -> None:
-        self.query_one(EditableLabel).start_editing()
+    def draggable_clicked(self, click_pos: Offset) -> None:
+        self.query_one(EditableLabel).start_editing(cursor_col=click_pos.x)
 
 
 class ColumnWidget(Vertical):

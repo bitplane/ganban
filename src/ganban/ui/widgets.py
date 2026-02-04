@@ -225,14 +225,22 @@ class EditableMarkdown(Container):
 
     def on_click(self, event) -> None:
         if not self._editing:
-            self._start_editing()
+            # Use screen coordinates relative to our region, not the clicked child
+            view = self.query_one("#view", Markdown)
+            row = event.screen_y - view.region.y
+            col = event.screen_x - view.region.x
+            self._start_editing(row=row, col=col)
 
-    def _start_editing(self) -> None:
+    def _start_editing(self, row: int = 0, col: int = 0) -> None:
         if self._editing:
             return
         self._editing = True
         text_area = self.query_one("#edit", _MarkdownEditArea)
         text_area.text = self._value
+        lines = self._value.split("\n")
+        row = min(row, len(lines) - 1) if lines else 0
+        col = min(col, len(lines[row])) if lines else 0
+        text_area.cursor_location = (row, col)
         self.query_one(ContentSwitcher).current = "edit"
         text_area.focus()
 

@@ -63,13 +63,13 @@ class DraggableMixin:
         event.prevent_default()
         self.release_mouse()
         if self._drag_start_pos is not None:
-            self.draggable_clicked()
+            self.draggable_clicked(Offset(event.x, event.y))
         self._drag_start_pos = None
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         """Called when drag threshold is exceeded. Override to post messages."""
         raise NotImplementedError
 
-    def draggable_clicked(self) -> None:
+    def draggable_clicked(self, click_pos: Offset) -> None:
         """Called when mouse released without dragging. Override for click behavior."""
         raise NotImplementedError

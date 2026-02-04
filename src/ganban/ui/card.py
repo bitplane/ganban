@@ -44,7 +44,7 @@ class CardWidget(DraggableMixin, Static):
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStart(self, mouse_pos))
 
-    def draggable_clicked(self) -> None:
+    def draggable_clicked(self, click_pos: Offset) -> None:
         card = self.board.cards.get(self.link.card_id)
         if card:
             self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
