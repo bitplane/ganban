@@ -14,6 +14,7 @@ from ganban.writer import (
     create_column,
     create_ticket,
     save_board,
+    slugify,
     try_auto_merge,
 )
 
@@ -891,3 +892,36 @@ async def test_create_column_saves(repo_with_ganban):
 
     loaded = await load_board(repo_with_ganban)
     assert any(c.name == "Archive" for c in loaded.columns)
+
+
+def test_slugify_basic():
+    """Basic slugification."""
+    assert slugify("Hello World") == "hello-world"
+
+
+def test_slugify_special_chars():
+    """Special characters become hyphens."""
+    assert slugify("What: is this?") == "what-is-this"
+    assert slugify("Test!") == "test"
+    assert slugify("{foo}") == "foo"
+    assert slugify("a.b.c") == "a-b-c"
+
+
+def test_slugify_multiple_spaces():
+    """Multiple spaces/special chars collapse to single hyphen."""
+    assert slugify("hello    world") == "hello-world"
+    assert slugify("a - b - c") == "a-b-c"
+
+
+def test_slugify_leading_trailing():
+    """Leading/trailing special chars stripped."""
+    assert slugify("  hello  ") == "hello"
+    assert slugify("---test---") == "test"
+    assert slugify("!hello!") == "hello"
+
+
+def test_slugify_empty():
+    """Empty string returns 'untitled'."""
+    assert slugify("") == "untitled"
+    assert slugify("   ") == "untitled"
+    assert slugify("!!!") == "untitled"

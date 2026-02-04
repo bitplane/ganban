@@ -30,11 +30,12 @@ class TicketCard(DraggableMixin, Static):
     }
     """
 
-    def __init__(self, link: TicketLink, title: str):
+    def __init__(self, link: TicketLink, title: str, board: Board):
         Static.__init__(self)
         self._init_draggable()
         self.link = link
         self.title = title
+        self.board = board
 
     def compose(self) -> ComposeResult:
         yield EditableLabel(self.title or self.link.slug, click_to_edit=False)
@@ -44,6 +45,14 @@ class TicketCard(DraggableMixin, Static):
 
     def draggable_clicked(self) -> None:
         self.query_one(EditableLabel).start_editing()
+
+    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+        """Update ticket title when edited."""
+        event.stop()
+        ticket = self.board.tickets.get(self.link.ticket_id)
+        if ticket and event.new_value:
+            ticket.content.title = event.new_value
+            self.title = event.new_value
 
 
 class AddTicketWidget(Static):
@@ -79,6 +88,6 @@ class AddTicketWidget(Static):
         if event.new_value and event.new_value != "+":
             ticket = create_ticket(self.board, event.new_value, column=self.column)
             link = self.column.links[-1]  # create_ticket adds link to end
-            card = TicketCard(link, ticket.content.title)
+            card = TicketCard(link, ticket.content.title, self.board)
             self.parent.mount(card, before=self)
         self.query_one(EditableLabel).value = "+"

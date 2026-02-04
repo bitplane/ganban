@@ -7,6 +7,7 @@ from textual.screen import Screen
 from textual.widgets import Static
 
 from ganban.models import Board
+from ganban.writer import save_board, slugify
 from ganban.ui.card import TicketCard, AddTicketWidget
 from ganban.ui.column import ColumnWidget, AddColumnWidget, ColumnPlaceholder
 from ganban.ui.drag import DragStart
@@ -43,6 +44,13 @@ class DragOverlay(Static):
 
     def __init__(self, title: str):
         super().__init__(title)
+
+
+def _renumber_column_links(column) -> None:
+    """Renumber all links in a column to sequential zero-padded positions."""
+    width = len(str(len(column.links))) if column.links else 1
+    for i, link in enumerate(column.links):
+        link.position = str(i + 1).zfill(width)
 
 
 class CardDragManager:
@@ -159,11 +167,13 @@ class CardDragManager:
         source_column = self._find_source_column(card)
         if source_column and card.link in source_column.links:
             source_column.links.remove(card.link)
+            _renumber_column_links(source_column)
 
         actual_pos = self._calculate_model_position(target_scroll, insert_before, card)
         target_column.links.insert(actual_pos, card.link)
+        _renumber_column_links(target_column)
 
-        new_card = TicketCard(card.link, card.title)
+        new_card = TicketCard(card.link, card.title, self.screen.board)
         target_scroll.mount(new_card, before=insert_before)
         card.remove()
 
@@ -296,6 +306,8 @@ class ColumnDragManager:
 
         for i, col in enumerate(self.screen.board.columns):
             col.order = str(i + 1)
+            prefix = "." if col.hidden else ""
+            col.path = f"{prefix}{col.order}.{slugify(col.name)}"
 
         column_widget.remove_class("dragging")
         column_widget.styles.offset = (0, 0)
@@ -333,7 +345,10 @@ class ColumnDragManager:
 class BoardScreen(Screen):
     """Main board screen showing all columns."""
 
-    BINDINGS = [("escape", "cancel_drag", "Cancel drag")]
+    BINDINGS = [
+        ("escape", "cancel_drag", "Cancel drag"),
+        ("ctrl+s", "save", "Save"),
+    ]
 
     DEFAULT_CSS = """
     BoardScreen {
@@ -407,3 +422,16 @@ class BoardScreen(Screen):
             self._column_drag.cancel()
         elif self._card_drag.active:
             self._card_drag.cancel()
+
+    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+        """Update board title when header is edited."""
+        header = self.query_one("#board-header", EditableLabel)
+        if event.control is header:
+            event.stop()
+            self.board.content.title = event.new_value
+
+    async def action_save(self) -> None:
+        """Save the board to git."""
+        new_commit = await save_board(self.board)
+        self.board.commit = new_commit
+        self.notify("Saved")

@@ -7,7 +7,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.models import Board, Column
-from ganban.writer import create_column
+from ganban.writer import create_column, slugify
 from ganban.ui.card import TicketCard, AddTicketWidget
 from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
@@ -102,7 +102,7 @@ class ColumnWidget(Vertical):
             for link in self.column.links:
                 ticket = self.board.tickets.get(link.ticket_id)
                 title = ticket.content.title if ticket else link.slug
-                yield TicketCard(link, title)
+                yield TicketCard(link, title, self.board)
             yield AddTicketWidget(self.column, self.board)
 
     def on_drag_start(self, event: DragStart) -> None:
@@ -116,6 +116,8 @@ class ColumnWidget(Vertical):
         event.stop()
         if event.new_value:
             self.column.name = event.new_value
+            prefix = "." if self.column.hidden else ""
+            self.column.path = f"{prefix}{self.column.order}.{slugify(event.new_value)}"
 
 
 class AddColumnWidget(Vertical):

@@ -61,10 +61,12 @@ class GanbanApp(App):
     """Git-based kanban board TUI."""
 
     TITLE = "ganban"
+    BINDINGS = [("ctrl+q", "quit", "Quit")]
 
     def __init__(self, repo_path: Path):
         super().__init__()
         self.repo_path = repo_path
+        self.board: Board | None = None
 
     async def on_mount(self) -> None:
         if not is_git_repo(self.repo_path):
@@ -88,5 +90,11 @@ class GanbanApp(App):
             create_column(board, "Done", order="3")
             await save_board(board, message="Initialize ganban board")
 
-        board = await load_board(str(self.repo_path))
-        self.push_screen(BoardScreen(board))
+        self.board = await load_board(str(self.repo_path))
+        self.push_screen(BoardScreen(self.board))
+
+    async def action_quit(self) -> None:
+        """Save and quit."""
+        if self.board:
+            await save_board(self.board)
+        self.exit()

@@ -2,8 +2,11 @@
 
 import asyncio
 import re
+from functools import cmp_to_key
 
 from git import Repo
+
+from ganban.ids import compare_ids
 from git.objects import Blob, Tree
 
 from ganban.models import Board, Column, MarkdownDoc, Ticket, TicketLink
@@ -119,7 +122,7 @@ def _load_columns(tree: Tree, tickets: dict[str, Ticket]) -> list[Column]:
 
         columns.append(column)
 
-    columns.sort(key=lambda c: c.order)
+    columns.sort(key=cmp_to_key(lambda a, b: compare_ids(a.order, b.order)))
     return columns
 
 
@@ -158,7 +161,7 @@ def _load_ticket_links(column_tree: Tree, tickets: dict[str, Ticket]) -> list[Ti
         )
         links.append(link)
 
-    links.sort(key=lambda link: link.position)
+    links.sort(key=cmp_to_key(lambda a, b: compare_ids(a.position, b.position)))
     return links
 
 

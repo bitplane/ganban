@@ -405,7 +405,7 @@ def create_ticket(
     # Add to column
     target_column = column or (board.columns[0] if board.columns else None)
     if target_column:
-        slug = _slugify(title)
+        slug = slugify(title)
         link = TicketLink(
             ticket_id=ticket_id,
             position=position if position is not None else len(target_column.links) + 1,
@@ -440,7 +440,7 @@ def create_column(
         existing_orders = [c.order for c in board.columns]
         order = next_id(max_id(existing_orders)) if existing_orders else "1"
 
-    slug = _slugify(name)
+    slug = slugify(name)
     path = f".{order}.{slug}" if hidden else f"{order}.{slug}"
 
     column = Column(
@@ -456,7 +456,7 @@ def create_column(
     return column
 
 
-def _slugify(text: str) -> str:
+def slugify(text: str) -> str:
     """Convert text to a URL-friendly slug."""
     slug = text.lower()
     slug = re.sub(r"[^a-z0-9]+", "-", slug)
