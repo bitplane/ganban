@@ -1,12 +1,14 @@
 """Detail modals for viewing and editing markdown content."""
 
+from datetime import date
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.events import Click
 from textual.screen import ModalScreen
 
 from ganban.models import Board, Card, Column
-from ganban.ui.cal import DateButton
+from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor
 
 
@@ -63,11 +65,25 @@ class CardDetailModal(DetailModal):
         self.card = card
 
     def compose(self) -> ComposeResult:
+        due = self._get_due_date()
         with Vertical(id="detail-container"):
             yield DocHeader(self.card.content)
             with Horizontal(id="card-metadata"):
-                yield DateButton()
+                yield DueDateWidget(due=due)
             yield MarkdownDocEditor(self.card.content, include_header=False)
+
+    def _get_due_date(self) -> date | None:
+        due_str = self.card.content.meta.get("due")
+        if due_str:
+            return date.fromisoformat(due_str)
+        return None
+
+    def on_due_date_widget_changed(self, event: DueDateWidget.Changed) -> None:
+        event.stop()
+        if event.due:
+            self.card.content.meta["due"] = event.due.isoformat()
+        else:
+            self.card.content.meta.pop("due", None)
 
 
 class ColumnDetailModal(DetailModal):

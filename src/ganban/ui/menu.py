@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich.cells import cell_len
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.events import Click
@@ -136,7 +137,7 @@ class MenuList(VerticalScroll):
         has_custom_widget = False
         for item in self._items:
             if isinstance(item, MenuItem):
-                max_len = max(max_len, len(item.label))
+                max_len = max(max_len, cell_len(item.label))
                 if item.has_submenu:
                     has_submenu = True
             elif not isinstance(item, MenuSeparator):
