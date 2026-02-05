@@ -202,17 +202,11 @@ class AddColumn(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableText("+", Static("+"), TextEditor(), classes="column-header")
-
-    def on_click(self) -> None:
-        editable = self.query_one(EditableText)
-        editable.value = ""
-        editable.focus()
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+", classes="column-header")
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        if event.new_value and event.new_value != "+":
+        if event.new_value:
             new_column = create_column(self.board, event.new_value)
             self.post_message(self.ColumnCreated(new_column))
-        editable = self.query_one(EditableText)
-        editable.value = "+"
+        self.query_one(EditableText).value = ""

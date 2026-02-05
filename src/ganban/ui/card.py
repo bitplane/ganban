@@ -156,17 +156,12 @@ class AddCard(Static):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableText("+", Static("+"), TextEditor())
-
-    def on_click(self) -> None:
-        editable = self.query_one(EditableText)
-        editable.value = ""
-        editable.focus()
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        if event.new_value and event.new_value != "+":
+        if event.new_value:
             new_card = create_card(self.board, event.new_value, column=self.column)
             link = self.column.links[-1]  # create_card adds link to end
             self.post_message(self.CardCreated(self.column, link, new_card.content.title))
-        self.query_one(EditableText).value = "+"
+        self.query_one(EditableText).value = ""

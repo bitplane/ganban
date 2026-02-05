@@ -74,10 +74,12 @@ class EditableText(Container):
         editor: Widget,
         *,
         clean: bool = True,
+        placeholder: str = "",
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self._clean_enabled = clean
+        self._placeholder = placeholder
         self._value = self._clean(value) if clean else value
         self._viewer = viewer
         self._editor = editor
@@ -105,8 +107,8 @@ class EditableText(Container):
         self.post_message(self.Changed(old_value, new_value))
 
     def _update_viewer(self) -> None:
-        """Update viewer with current value."""
-        self._viewer.update(self._value)
+        """Update viewer with current value, or placeholder if empty."""
+        self._viewer.update(self._value or self._placeholder)
 
     def compose(self) -> ComposeResult:
         self._editor.id = "edit"

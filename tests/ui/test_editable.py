@@ -207,3 +207,35 @@ async def test_click_enters_edit_mode(app):
 
         assert editable.query_one("#edit").display is True
         assert editable.query_one("#view").display is False
+
+
+class PlaceholderApp(App):
+    """Test app with placeholder EditableText."""
+
+    def compose(self) -> ComposeResult:
+        yield Button("focus target", id="focus-target")
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+", id="editable")
+
+
+@pytest.mark.asyncio
+async def test_placeholder_shows_when_empty():
+    """Placeholder is displayed when value is empty."""
+    app = PlaceholderApp()
+    async with app.run_test():
+        editable = app.query_one("#editable", EditableText)
+        viewer = editable.query_one("#view Static", Static)
+        assert editable.value == ""
+        assert str(viewer.render()) == "+"
+
+
+@pytest.mark.asyncio
+async def test_placeholder_editor_starts_empty():
+    """Editor starts with empty value, not the placeholder."""
+    app = PlaceholderApp()
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+
+        editor = editable.query_one("#edit", TextEditor)
+        assert editor.text == ""

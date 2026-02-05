@@ -60,6 +60,7 @@ class TextEditor(BaseEditor):
     DEFAULT_CSS = """
     TextEditor {
         height: auto;
+        padding: 0;
     }
     """
 
@@ -77,6 +78,7 @@ class MarkdownEditor(BaseEditor):
     DEFAULT_CSS = """
     MarkdownEditor {
         height: 100%;
+        padding: 0;
     }
     """
 
