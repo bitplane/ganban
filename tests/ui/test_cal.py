@@ -5,7 +5,8 @@ from datetime import date
 import pytest
 from textual.app import App, ComposeResult
 
-from ganban.ui.cal import Calendar, CalendarDay
+from ganban.ui.cal import Calendar, CalendarDay, CalendarMenuItem, DateButton, date_diff
+from ganban.ui.menu import ContextMenu
 
 
 class CalendarApp(App):
@@ -204,3 +205,181 @@ async def test_year_wrap_next():
 
         title = cal.query_one("#title")
         assert title.content == "Jan 2026"
+
+
+# date_diff tests
+
+
+def test_date_diff_same_day():
+    """Same date returns 0d."""
+    ref = date(2026, 2, 15)
+    assert date_diff(ref, ref) == "0d"
+
+
+def test_date_diff_days_future():
+    """Days in the future."""
+    ref = date(2026, 2, 15)
+    assert date_diff(date(2026, 2, 16), ref) == "1d"
+    assert date_diff(date(2026, 2, 20), ref) == "5d"
+    assert date_diff(date(2026, 3, 15), ref) == "28d"
+
+
+def test_date_diff_days_past():
+    """Days in the past have minus sign."""
+    ref = date(2026, 2, 15)
+    assert date_diff(date(2026, 2, 14), ref) == "-1d"
+    assert date_diff(date(2026, 2, 10), ref) == "-5d"
+    assert date_diff(date(2026, 1, 20), ref) == "-26d"
+
+
+def test_date_diff_months_future():
+    """Months for 60+ days in future."""
+    ref = date(2026, 2, 15)
+    assert date_diff(date(2026, 5, 15), ref) == "3m"
+    assert date_diff(date(2027, 1, 15), ref) == "11m"
+
+
+def test_date_diff_months_past():
+    """Months for 60+ days in past."""
+    ref = date(2026, 6, 15)
+    assert date_diff(date(2026, 3, 15), ref) == "-3m"
+    assert date_diff(date(2025, 8, 15), ref) == "-10m"
+
+
+def test_date_diff_years_future():
+    """Years for 24+ months in future."""
+    ref = date(2026, 2, 15)
+    assert date_diff(date(2028, 3, 15), ref) == "2y"
+    assert date_diff(date(2031, 2, 15), ref) == "5y"
+
+
+def test_date_diff_years_past():
+    """Years for 24+ months in past."""
+    ref = date(2026, 6, 15)
+    assert date_diff(date(2024, 5, 15), ref) == "-2y"
+    assert date_diff(date(2021, 6, 15), ref) == "-5y"
+
+
+def test_date_diff_boundary_59_days():
+    """59 days still shows days."""
+    ref = date(2026, 1, 1)
+    assert date_diff(date(2026, 3, 1), ref) == "59d"
+
+
+def test_date_diff_boundary_60_days():
+    """60 days switches to months."""
+    ref = date(2026, 1, 1)
+    assert date_diff(date(2026, 3, 2), ref) == "2m"
+
+
+def test_date_diff_boundary_23_months():
+    """23 months still shows months."""
+    ref = date(2026, 1, 15)
+    assert date_diff(date(2027, 12, 15), ref) == "23m"
+
+
+def test_date_diff_boundary_24_months():
+    """24 months switches to years."""
+    ref = date(2026, 1, 15)
+    assert date_diff(date(2028, 1, 15), ref) == "2y"
+
+
+# DateButton tests
+
+
+class DateButtonApp(App):
+    """Minimal app for testing date button."""
+
+    def __init__(self, selected: date | None = None):
+        super().__init__()
+        self._selected = selected
+        self.date_selected: date | None = None
+
+    def compose(self) -> ComposeResult:
+        yield DateButton(selected=self._selected)
+
+    def on_date_button_date_selected(self, event: DateButton.DateSelected) -> None:
+        self.date_selected = event.date
+
+
+@pytest.mark.asyncio
+async def test_date_button_displays_icon():
+    """DateButton displays calendar icon."""
+    app = DateButtonApp()
+    async with app.run_test():
+        btn = app.query_one(DateButton)
+        assert btn.content == "🗓️"
+
+
+@pytest.mark.asyncio
+async def test_date_button_click_opens_menu():
+    """Clicking DateButton opens ContextMenu with calendar."""
+    app = DateButtonApp()
+    async with app.run_test() as pilot:
+        btn = app.query_one(DateButton)
+        await pilot.click(btn)
+        assert isinstance(app.screen, ContextMenu)
+        assert app.screen.query_one(CalendarMenuItem)
+
+
+@pytest.mark.asyncio
+async def test_date_button_selecting_date_emits_message():
+    """Selecting a date emits DateSelected message."""
+    app = DateButtonApp()
+    async with app.run_test() as pilot:
+        btn = app.query_one(DateButton)
+        await pilot.click(btn)
+
+        # Click a day in the calendar
+        cal = app.screen.query_one(Calendar)
+        target_day = None
+        for day in cal.query(CalendarDay):
+            if day.date.month == date.today().month:
+                target_day = day
+                break
+
+        await pilot.click(target_day)
+
+        # Menu should close and message should be emitted
+        assert not isinstance(app.screen, ContextMenu)
+        assert app.date_selected == target_day.date
+        assert btn.selected == target_day.date
+
+
+@pytest.mark.asyncio
+async def test_date_button_escape_cancels():
+    """Pressing escape closes menu without selecting."""
+    app = DateButtonApp()
+    async with app.run_test() as pilot:
+        btn = app.query_one(DateButton)
+        await pilot.click(btn)
+        assert isinstance(app.screen, ContextMenu)
+
+        await pilot.press("escape")
+
+        assert not isinstance(app.screen, ContextMenu)
+        assert app.date_selected is None
+
+
+@pytest.mark.asyncio
+async def test_date_button_with_initial_selection():
+    """DateButton with initial selection shows that date in calendar."""
+    selected = date(2026, 3, 20)
+    app = DateButtonApp(selected=selected)
+    async with app.run_test() as pilot:
+        btn = app.query_one(DateButton)
+        assert btn.selected == selected
+
+        await pilot.click(btn)
+        cal = app.screen.query_one(Calendar)
+
+        # Check calendar shows March 2026
+        title = cal.query_one("#title")
+        assert title.content == "Mar 2026"
+
+        # Check selected date has class
+        for day in cal.query(CalendarDay):
+            if day.date == selected:
+                assert "selected" in day.classes
+                return
+        pytest.fail("Selected date not found")

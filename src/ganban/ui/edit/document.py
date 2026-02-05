@@ -17,6 +17,50 @@ if TYPE_CHECKING:
     from ganban.models import MarkdownDoc
 
 
+class DocHeader(Container):
+    """Editable document title with rule underneath."""
+
+    DEFAULT_CSS = """
+    DocHeader {
+        width: 100%;
+        height: auto;
+    }
+    DocHeader #doc-title {
+        width: 100%;
+        height: auto;
+        text-style: bold;
+        border-bottom: solid $primary;
+    }
+    DocHeader #doc-title > ContentSwitcher > Static {
+        text-style: bold;
+    }
+    """
+
+    class TitleChanged(Message):
+        """Emitted when the title changes."""
+
+        def __init__(self, new_title: str) -> None:
+            super().__init__()
+            self.new_title = new_title
+
+    def __init__(self, doc: MarkdownDoc) -> None:
+        super().__init__()
+        self.doc = doc
+
+    def compose(self) -> ComposeResult:
+        yield EditableText(
+            self.doc.title,
+            Static(self.doc.title),
+            TextEditor(),
+            id="doc-title",
+        )
+
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+        event.stop()
+        self.doc.title = event.new_value
+        self.post_message(self.TitleChanged(event.new_value))
+
+
 class MarkdownDocEditor(Container):
     """Two-panel editor for MarkdownDoc content."""
 
@@ -25,15 +69,6 @@ class MarkdownDocEditor(Container):
         width: 100%;
         height: 100%;
         layout: vertical;
-    }
-    #doc-title {
-        width: 100%;
-        height: auto;
-        text-style: bold;
-        border-bottom: solid $primary;
-    }
-    #doc-title > ContentSwitcher > Static {
-        text-style: bold;
     }
     #doc-editor-container {
         width: 100%;
@@ -58,17 +93,14 @@ class MarkdownDocEditor(Container):
     class Changed(Message):
         """Emitted when the document content changes."""
 
-    def __init__(self, doc: MarkdownDoc) -> None:
+    def __init__(self, doc: MarkdownDoc, include_header: bool = True) -> None:
         super().__init__()
         self.doc = doc
+        self._include_header = include_header
 
     def compose(self) -> ComposeResult:
-        yield EditableText(
-            self.doc.title,
-            Static(self.doc.title),
-            TextEditor(),
-            id="doc-title",
-        )
+        if self._include_header:
+            yield DocHeader(self.doc)
         with Horizontal(id="doc-editor-container"):
             with VerticalScroll(id="doc-editor-left"):
                 yield SectionEditor(None, self.doc.body, id="main-section")
@@ -76,12 +108,9 @@ class MarkdownDocEditor(Container):
                 for heading, content in self.doc.sections.items():
                     yield SectionEditor(heading, content, classes="subsection")
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        """Update doc when title changes."""
-        if event.control.id == "doc-title":
-            event.stop()
-            self.doc.title = event.new_value
-            self.post_message(self.Changed())
+    def on_doc_header_title_changed(self, event: DocHeader.TitleChanged) -> None:
+        event.stop()
+        self.post_message(self.Changed())
 
     def on_section_editor_heading_changed(self, event: SectionEditor.HeadingChanged) -> None:
         """Update doc when a section heading changes."""

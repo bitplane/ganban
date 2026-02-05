@@ -130,16 +130,23 @@ class MenuList(VerticalScroll):
             self.post_message(self.Ready(self))
 
     def _set_width_from_content(self) -> None:
-        """Set menu width based on longest item label."""
+        """Set menu width based on content."""
         max_len = 0
         has_submenu = False
+        has_custom_widget = False
         for item in self._items:
             if isinstance(item, MenuItem):
                 max_len = max(max_len, len(item.label))
                 if item.has_submenu:
                     has_submenu = True
-        width = max_len + (2 if has_submenu else 0) + 2
-        self.styles.width = width
+            elif not isinstance(item, MenuSeparator):
+                # Custom widget - let it determine its own width
+                has_custom_widget = True
+        if has_custom_widget:
+            self.styles.width = "auto"
+        else:
+            width = max_len + (2 if has_submenu else 0) + 2
+            self.styles.width = width
 
     def _focus_first_enabled(self) -> None:
         """Focus the first enabled menu item."""
@@ -349,3 +356,8 @@ class ContextMenu(ModalScreen[MenuItem | None]):
             if menu.region.contains(event.screen_x, event.screen_y):
                 return
         self.dismiss(None)
+
+    def on_calendar_menu_item_selected(self, event) -> None:
+        """Handle calendar menu item selection."""
+        event.stop()
+        self.dismiss(event.item)

@@ -1,12 +1,13 @@
 """Detail modals for viewing and editing markdown content."""
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.events import Click
 from textual.screen import ModalScreen
 
 from ganban.models import Board, Card, Column
-from ganban.ui.edit import MarkdownDocEditor
+from ganban.ui.cal import DateButton
+from ganban.ui.edit import DocHeader, MarkdownDocEditor
 
 
 class DetailModal(ModalScreen[None]):
@@ -50,13 +51,23 @@ class DetailModal(ModalScreen[None]):
 class CardDetailModal(DetailModal):
     """Modal screen showing full card details."""
 
+    DEFAULT_CSS = """
+    CardDetailModal #card-metadata {
+        width: 100%;
+        height: 1;
+    }
+    """
+
     def __init__(self, card: Card) -> None:
         super().__init__()
         self.card = card
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            yield MarkdownDocEditor(self.card.content)
+            yield DocHeader(self.card.content)
+            with Horizontal(id="card-metadata"):
+                yield DateButton()
+            yield MarkdownDocEditor(self.card.content, include_header=False)
 
 
 class ColumnDetailModal(DetailModal):

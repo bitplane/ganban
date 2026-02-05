@@ -1,7 +1,7 @@
 """Calendar widget for date selection."""
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -9,12 +9,64 @@ from textual.message import Message
 from textual.widgets import Static
 
 
+def date_diff(target: date, reference: date) -> str:
+    """Return compact string showing difference between dates.
+
+    Examples: "1d", "-3d", "2m", "-1m", "5y", "-2y"
+    Uses days for <60 days, months for <24 months, years otherwise.
+    """
+    days = (target - reference).days
+    if days == 0:
+        return "0d"
+
+    sign = "" if days > 0 else "-"
+    abs_days = abs(days)
+
+    if abs_days < 60:
+        return f"{sign}{abs_days}d"
+
+    # Calculate month difference
+    months = (target.year - reference.year) * 12 + (target.month - reference.month)
+    abs_months = abs(months)
+
+    if abs_months < 24:
+        return f"{sign}{abs_months}m"
+
+    # Years
+    years = abs(target.year - reference.year)
+    return f"{sign}{years}y"
+
+
+class NavButton(Static):
+    """Navigation button for calendar."""
+
+    class Clicked(Message):
+        def __init__(self, button: "NavButton") -> None:
+            super().__init__()
+            self.button = button
+
+    def on_click(self, event) -> None:
+        event.stop()
+        self.post_message(self.Clicked(self))
+
+
 class CalendarDay(Static):
     """A single day cell."""
+
+    class Clicked(Message):
+        """Posted when this day is clicked."""
+
+        def __init__(self, day: "CalendarDay") -> None:
+            super().__init__()
+            self.day = day
 
     def __init__(self, d: date, **kwargs) -> None:
         super().__init__(str(d.day).rjust(2), **kwargs)
         self.date = d
+
+    def on_click(self, event) -> None:
+        event.stop()
+        self.post_message(self.Clicked(self))
 
 
 class Calendar(Container):
@@ -32,14 +84,14 @@ class Calendar(Container):
             return self._sender
 
     DEFAULT_CSS = """
-    Calendar { width: auto; height: auto; }
+    Calendar { width: auto; height: auto; background: $background; }
     .cal-header { width: 100%; height: 1; }
     .cal-nav { width: 2; }
     .cal-title { width: 1fr; text-align: center; }
     .cal-grid { width: auto; height: auto; }
     .cal-row { width: auto; height: 1; }
     .cal-label { width: 3; color: $text-muted; }
-    CalendarDay { width: 3; text-align: right; }
+    CalendarDay { width: 3; text-align: center; }
     CalendarDay:hover { background: $primary-darken-2; }
     CalendarDay.today { text-style: bold; color: $primary; }
     CalendarDay.selected { background: $primary; color: $text; }
@@ -59,9 +111,9 @@ class Calendar(Container):
 
     def compose(self) -> ComposeResult:
         with Horizontal(classes="cal-header"):
-            yield Static("<<", classes="cal-nav", id="prev")
+            yield NavButton("<<", classes="cal-nav", id="prev")
             yield Static(self._viewing.strftime("%b %Y"), classes="cal-title", id="title")
-            yield Static(">>", classes="cal-nav", id="next")
+            yield NavButton(">>", classes="cal-nav", id="next")
 
         yield self._build_grid()
 
@@ -77,10 +129,15 @@ class Calendar(Container):
         return grid
 
     def _days_for_row(self, day_of_week: int) -> list[date]:
-        """Get all dates for a given day-of-week in current month view."""
+        """Get 6 dates for a given day-of-week in current month view."""
         cal = calendar.Calendar(firstweekday=6)  # Sunday first
         weeks = cal.monthdatescalendar(self._viewing.year, self._viewing.month)
-        return [week[day_of_week] for week in weeks]
+        days = [week[day_of_week] for week in weeks]
+        # Pad to 6 columns if needed
+        while len(days) < 6:
+            last = days[-1]
+            days.append(last + timedelta(days=7))
+        return days[:6]
 
     def _make_day(self, d: date) -> CalendarDay:
         """Create a day cell with appropriate CSS classes."""
@@ -93,17 +150,18 @@ class Calendar(Container):
             classes.append("other-month")
         return CalendarDay(d, classes=" ".join(classes))
 
-    def on_click(self, event) -> None:
-        widget, _ = self.app.get_widget_at(event.screen_x, event.screen_y)
-
-        if widget.id == "prev":
+    def on_nav_button_clicked(self, event: NavButton.Clicked) -> None:
+        event.stop()
+        if event.button.id == "prev":
             self._go_prev_month()
-        elif widget.id == "next":
+        elif event.button.id == "next":
             self._go_next_month()
-        elif isinstance(widget, CalendarDay):
-            self._selected = widget.date
-            self.post_message(self.DateSelected(widget.date))
-            self._refresh()
+
+    def on_calendar_day_clicked(self, event: CalendarDay.Clicked) -> None:
+        event.stop()
+        self._selected = event.day.date
+        self.post_message(self.DateSelected(event.day.date))
+        self._refresh()
 
     def _go_prev_month(self) -> None:
         if self._viewing.month == 1:
@@ -126,3 +184,82 @@ class Calendar(Container):
         new_grid = self._build_grid()
         old_grid.remove()
         self.mount(new_grid)
+
+
+class CalendarMenuItem(Container):
+    """Menu item containing a calendar picker."""
+
+    class Selected(Message):
+        """Posted when a date is selected, signals menu to close."""
+
+        def __init__(self, item: "CalendarMenuItem") -> None:
+            super().__init__()
+            self.item = item
+
+    DEFAULT_CSS = """
+    CalendarMenuItem {
+        width: auto;
+        height: auto;
+    }
+    """
+
+    def __init__(self, selected: date | None = None) -> None:
+        super().__init__()
+        self._initial = selected
+        self.selected_date: date | None = selected
+
+    def compose(self) -> ComposeResult:
+        yield Calendar(selected=self._initial)
+
+    def on_calendar_date_selected(self, event: Calendar.DateSelected) -> None:
+        event.stop()
+        self.selected_date = event.date
+        self.post_message(self.Selected(self))
+
+
+class DateButton(Static):
+    """A button that opens a calendar menu for date selection."""
+
+    class DateSelected(Message):
+        """Emitted when a date is selected."""
+
+        def __init__(self, selected: date) -> None:
+            super().__init__()
+            self.date = selected
+
+        @property
+        def control(self) -> "DateButton":
+            return self._sender
+
+    DEFAULT_CSS = """
+    DateButton {
+        width: 2;
+        height: 1;
+    }
+    DateButton:hover {
+        background: $primary-darken-2;
+    }
+    """
+
+    def __init__(self, selected: date | None = None, icon: str = "🗓️", **kwargs) -> None:
+        super().__init__(icon, **kwargs)
+        self._selected = selected
+
+    @property
+    def selected(self) -> date | None:
+        return self._selected
+
+    def on_click(self, event) -> None:
+        event.stop()
+        from ganban.ui.menu import ContextMenu
+
+        # Position at button, not mouse (for keyboard accessibility)
+        x = self.region.x
+        y = self.region.y + 1  # Below the button
+        menu = ContextMenu([CalendarMenuItem(self._selected)], x, y)
+        self.app.push_screen(menu, self._on_menu_closed)
+
+    def _on_menu_closed(self, result) -> None:
+        if isinstance(result, CalendarMenuItem) and result.selected_date is not None:
+            self._selected = result.selected_date
+            self.post_message(self.DateSelected(result.selected_date))
