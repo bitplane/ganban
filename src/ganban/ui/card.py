@@ -10,7 +10,8 @@ from ganban.writer import create_card
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.edit import EditableLabel, PlainStatic
+from ganban.ui.edit import EditableLabel
+from ganban.ui.static import PlainStatic
 
 
 class CardWidget(DraggableMixin, Static):

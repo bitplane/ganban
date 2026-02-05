@@ -20,11 +20,25 @@ class SubmittingTextArea(TextArea):
     class Cancelled(Message):
         """Emitted when Escape is pressed."""
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._submitted = False
+
+    def _submit(self) -> None:
+        """Post Submitted message, but only once per editing session."""
+        if not self._submitted:
+            self._submitted = True
+            self.post_message(self.Submitted())
+
+    def reset_submitted(self) -> None:
+        """Reset submitted state for new editing session."""
+        self._submitted = False
+
     async def _on_key(self, event: Key) -> None:
         if event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.post_message(self.Submitted())
+            self._submit()
         elif event.key == "escape":
             event.prevent_default()
             event.stop()
@@ -33,7 +47,7 @@ class SubmittingTextArea(TextArea):
             await super()._on_key(event)
 
     def on_blur(self) -> None:
-        self.post_message(self.Submitted())
+        self._submit()
 
 
 class MarkdownTextArea(SubmittingTextArea):

@@ -8,12 +8,7 @@ from textual.widgets import ContentSwitcher, Static
 
 from ganban.ui.edit.text_area import SubmittingTextArea
 from ganban.ui.events import ValueChanged
-
-
-class PlainStatic(Static):
-    """Static that doesn't allow text selection."""
-
-    ALLOW_SELECT = False
+from ganban.ui.static import PlainStatic
 
 
 class EditableLabel(Container):
@@ -88,6 +83,7 @@ class EditableLabel(Container):
         self._editing = True
         edit_text = self._value if text is None else text
         text_area = self.query_one("#edit", SubmittingTextArea)
+        text_area.reset_submitted()
         text_area.disabled = False
         text_area.text = edit_text
         text_area.cursor_location = (0, min(cursor_col, len(edit_text)))

@@ -76,6 +76,7 @@ class EditableMarkdown(Container):
             return
         self._editing = True
         text_area = self.query_one("#edit", MarkdownTextArea)
+        text_area.reset_submitted()
         text_area.disabled = False
         text_area.text = self._value
         lines = self._value.split("\n")
