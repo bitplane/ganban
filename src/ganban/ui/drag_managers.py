@@ -319,26 +319,14 @@ class ColumnDragManager:
 
         self.screen.release_mouse()
 
-        from ganban.writer import build_column_path
-
         column_widget = self.dragging
-        column = column_widget.column
-        insert_before = self.insert_before
-
         columns_container = self.screen.query_one("#columns", Horizontal)
-
         new_index = self._calculate_model_position(columns_container, column_widget)
-
-        self.screen.board.columns.remove(column)
-        self.screen.board.columns.insert(new_index, column)
-
-        for i, col in enumerate(self.screen.board.columns):
-            col.order = str(i + 1)
-            col.path = build_column_path(col.order, col.name, col.hidden)
 
         column_widget.remove_class("dragging")
         column_widget.styles.offset = (0, 0)
-        columns_container.move_child(column_widget, before=insert_before)
+
+        self.screen._move_column_to_index(column_widget, new_index)
 
         self._cleanup()
 

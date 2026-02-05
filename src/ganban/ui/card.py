@@ -80,6 +80,7 @@ class CardWidget(DraggableMixin, Static):
 
     def on_click(self, event) -> None:
         if event.button == 3:  # Right click
+            event.stop()
             current_col = self._find_column()
 
             # Build move submenu from visible columns (excluding current)

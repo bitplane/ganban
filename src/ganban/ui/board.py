@@ -5,7 +5,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 
 from ganban.models import Board
-from ganban.writer import save_board
+from ganban.writer import build_column_path, save_board
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 from ganban.ui.drag import DragStarted
@@ -166,3 +166,59 @@ class BoardScreen(Screen):
         add_widget = columns_container.query_one(AddColumn)
         new_widget = ColumnWidget(event.column, self.board)
         columns_container.mount(new_widget, before=add_widget)
+
+    def _move_column_to_index(self, col_widget: ColumnWidget, new_index: int) -> None:
+        """Move column to new position in both model and UI."""
+        column = col_widget.column
+
+        # Update model
+        self.board.columns.remove(column)
+        self.board.columns.insert(new_index, column)
+
+        # Renumber all columns
+        for i, col in enumerate(self.board.columns):
+            col.order = str(i + 1)
+            col.path = build_column_path(col.order, col.name, col.hidden)
+
+        # Sync UI to match model
+        self._sync_column_order()
+
+    def _sync_column_order(self) -> None:
+        """Reorder column widgets to match model order."""
+        columns_container = self.query_one("#columns", Horizontal)
+        add_column = columns_container.query_one(AddColumn)
+        widgets_by_column = {id(cw.column): cw for cw in self.query(ColumnWidget)}
+
+        insert_before = add_column
+        for column in reversed(self.board.columns):
+            if id(column) not in widgets_by_column:
+                continue  # skip hidden columns
+            widget = widgets_by_column[id(column)]
+            columns_container.move_child(widget, before=insert_before)
+            insert_before = widget
+
+    def on_column_widget_move_requested(self, event: ColumnWidget.MoveRequested) -> None:
+        """Handle column move request."""
+        event.stop()
+        col_widget = event.column_widget
+        direction = event.direction
+
+        current_index = self.board.columns.index(col_widget.column)
+        new_index = current_index + direction
+
+        if new_index < 0 or new_index >= len(self.board.columns):
+            return
+
+        self._move_column_to_index(col_widget, new_index)
+
+    def on_column_widget_delete_requested(self, event: ColumnWidget.DeleteRequested) -> None:
+        """Handle column delete request."""
+        event.stop()
+        col_widget = event.column_widget
+
+        # Remove from model
+        if col_widget.column in self.board.columns:
+            self.board.columns.remove(col_widget.column)
+
+        # Remove from UI
+        col_widget.remove()

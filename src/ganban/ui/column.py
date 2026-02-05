@@ -11,6 +11,7 @@ from textual.widgets import Static
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
 from ganban.ui.drag import DraggableMixin, DragStarted
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.widgets import EditableLabel
 
 if TYPE_CHECKING:
@@ -85,6 +86,21 @@ class ColumnWidget(Vertical):
             """The column widget being dragged."""
             return self.column_widget
 
+    class MoveRequested(Message):
+        """Posted when column should be moved."""
+
+        def __init__(self, column_widget: "ColumnWidget", direction: int) -> None:
+            super().__init__()
+            self.column_widget = column_widget
+            self.direction = direction  # -1 for left, +1 for right
+
+    class DeleteRequested(Message):
+        """Posted when column should be deleted."""
+
+        def __init__(self, column_widget: "ColumnWidget") -> None:
+            super().__init__()
+            self.column_widget = column_widget
+
     def __init__(self, column: Column, board: Board):
         super().__init__()
         self.column = column
@@ -113,6 +129,43 @@ class ColumnWidget(Vertical):
         if event.new_value:
             self.column.name = event.new_value
             self.column.path = build_column_path(self.column.order, event.new_value, self.column.hidden)
+
+    def on_click(self, event) -> None:
+        """Show context menu on right-click."""
+        if event.button == 3:
+            event.stop()
+            col_index = self._get_column_index()
+            visible_count = sum(1 for c in self.board.columns if not c.hidden)
+
+            items = [
+                MenuItem("Move Left", "move_left", disabled=(col_index == 0)),
+                MenuItem("Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
+                MenuSeparator(),
+                MenuItem("Delete", "delete"),
+            ]
+
+            menu = ContextMenu(items, event.screen_x, event.screen_y)
+            self.app.push_screen(menu, self._on_menu_closed)
+
+    def _on_menu_closed(self, item: MenuItem | None) -> None:
+        """Handle context menu selection."""
+        if item is None:
+            return
+        match item.item_id:
+            case "move_left":
+                self.post_message(self.MoveRequested(self, -1))
+            case "move_right":
+                self.post_message(self.MoveRequested(self, 1))
+            case "delete":
+                self.post_message(self.DeleteRequested(self))
+
+    def _get_column_index(self) -> int:
+        """Get the index of this column among visible columns."""
+        visible_columns = [c for c in self.board.columns if not c.hidden]
+        for i, col in enumerate(visible_columns):
+            if col is self.column:
+                return i
+        return -1
 
 
 class AddColumn(Vertical):
