@@ -2,6 +2,7 @@
 
 from textual.app import ComposeResult
 from textual.geometry import Offset
+from textual.message import Message
 from textual.widgets import Static
 
 from ganban.models import Board, CardLink, Column
@@ -14,6 +15,21 @@ from ganban.ui.widgets import EditableLabel, NonSelectableStatic
 
 class CardWidget(DraggableMixin, Static):
     """A single card in a column."""
+
+    class MoveRequested(Message):
+        """Posted when card should be moved to another column."""
+
+        def __init__(self, card: "CardWidget", target_column: str):
+            super().__init__()
+            self.card = card
+            self.target_column = target_column
+
+    class DeleteRequested(Message):
+        """Posted when card should be deleted."""
+
+        def __init__(self, card: "CardWidget"):
+            super().__init__()
+            self.card = card
 
     DEFAULT_CSS = """
     CardWidget {
@@ -55,25 +71,33 @@ class CardWidget(DraggableMixin, Static):
             self.title = card.content.title
             self.query_one(NonSelectableStatic).update(self.title or self.link.slug)
 
+    def _find_column(self) -> Column | None:
+        """Find the column containing this card's link."""
+        for col in self.board.columns:
+            if self.link in col.links:
+                return col
+        return None
+
     def on_click(self, event) -> None:
         if event.button == 3:  # Right click
-            menu = ContextMenu(
-                [
-                    MenuItem("Edit", "edit"),
-                    MenuItem(
-                        "Move to",
-                        submenu=[
-                            MenuItem("Backlog", "move-backlog"),
-                            MenuItem("In Progress", "move-progress"),
-                            MenuItem("Done", "move-done"),
-                        ],
-                    ),
-                    MenuSeparator(),
-                    MenuItem("Delete", "delete"),
-                ],
-                event.screen_x,
-                event.screen_y,
-            )
+            current_col = self._find_column()
+
+            # Build move submenu from visible columns (excluding current)
+            move_items = [
+                MenuItem(col.name, f"move:{col.name}")
+                for col in self.board.columns
+                if not col.hidden and col is not current_col
+            ]
+
+            items = [
+                MenuItem("Edit", "edit"),
+            ]
+            if move_items:
+                items.append(MenuItem("Move to", submenu=move_items))
+            items.append(MenuSeparator())
+            items.append(MenuItem("Delete", "delete"))
+
+            menu = ContextMenu(items, event.screen_x, event.screen_y)
             self.app.push_screen(menu, self._on_menu_closed)
 
     def _on_menu_closed(self, item: MenuItem | None) -> None:
@@ -85,11 +109,31 @@ class CardWidget(DraggableMixin, Static):
                 if card:
                     self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
             case "delete":
-                self.app.bell()  # TODO: implement delete
+                self._delete_card()
+            case s if s and s.startswith("move:"):
+                col_name = s[5:]
+                self._move_to_column(col_name)
+
+    def _delete_card(self) -> None:
+        """Request deletion of this card."""
+        self.post_message(self.DeleteRequested(self))
+
+    def _move_to_column(self, col_name: str) -> None:
+        """Request move to the named column."""
+        self.post_message(self.MoveRequested(self, col_name))
 
 
 class AddCardWidget(Static):
     """Widget to add a new card to a column."""
+
+    class CardCreated(Message):
+        """Posted when a new card is created."""
+
+        def __init__(self, column: Column, card_link: CardLink, title: str):
+            super().__init__()
+            self.column = column
+            self.card_link = card_link
+            self.title = title
 
     DEFAULT_CSS = """
     AddCardWidget {
@@ -121,6 +165,5 @@ class AddCardWidget(Static):
         if event.new_value and event.new_value != "+":
             new_card = create_card(self.board, event.new_value, column=self.column)
             link = self.column.links[-1]  # create_card adds link to end
-            card_widget = CardWidget(link, new_card.content.title, self.board)
-            self.parent.mount(card_widget, before=self)
+            self.post_message(self.CardCreated(self.column, link, new_card.content.title))
         self.query_one(EditableLabel).value = "+"

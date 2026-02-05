@@ -1,5 +1,7 @@
 """Column widgets for ganban UI."""
 
+from typing import TYPE_CHECKING
+
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.geometry import Offset
@@ -8,9 +10,11 @@ from textual.widgets import Static
 
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
-from ganban.ui.card import AddCardWidget, CardWidget
 from ganban.ui.drag import DraggableMixin, DragStart
 from ganban.ui.widgets import EditableLabel
+
+if TYPE_CHECKING:
+    pass
 
 
 class ColumnHeader(DraggableMixin, Static):
@@ -87,6 +91,8 @@ class ColumnWidget(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
+        from ganban.ui.card import AddCardWidget, CardWidget
+
         yield ColumnHeader(self.column.name)
         with VerticalScroll(classes="column-body"):
             for link in self.column.links:
@@ -111,6 +117,13 @@ class ColumnWidget(Vertical):
 
 class AddColumnWidget(Vertical):
     """Widget to add a new column."""
+
+    class ColumnCreated(Message):
+        """Posted when a new column is created."""
+
+        def __init__(self, column: Column):
+            super().__init__()
+            self.column = column
 
     DEFAULT_CSS = """
     AddColumnWidget {
@@ -140,7 +153,6 @@ class AddColumnWidget(Vertical):
         event.stop()
         if event.new_value and event.new_value != "+":
             new_column = create_column(self.board, event.new_value)
-            new_widget = ColumnWidget(new_column, self.board)
-            self.parent.mount(new_widget, before=self)
+            self.post_message(self.ColumnCreated(new_column))
         label = self.query_one(EditableLabel)
         label.value = "+"

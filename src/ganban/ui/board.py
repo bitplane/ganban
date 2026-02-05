@@ -1,15 +1,15 @@
 """Board screen showing kanban columns and cards."""
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 
 from ganban.models import Board
 from ganban.writer import save_board
-from ganban.ui.card import CardWidget
-from ganban.ui.column import ColumnWidget, AddColumnWidget
+from ganban.ui.card import AddCardWidget, CardWidget
+from ganban.ui.column import AddColumnWidget, ColumnWidget
 from ganban.ui.drag import DragStart
-from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
+from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, _renumber_column_links
 from ganban.ui.widgets import EditableLabel
 
 
@@ -106,3 +106,63 @@ class BoardScreen(Screen):
         new_commit = await save_board(self.board)
         self.board.commit = new_commit
         self.notify("Saved")
+
+    def on_card_widget_move_requested(self, event: CardWidget.MoveRequested) -> None:
+        """Handle card move request."""
+        event.stop()
+        card = event.card
+        col_name = event.target_column
+
+        source_col = card._find_column()
+        target_col = next((c for c in self.board.columns if c.name == col_name), None)
+        if not target_col or target_col is source_col:
+            return
+
+        # Update model
+        if source_col and card.link in source_col.links:
+            source_col.links.remove(card.link)
+            _renumber_column_links(source_col)
+
+        target_col.links.append(card.link)
+        _renumber_column_links(target_col)
+
+        # Update UI - find target column widget and mount new card
+        for col_widget in self.query(ColumnWidget):
+            if col_widget.column is target_col:
+                scroll = col_widget.query_one(VerticalScroll)
+                add_widget = scroll.query_one(AddCardWidget)
+                new_card = CardWidget(card.link, card.title, self.board)
+                scroll.mount(new_card, before=add_widget)
+                break
+
+        card.remove()
+
+    def on_card_widget_delete_requested(self, event: CardWidget.DeleteRequested) -> None:
+        """Handle card delete request."""
+        event.stop()
+        card = event.card
+        col = card._find_column()
+        if col and card.link in col.links:
+            col.links.remove(card.link)
+            _renumber_column_links(col)
+            card.remove()
+
+    def on_add_card_widget_card_created(self, event: AddCardWidget.CardCreated) -> None:
+        """Handle new card creation."""
+        event.stop()
+        # Find the column widget for this column and mount the new card
+        for col_widget in self.query(ColumnWidget):
+            if col_widget.column is event.column:
+                scroll = col_widget.query_one(VerticalScroll)
+                add_widget = scroll.query_one(AddCardWidget)
+                card_widget = CardWidget(event.card_link, event.title, self.board)
+                scroll.mount(card_widget, before=add_widget)
+                break
+
+    def on_add_column_widget_column_created(self, event: AddColumnWidget.ColumnCreated) -> None:
+        """Handle new column creation."""
+        event.stop()
+        columns_container = self.query_one("#columns", Horizontal)
+        add_widget = columns_container.query_one(AddColumnWidget)
+        new_widget = ColumnWidget(event.column, self.board)
+        columns_container.mount(new_widget, before=add_widget)
