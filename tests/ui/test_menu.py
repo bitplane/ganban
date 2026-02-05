@@ -209,3 +209,19 @@ async def test_moving_to_item_without_submenu_closes_all(menu_items):
         assert app.focused.item_id == "quit"
         # Only root menu should remain
         assert len(screen._open_menus) == 1
+
+
+@pytest.mark.asyncio
+async def test_all_disabled_menu_navigation(all_disabled_menu):
+    """Up/down in menu with all disabled items doesn't crash."""
+    app = MenuTestApp(all_disabled_menu)
+    async with app.run_test() as pilot:
+        # No item should be focused (all disabled)
+        assert not isinstance(app.focused, MenuItem)
+
+        # Pressing up/down should not crash
+        await pilot.press("down")
+        await pilot.press("up")
+
+        # Still no MenuItem focused
+        assert not isinstance(app.focused, MenuItem)

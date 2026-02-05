@@ -60,3 +60,13 @@ def menu_items():
         MenuSeparator(),
         MenuItem("Quit", item_id="quit"),
     ]
+
+
+@pytest.fixture
+def all_disabled_menu():
+    """A menu where all items are disabled."""
+    return [
+        MenuItem("One", item_id="one", disabled=True),
+        MenuItem("Two", item_id="two", disabled=True),
+        MenuItem("Three", item_id="three", disabled=True),
+    ]

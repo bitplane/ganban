@@ -195,11 +195,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         menu._focus_first_enabled()
 
     @property
-    def _current_menu(self) -> MenuList:
-        """The deepest open menu."""
-        return self._open_menus[-1]
-
-    @property
     def _focused_item(self) -> MenuItem | None:
         """The currently focused MenuItem."""
         focused = self.app.focused
@@ -238,11 +233,8 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         menu.styles.offset = (x, y)
         menu.add_class("-visible")
 
-    def _open_submenu(self, parent_item: MenuItem) -> MenuList | None:
-        """Open submenu for item. Returns None if no submenu."""
-        if not parent_item.has_submenu:
-            return None
-
+    def _open_submenu(self, parent_item: MenuItem) -> MenuList:
+        """Open submenu for item. Caller must verify has_submenu first."""
         # Already open?
         if self._open_menus[-1].parent_item is parent_item:
             return self._open_menus[-1]
@@ -253,10 +245,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
 
         # Position to the right of parent item
         parent_menu = self._menu_for_item(parent_item)
-        if parent_menu:
-            x = parent_menu.region.x + parent_menu.region.width
-        else:
-            x = parent_item.region.x + parent_item.region.width
+        x = parent_menu.region.x + parent_menu.region.width
         y = parent_item.region.y
 
         self._position_menu(submenu, x, y)
@@ -290,8 +279,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if not focused:
             return
         menu = self._menu_for_item(focused)
-        if not menu:
-            return
         items = menu.get_focusable_items()
         if not items:
             return
@@ -307,8 +294,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if not focused:
             return
         menu = self._menu_for_item(focused)
-        if not menu:
-            return
         items = menu.get_focusable_items()
         if not items:
             return
@@ -324,9 +309,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if not focused:
             return
         if focused.has_submenu:
-            submenu = self._open_submenu(focused)
-            if submenu:
-                submenu._focus_first_enabled()
+            self._open_submenu(focused)._focus_first_enabled()
         else:
             self.post_message(self.ItemSelected(focused, self))
             self.dismiss(focused)
@@ -349,9 +332,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         event.stop()
         item = event.item
         if item.has_submenu:
-            submenu = self._open_submenu(item)
-            if submenu:
-                submenu._focus_first_enabled()
+            self._open_submenu(item)._focus_first_enabled()
         else:
             self.post_message(self.ItemSelected(item, self))
             self.dismiss(item)
