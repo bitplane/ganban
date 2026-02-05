@@ -59,8 +59,13 @@ class EditableLabel(Container):
 
     @value.setter
     def value(self, new_value: str) -> None:
-        self._value = self._clean(new_value)
+        new_value = self._clean(new_value)
+        if new_value == self._value:
+            return
+        old_value = self._value
+        self._value = new_value
         self.query_one("#view", Static).update(self._value)
+        self.post_message(self.Changed(old_value, new_value))
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
@@ -95,13 +100,9 @@ class EditableLabel(Container):
             return
         self._editing = False
         text_area = self.query_one("#edit", SubmittingTextArea)
-        new_value = self._clean(text_area.text)
 
-        if save and new_value != self._value:
-            old_value = self._value
-            self._value = new_value
-            self.query_one("#view", Static).update(self._value)
-            self.post_message(self.Changed(old_value, new_value))
+        if save:
+            self.value = text_area.text
 
         self.query_one(ContentSwitcher).current = "view"
         text_area.disabled = True
