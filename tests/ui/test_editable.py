@@ -100,6 +100,39 @@ async def test_escape_cancels_edit(app):
         assert app.changes == []
 
 
+class EscapeTrackingApp(App):
+    """Test app that tracks if escape was handled at app level."""
+
+    BINDINGS = [("escape", "handle_escape", "Escape")]
+
+    def __init__(self):
+        super().__init__()
+        self.escape_handled = False
+
+    def compose(self) -> ComposeResult:
+        yield Button("focus target", id="focus-target")
+        yield EditableText("test", Static("test"), TextEditor(), id="editable")
+
+    def action_handle_escape(self) -> None:
+        self.escape_handled = True
+
+
+@pytest.mark.asyncio
+async def test_escape_while_editing_does_not_bubble():
+    """Escape while editing should not bubble to parent bindings."""
+    app = EscapeTrackingApp()
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert app.escape_handled is False  # Escape was stopped
+        assert editable._editing is False  # But edit was canceled
+
+
 @pytest.mark.asyncio
 async def test_enter_saves_and_exits(app):
     """Enter key saves changes and exits edit mode."""

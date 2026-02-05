@@ -110,7 +110,11 @@ async def test_escape_closes_modal(card):
         await pilot.click(app.screen, offset=(5, 5))
         await pilot.pause()
 
+        # If an EditableText got focused, first escape cancels edit, second closes modal
         await pilot.press("escape")
+        await pilot.pause()
+        if isinstance(app.screen, DetailModal):
+            await pilot.press("escape")
         assert not isinstance(app.screen, DetailModal)
 
 
@@ -131,15 +135,14 @@ async def test_editing_title_updates_doc(card):
     """Editing the title updates the underlying document."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
-        editor = app.screen.query_one("#main-section", SectionEditor)
-        heading = editor.query_one(".section-heading", EditableText)
+        title = app.screen.query_one("#doc-title", EditableText)
 
         # Start editing by focusing
-        heading.focus()
+        title.focus()
         await pilot.pause()
 
         # Set new title
-        text_area = heading.query_one("#edit")
+        text_area = title.query_one("#edit")
         text_area.text = "New Title"
 
         # Submit
@@ -226,9 +229,9 @@ async def test_editing_main_body_updates_doc(card):
         text_area = body.query_one("#edit")
         text_area.text = "Updated body content"
 
-        # Blur to save
-        heading = editor.query_one(".section-heading", EditableText)
-        heading.focus()
+        # Blur to save by focusing the title
+        title = app.screen.query_one("#doc-title", EditableText)
+        title.focus()
         await pilot.pause()
 
         assert card.content.body == "Updated body content"
@@ -241,9 +244,12 @@ async def test_action_close_via_escape(card):
     async with app.run_test() as pilot:
         assert isinstance(app.screen, DetailModal)
 
-        # Press escape without clicking first
+        # If an EditableText is focused (starts editing), first escape cancels edit
         await pilot.press("escape")
         await pilot.pause()
+        if isinstance(app.screen, DetailModal):
+            await pilot.press("escape")
+            await pilot.pause()
 
         assert not isinstance(app.screen, DetailModal)
 
