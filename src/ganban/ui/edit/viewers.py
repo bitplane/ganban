@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Container
 from textual.widgets import Markdown, Static
 
 
@@ -15,12 +15,12 @@ class TextViewer(Static):
         super().update(value)
 
 
-class MarkdownViewer(VerticalScroll):
-    """Scrollable markdown viewer."""
+class MarkdownViewer(Container):
+    """Markdown viewer container."""
 
     DEFAULT_CSS = """
     MarkdownViewer {
-        height: 100%;
+        height: auto;
     }
     """
 

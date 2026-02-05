@@ -19,11 +19,11 @@ class DetailModal(ModalScreen[None]):
     }
 
     #detail-container {
-        width: 80%;
-        height: 80%;
+        width: 90%;
+        height: 90%;
         background: $surface;
         border: solid $primary;
-        padding: 1 1;
+        padding: 0 1;
     }
     """
 

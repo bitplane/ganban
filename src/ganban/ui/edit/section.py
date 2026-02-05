@@ -18,7 +18,7 @@ class SectionEditor(Container):
     DEFAULT_CSS = """
     SectionEditor {
         width: 100%;
-        height: 1fr;
+        height: auto;
     }
     SectionEditor > .section-heading {
         width: 100%;
@@ -30,13 +30,10 @@ class SectionEditor(Container):
         text-style: bold;
     }
     SectionEditor > .section-body {
-        height: 1fr;
-    }
-    SectionEditor > .section-body > ContentSwitcher {
-        height: 100%;
+        height: auto;
+        min-height: 3;
     }
     SectionEditor > .section-body #view {
-        height: 100%;
         padding: 0;
     }
     SectionEditor > .section-body #view MarkdownViewer {
@@ -48,7 +45,8 @@ class SectionEditor(Container):
         margin: 0;
     }
     SectionEditor > .section-body #edit {
-        height: 100%;
+        height: auto;
+        scrollbar-size: 0 0;
     }
     """
 
@@ -76,13 +74,13 @@ class SectionEditor(Container):
         def control(self) -> SectionEditor:
             return self._sender
 
-    def __init__(self, heading: str, body: str = "", **kwargs) -> None:
+    def __init__(self, heading: str | None, body: str = "", **kwargs) -> None:
         super().__init__(**kwargs)
         self._heading = heading
         self._body = body
 
     @property
-    def heading(self) -> str:
+    def heading(self) -> str | None:
         return self._heading
 
     @property
@@ -90,12 +88,13 @@ class SectionEditor(Container):
         return self._body
 
     def compose(self) -> ComposeResult:
-        yield EditableText(
-            self._heading,
-            Static(self._heading),
-            TextEditor(),
-            classes="section-heading",
-        )
+        if self._heading is not None:
+            yield EditableText(
+                self._heading,
+                Static(self._heading),
+                TextEditor(),
+                classes="section-heading",
+            )
         yield EditableText(
             self._body,
             MarkdownViewer(self._body),
