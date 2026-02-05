@@ -3,6 +3,7 @@
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
+from textual.widgets import Static
 
 from ganban.models import Board
 from ganban.writer import build_column_path, save_board
@@ -12,7 +13,7 @@ from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import DragStarted
 from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, renumber_links
 from ganban.ui.menu import ContextMenu, MenuItem
-from ganban.ui.edit import EditableLabel
+from ganban.ui.edit import EditableText, TextEditor
 
 
 class BoardScreen(Screen):
@@ -55,7 +56,7 @@ class BoardScreen(Screen):
 
     def compose(self) -> ComposeResult:
         title = self.board.content.title or "ganban"
-        yield EditableLabel(title, click_to_edit=True, id="board-header")
+        yield EditableText(title, Static(title), TextEditor(), id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
 
@@ -96,9 +97,9 @@ class BoardScreen(Screen):
         elif self._card_drag.active:
             self._card_drag.cancel()
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update board title when header is edited."""
-        header = self.query_one("#board-header", EditableLabel)
+        header = self.query_one("#board-header", EditableText)
         if event.control is header:
             event.stop()
             self.board.content.title = event.new_value
@@ -107,7 +108,7 @@ class BoardScreen(Screen):
         """Show context menu on right-click on board header."""
         if event.button != 3:
             return
-        header = self.query_one("#board-header", EditableLabel)
+        header = self.query_one("#board-header", EditableText)
         if header.region.contains(event.screen_x, event.screen_y):
             event.stop()
             items = [MenuItem("Edit", "edit")]

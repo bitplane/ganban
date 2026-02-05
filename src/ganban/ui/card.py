@@ -10,7 +10,7 @@ from ganban.writer import create_card
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.edit import EditableLabel
+from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
 
 
@@ -144,7 +144,7 @@ class AddCard(Static):
         margin-bottom: 1;
         border: dashed $surface-lighten-2;
     }
-    AddCard > EditableLabel > Static {
+    AddCard > EditableText > ContentSwitcher > Static {
         text-align: center;
         color: $text-muted;
     }
@@ -156,15 +156,17 @@ class AddCard(Static):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel("+")
+        yield EditableText("+", Static("+"), TextEditor())
 
     def on_click(self) -> None:
-        self.query_one(EditableLabel).start_editing(text="")
+        editable = self.query_one(EditableText)
+        editable.value = ""
+        editable.focus()
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
         if event.new_value and event.new_value != "+":
             new_card = create_card(self.board, event.new_value, column=self.column)
             link = self.column.links[-1]  # create_card adds link to end
             self.post_message(self.CardCreated(self.column, link, new_card.content.title))
-        self.query_one(EditableLabel).value = "+"
+        self.query_one(EditableText).value = "+"

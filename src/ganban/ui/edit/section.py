@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Container
+from textual.message import Message
+from textual.widgets import Markdown, Static
 
-from ganban.ui.edit.label import EditableLabel
-from ganban.ui.edit.markdown import EditableMarkdown
-from ganban.ui.events import ValueChanged
+from ganban.ui.edit.editable import EditableText
+from ganban.ui.edit.editors import MarkdownEditor, TextEditor
 
 
 class SectionEditor(Container):
@@ -24,23 +25,43 @@ class SectionEditor(Container):
         text-style: bold;
         border-bottom: solid $primary-darken-2;
     }
-    SectionEditor > .section-heading > Static {
+    SectionEditor > .section-heading > ContentSwitcher > Static {
         text-style: bold;
     }
-    SectionEditor > EditableMarkdown {
+    SectionEditor > .section-body {
         height: 1fr;
+    }
+    SectionEditor > .section-body > ContentSwitcher {
+        height: 100%;
+    }
+    SectionEditor > .section-body #view {
+        height: 100%;
+        padding: 0;
+    }
+    SectionEditor > .section-body #edit {
+        height: 100%;
     }
     """
 
-    class HeadingChanged(ValueChanged):
+    class HeadingChanged(Message):
         """Emitted when the section heading changes."""
+
+        def __init__(self, old_value: str, new_value: str) -> None:
+            super().__init__()
+            self.old_value = old_value
+            self.new_value = new_value
 
         @property
         def control(self) -> SectionEditor:
             return self._sender
 
-    class BodyChanged(ValueChanged):
+    class BodyChanged(Message):
         """Emitted when the section body changes."""
+
+        def __init__(self, old_value: str, new_value: str) -> None:
+            super().__init__()
+            self.old_value = old_value
+            self.new_value = new_value
 
         @property
         def control(self) -> SectionEditor:
@@ -60,15 +81,25 @@ class SectionEditor(Container):
         return self._body
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self._heading, click_to_edit=True, classes="section-heading")
-        yield EditableMarkdown(self._body)
+        yield EditableText(
+            self._heading,
+            Static(self._heading),
+            TextEditor(),
+            classes="section-heading",
+        )
+        yield EditableText(
+            self._body,
+            Markdown(self._body),
+            MarkdownEditor(),
+            classes="section-body",
+            clean=False,
+        )
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        self._heading = event.new_value
-        self.post_message(self.HeadingChanged(event.old_value, event.new_value))
-
-    def on_editable_markdown_changed(self, event: EditableMarkdown.Changed) -> None:
-        event.stop()
-        self._body = event.new_value
-        self.post_message(self.BodyChanged(event.old_value, event.new_value))
+        if "section-heading" in event.control.classes:
+            self._heading = event.new_value
+            self.post_message(self.HeadingChanged(event.old_value, event.new_value))
+        else:
+            self._body = event.new_value
+            self.post_message(self.BodyChanged(event.old_value, event.new_value))

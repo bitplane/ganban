@@ -13,7 +13,7 @@ from ganban.writer import build_column_path, create_column
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.edit import EditableLabel
+from ganban.ui.edit import EditableText, TextEditor
 
 if TYPE_CHECKING:
     pass
@@ -27,7 +27,7 @@ class ColumnHeader(DraggableMixin, Static):
         width: 100%;
         height: auto;
     }
-    ColumnHeader > Static {
+    ColumnHeader > EditableText > ContentSwitcher > Static {
         width: 100%;
         text-align: center;
         text-style: bold;
@@ -42,13 +42,13 @@ class ColumnHeader(DraggableMixin, Static):
         self.column_name = column_name
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel(self.column_name, click_to_edit=True)
+        yield EditableText(self.column_name, Static(self.column_name), TextEditor())
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStarted(self, mouse_pos))
 
     def draggable_clicked(self, click_pos: Offset) -> None:
-        self.query_one(EditableLabel).start_editing(cursor_col=click_pos.x)
+        self.query_one(EditableText).focus()
 
 
 class ColumnWidget(Vertical):
@@ -124,7 +124,7 @@ class ColumnWidget(Vertical):
             event.stop()
             self.post_message(self.DragStarted(self, event.mouse_offset))
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update column name when header is edited."""
         event.stop()
         if event.new_value:
@@ -191,7 +191,7 @@ class AddColumn(Vertical):
         max-width: 25;
         padding: 0 1;
     }
-    AddColumn .column-header > Static {
+    AddColumn .column-header > ContentSwitcher > Static {
         text-align: center;
         text-style: bold;
     }
@@ -202,15 +202,17 @@ class AddColumn(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableLabel("+", classes="column-header")
+        yield EditableText("+", Static("+"), TextEditor(), classes="column-header")
 
     def on_click(self) -> None:
-        self.query_one(EditableLabel).start_editing(text="")
+        editable = self.query_one(EditableText)
+        editable.value = ""
+        editable.focus()
 
-    def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
         if event.new_value and event.new_value != "+":
             new_column = create_column(self.board, event.new_value)
             self.post_message(self.ColumnCreated(new_column))
-        label = self.query_one(EditableLabel)
-        label.value = "+"
+        editable = self.query_one(EditableText)
+        editable.value = "+"

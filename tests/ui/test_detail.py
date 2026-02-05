@@ -5,7 +5,7 @@ from textual.app import App
 
 from ganban.models import Board, Card, Column, MarkdownDoc
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
-from ganban.ui.edit import MarkdownDocEditor, SectionEditor
+from ganban.ui.edit import EditableText, MarkdownDocEditor, SectionEditor
 
 
 class DetailTestApp(App):
@@ -101,10 +101,14 @@ async def test_board_detail_modal_shows_content(board):
 
 @pytest.mark.asyncio
 async def test_escape_closes_modal(card):
-    """Escape key closes the modal."""
+    """Escape key closes the modal when not editing."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         assert isinstance(app.screen, DetailModal)
+
+        # Click somewhere that's not an EditableText to ensure we're not editing
+        await pilot.click(app.screen, offset=(5, 5))
+        await pilot.pause()
 
         await pilot.press("escape")
         assert not isinstance(app.screen, DetailModal)
@@ -128,14 +132,14 @@ async def test_editing_title_updates_doc(card):
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         editor = app.screen.query_one("#main-section", SectionEditor)
-        label = editor.query_one(".section-heading")
+        heading = editor.query_one(".section-heading", EditableText)
 
-        # Start editing
-        label.start_editing()
+        # Start editing by focusing
+        heading.focus()
         await pilot.pause()
 
-        # Clear and type new title
-        text_area = label.query_one("#edit")
+        # Set new title
+        text_area = heading.query_one("#edit")
         text_area.text = "New Title"
 
         # Submit
@@ -161,11 +165,11 @@ async def test_editing_section_updates_doc(card):
         assert notes_section is not None
 
         # Start editing body
-        markdown = notes_section.query_one("EditableMarkdown")
-        markdown.start_editing()
+        body = notes_section.query_one(".section-body", EditableText)
+        body.focus()
         await pilot.pause()
 
-        text_area = markdown.query_one("#edit")
+        text_area = body.query_one("#edit")
         text_area.text = "Updated notes"
 
         # Blur to save (click elsewhere)
@@ -192,11 +196,11 @@ async def test_renaming_section_updates_doc(card):
         assert notes_section is not None
 
         # Start editing heading
-        label = notes_section.query_one(".section-heading")
-        label.start_editing()
+        heading = notes_section.query_one(".section-heading", EditableText)
+        heading.focus()
         await pilot.pause()
 
-        text_area = label.query_one("#edit")
+        text_area = heading.query_one("#edit")
         text_area.text = "Comments"
 
         await pilot.press("enter")
