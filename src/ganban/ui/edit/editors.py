@@ -40,7 +40,6 @@ class BaseEditor(TextArea):
     async def _on_key(self, event: Key) -> None:
         if event.key == "escape":
             event.prevent_default()
-            event.stop()
             self._finish(save=False)
         elif event.key == "enter" and self.SAVE_ON_ENTER:
             event.prevent_default()
