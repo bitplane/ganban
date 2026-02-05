@@ -10,9 +10,10 @@ from textual.widgets import Static
 
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
+from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.widgets import EditableLabel
+from ganban.ui.edit import EditableLabel
 
 if TYPE_CHECKING:
     pass
@@ -138,6 +139,8 @@ class ColumnWidget(Vertical):
             visible_count = sum(1 for c in self.board.columns if not c.hidden)
 
             items = [
+                MenuItem("Edit", "edit"),
+                MenuSeparator(),
                 MenuItem("Move Left", "move_left", disabled=(col_index == 0)),
                 MenuItem("Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
                 MenuSeparator(),
@@ -152,6 +155,8 @@ class ColumnWidget(Vertical):
         if item is None:
             return
         match item.item_id:
+            case "edit":
+                self.app.push_screen(ColumnDetailModal(self.column))
             case "move_left":
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":

@@ -8,9 +8,11 @@ from ganban.models import Board
 from ganban.writer import build_column_path, save_board
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
+from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import DragStarted
 from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, renumber_links
-from ganban.ui.widgets import EditableLabel
+from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.edit import EditableLabel
 
 
 class BoardScreen(Screen):
@@ -100,6 +102,22 @@ class BoardScreen(Screen):
         if event.control is header:
             event.stop()
             self.board.content.title = event.new_value
+
+    def on_click(self, event) -> None:
+        """Show context menu on right-click on board header."""
+        if event.button != 3:
+            return
+        header = self.query_one("#board-header", EditableLabel)
+        if header.region.contains(event.screen_x, event.screen_y):
+            event.stop()
+            items = [MenuItem("Edit", "edit")]
+            menu = ContextMenu(items, event.screen_x, event.screen_y)
+            self.app.push_screen(menu, self._on_header_menu_closed)
+
+    def _on_header_menu_closed(self, item: MenuItem | None) -> None:
+        """Handle board header context menu selection."""
+        if item and item.item_id == "edit":
+            self.app.push_screen(BoardDetailModal(self.board))
 
     async def action_save(self) -> None:
         """Save the board to git."""
