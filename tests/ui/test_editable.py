@@ -296,3 +296,75 @@ async def test_stop_edit_when_not_editing_is_noop(app):
         # Should still not be editing and value unchanged
         assert editable._editing is False
         assert editable.value == original_value
+
+
+@pytest.mark.asyncio
+async def test_tab_in_shift_tab_out_tab_back_in(app):
+    """Tab in, shift+tab out, tab back in, type, tab out - text should save."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+
+        # Tab into editor
+        await pilot.press("tab")
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Shift+tab out (blur saves)
+        await pilot.press("shift+tab")
+        await pilot.pause()
+        assert editable._editing is False
+
+        # Tab back in
+        await pilot.press("tab")
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Type something
+        editor = editable.query_one("#edit", TextEditor)
+        editor.select_all()
+        await pilot.press("n", "e", "w")
+        await pilot.pause()
+
+        # Tab out (blur saves)
+        await pilot.press("tab")
+        await pilot.pause()
+
+        assert editable.value == "new"
+
+
+@pytest.mark.asyncio
+async def test_tab_in_escape_out_shift_tab_tab_back_in(app):
+    """Tab in, escape out, shift+tab, tab back in, type, tab out - text should save."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+
+        # Tab into editor
+        await pilot.press("tab")
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Escape out (cancels, doesn't save)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert editable._editing is False
+
+        # Shift+tab to focus target
+        await pilot.press("shift+tab")
+        await pilot.pause()
+
+        # Tab back in
+        await pilot.press("tab")
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Type something
+        editor = editable.query_one("#edit", TextEditor)
+        editor.select_all()
+        await pilot.press("n", "e", "w")
+        await pilot.pause()
+
+        # Tab out (blur saves)
+        await pilot.press("tab")
+        await pilot.pause()
+
+        assert editable.value == "new"

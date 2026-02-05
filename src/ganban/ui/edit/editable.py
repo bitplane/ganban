@@ -23,10 +23,14 @@ class _FocusableView(Container):
     }
     """
 
-    def on_focus(self) -> None:
+    def _get_editable_parent(self) -> "EditableText | None":
         parent = self.parent
         while parent and not isinstance(parent, EditableText):
             parent = parent.parent
+        return parent
+
+    def on_focus(self) -> None:
+        parent = self._get_editable_parent()
         if parent and not parent._skip_next_focus:
             parent._start_edit()
         if parent:
@@ -141,7 +145,10 @@ class EditableText(Container):
             return
         if save:
             self.value = value
-        self._skip_next_focus = True
+        # Only skip if focus will stay inside this widget (view gets it)
+        focused = self.app.focused
+        focus_inside = focused is not None and self in focused.ancestors
+        self._skip_next_focus = focus_inside
         self.query_one(ContentSwitcher).current = "view"
         self._editing = False
 
