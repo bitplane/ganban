@@ -98,6 +98,13 @@ class MenuList(VerticalScroll):
     }
     """
 
+    class Ready(Message):
+        """Posted when menu has been laid out and has a size."""
+
+        def __init__(self, menu: MenuList) -> None:
+            super().__init__()
+            self.menu = menu
+
     def __init__(
         self,
         items: list[MenuItem | MenuSeparator],
@@ -106,12 +113,21 @@ class MenuList(VerticalScroll):
         super().__init__()
         self._items = items
         self.parent_item = parent_item
+        self._ready_sent: bool = False
+        self._target_x: int = 0
+        self._target_y: int = 0
 
     def compose(self) -> ComposeResult:
         yield from self._items
 
     def on_mount(self) -> None:
         self._set_width_from_content()
+
+    def on_resize(self, event) -> None:
+        """Notify when we have actual dimensions."""
+        if not self._ready_sent and self.size.width > 0 and self.size.height > 0:
+            self._ready_sent = True
+            self.post_message(self.Ready(self))
 
     def _set_width_from_content(self) -> None:
         """Set menu width based on longest item label."""
@@ -196,30 +212,42 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         return next(menu for menu in self._open_menus if item in menu.query(MenuItem))
 
     def _position_menu(self, menu: MenuList, x: int, y: int) -> None:
-        self.call_after_refresh(self._apply_position, menu, x, y)
+        """Show menu at initial position. Edge adjustment happens on_menu_list_ready."""
+        menu._target_x = x
+        menu._target_y = y
+        menu.styles.offset = (x, y)
+        menu.add_class("-visible")
 
-    def _apply_position(self, menu: MenuList, x: int, y: int) -> None:
+    def on_menu_list_ready(self, event: MenuList.Ready) -> None:
+        """Adjust menu position when we know actual dimensions."""
+        event.stop()
+        menu = event.menu
+        x = menu._target_x
+        y = menu._target_y
+
         screen_width = self.app.size.width
         screen_height = self.app.size.height
         menu_width = menu.size.width
         menu_height = menu.size.height
 
+        needs_adjustment = False
+
         if x + menu_width > screen_width:
+            needs_adjustment = True
             if menu.parent_item:
                 parent_menu = self._menu_for_item(menu.parent_item)
-                if parent_menu:
-                    x = parent_menu.region.x - menu_width
+                x = parent_menu.region.x - menu_width
             else:
                 x = screen_width - menu_width
 
         if y + menu_height > screen_height:
+            needs_adjustment = True
             y = screen_height - menu_height
 
-        x = max(0, x)
-        y = max(0, y)
-
-        menu.styles.offset = (x, y)
-        menu.add_class("-visible")
+        if needs_adjustment:
+            x = max(0, x)
+            y = max(0, y)
+            menu.styles.offset = (x, y)
 
     def _open_submenu(self, parent_item: MenuItem) -> MenuList:
         """Open submenu for item. Caller must verify has_submenu first."""

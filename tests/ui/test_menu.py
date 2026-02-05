@@ -9,12 +9,14 @@ from ganban.ui.menu import ContextMenu, MenuItem, MenuList, MenuSeparator
 class MenuTestApp(App):
     """Minimal app for testing menus."""
 
-    def __init__(self, menu_items):
+    def __init__(self, menu_items, x=0, y=0):
         super().__init__()
         self._menu_items = menu_items
+        self._x = x
+        self._y = y
 
     def on_mount(self):
-        self.push_screen(ContextMenu(self._menu_items, x=0, y=0))
+        self.push_screen(ContextMenu(self._menu_items, x=self._x, y=self._y))
 
 
 @pytest.mark.asyncio
@@ -353,3 +355,52 @@ async def test_click_separator_does_not_dismiss(menu_items):
 
         # Menu should still be open
         assert isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_menu_repositions_near_right_edge(menu_items):
+    """Menu repositions when it would overflow right edge."""
+    # Position menu near right edge (default terminal is 80x24)
+    app = MenuTestApp(menu_items, x=75, y=0)
+    async with app.run_test():
+        screen = app.screen
+        root_menu = screen._open_menus[0]
+
+        # Menu should have been repositioned to fit on screen
+        # x offset should be less than 75
+        assert root_menu.styles.offset.x.value < 75
+
+
+@pytest.mark.asyncio
+async def test_menu_repositions_near_bottom_edge(menu_items):
+    """Menu repositions when it would overflow bottom edge."""
+    # Position menu near bottom edge
+    app = MenuTestApp(menu_items, x=0, y=20)
+    async with app.run_test():
+        screen = app.screen
+        root_menu = screen._open_menus[0]
+
+        # Menu should have been repositioned to fit on screen
+        # y offset should be less than 20
+        assert root_menu.styles.offset.y.value < 20
+
+
+@pytest.mark.asyncio
+async def test_submenu_flips_left_near_right_edge(menu_items):
+    """Submenu opens to the left when near right edge."""
+    # Position menu so submenu would overflow right (80 - menu_width ~8 = 72)
+    app = MenuTestApp(menu_items, x=72, y=0)
+    async with app.run_test() as pilot:
+        screen = app.screen
+        root_menu = screen._open_menus[0]
+
+        # Open Edit submenu
+        await pilot.press("down")  # Edit
+        assert app.focused.item_id == "edit"
+
+        # Submenu should be open
+        assert len(screen._open_menus) == 2
+        submenu = screen._open_menus[1]
+
+        # Submenu should be positioned to the left of root menu
+        assert submenu.styles.offset.x.value < root_menu.styles.offset.x.value
