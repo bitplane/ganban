@@ -3,7 +3,7 @@
 import pytest
 from textual.app import App
 
-from ganban.ui.menu import ContextMenu, MenuItem, MenuList
+from ganban.ui.menu import ContextMenu, MenuItem, MenuList, MenuSeparator
 
 
 class MenuTestApp(App):
@@ -213,15 +213,143 @@ async def test_moving_to_item_without_submenu_closes_all(menu_items):
 
 @pytest.mark.asyncio
 async def test_all_disabled_menu_navigation(all_disabled_menu):
-    """Up/down in menu with all disabled items doesn't crash."""
+    """Up/down/enter in menu with all disabled items doesn't crash."""
     app = MenuTestApp(all_disabled_menu)
     async with app.run_test() as pilot:
         # No item should be focused (all disabled)
         assert not isinstance(app.focused, MenuItem)
 
-        # Pressing up/down should not crash
+        # Pressing up/down/enter should not crash
         await pilot.press("down")
         await pilot.press("up")
+        await pilot.press("enter")
 
-        # Still no MenuItem focused
+        # Still no MenuItem focused, menu still open
         assert not isinstance(app.focused, MenuItem)
+        assert isinstance(app.screen, ContextMenu)
+
+
+def find_item(screen, item_id):
+    """Find a MenuItem by its item_id."""
+    for item in screen.query(MenuItem):
+        if item.item_id == item_id:
+            return item
+    return None
+
+
+@pytest.mark.asyncio
+async def test_hover_focuses_item(menu_items):
+    """Hovering over a menu item focuses it."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        # Initially focused on Open
+        assert app.focused.item_id == "open"
+
+        # Hover over Quit (last item)
+        quit_item = find_item(app.screen, "quit")
+        await pilot.hover(quit_item)
+
+        assert app.focused.item_id == "quit"
+
+
+@pytest.mark.asyncio
+async def test_hover_opens_submenu(menu_items):
+    """Hovering over item with submenu opens it."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        screen = app.screen
+        assert len(screen._open_menus) == 1
+
+        # Hover over Edit (has submenu)
+        edit_item = find_item(screen, "edit")
+        await pilot.hover(edit_item)
+
+        assert app.focused.item_id == "edit"
+        assert len(screen._open_menus) == 2
+        assert screen._open_menus[-1].parent_item.item_id == "edit"
+
+
+@pytest.mark.asyncio
+async def test_enter_selects_leaf_item(menu_items):
+    """Enter key on leaf item selects it and dismisses menu."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        # Open is focused, it's a leaf item
+        assert app.focused.item_id == "open"
+
+        await pilot.press("enter")
+
+        # Menu should be dismissed
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_left_at_root_does_nothing(menu_items):
+    """Left arrow at root level (no submenu open) does nothing."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        screen = app.screen
+        assert app.focused.item_id == "open"
+        assert len(screen._open_menus) == 1
+
+        await pilot.press("left")
+
+        # Still at root, still focused on Open
+        assert app.focused.item_id == "open"
+        assert len(screen._open_menus) == 1
+
+
+@pytest.mark.asyncio
+async def test_click_selects_leaf_item(menu_items):
+    """Clicking a leaf item selects it and dismisses menu."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        quit_item = find_item(app.screen, "quit")
+        await pilot.click(quit_item)
+
+        # Menu should be dismissed
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_click_opens_submenu(menu_items):
+    """Clicking item with submenu opens it."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        screen = app.screen
+        edit_item = find_item(screen, "edit")
+        await pilot.click(edit_item)
+
+        # Submenu should be open, focus on first item
+        assert len(screen._open_menus) == 2
+        assert app.focused.item_id == "cut"
+
+
+@pytest.mark.asyncio
+async def test_click_outside_dismisses(menu_items):
+    """Clicking outside the menu dismisses it."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        assert isinstance(app.screen, ContextMenu)
+
+        # Click away from the menu (menu is at top-left)
+        await pilot.click(offset=(50, 10))
+
+        # Menu should be dismissed
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_click_separator_does_not_dismiss(menu_items):
+    """Clicking a separator (inside menu but not on item) doesn't dismiss."""
+    app = MenuTestApp(menu_items)
+    async with app.run_test() as pilot:
+        screen = app.screen
+        assert isinstance(screen, ContextMenu)
+
+        # Find and click a separator
+        separator = screen.query_one(MenuSeparator)
+        await pilot.click(separator)
+
+        # Menu should still be open
+        assert isinstance(app.screen, ContextMenu)

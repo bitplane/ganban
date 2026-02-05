@@ -20,10 +20,6 @@ class MenuItem(Static, can_focus=True):
             super().__init__()
             self.item = item
 
-        @property
-        def control(self) -> MenuItem:
-            return self.item
-
     DEFAULT_CSS = """
     MenuItem {
         width: 100%;
@@ -147,14 +143,9 @@ class ContextMenu(ModalScreen[MenuItem | None]):
     class ItemSelected(Message):
         """Posted when an item is selected."""
 
-        def __init__(self, item: MenuItem, control: ContextMenu) -> None:
+        def __init__(self, item: MenuItem) -> None:
             super().__init__()
             self.item = item
-            self._control = control
-
-        @property
-        def control(self) -> ContextMenu:
-            return self._control
 
     DEFAULT_CSS = """
     ContextMenu {
@@ -200,12 +191,9 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         focused = self.app.focused
         return focused if isinstance(focused, MenuItem) else None
 
-    def _menu_for_item(self, item: MenuItem) -> MenuList | None:
+    def _menu_for_item(self, item: MenuItem) -> MenuList:
         """Find which menu contains an item."""
-        for menu in self._open_menus:
-            if item in menu.query(MenuItem):
-                return menu
-        return None
+        return next(menu for menu in self._open_menus if item in menu.query(MenuItem))
 
     def _position_menu(self, menu: MenuList, x: int, y: int) -> None:
         self.call_after_refresh(self._apply_position, menu, x, y)
@@ -280,13 +268,8 @@ class ContextMenu(ModalScreen[MenuItem | None]):
             return
         menu = self._menu_for_item(focused)
         items = menu.get_focusable_items()
-        if not items:
-            return
-        if focused in items:
-            idx = items.index(focused)
-            items[(idx - 1) % len(items)].focus()
-        else:
-            items[-1].focus()
+        idx = items.index(focused)
+        items[(idx - 1) % len(items)].focus()
 
     def action_focus_next(self) -> None:
         """Focus the next enabled item in current menu (wraps around)."""
@@ -295,13 +278,8 @@ class ContextMenu(ModalScreen[MenuItem | None]):
             return
         menu = self._menu_for_item(focused)
         items = menu.get_focusable_items()
-        if not items:
-            return
-        if focused in items:
-            idx = items.index(focused)
-            items[(idx + 1) % len(items)].focus()
-        else:
-            items[0].focus()
+        idx = items.index(focused)
+        items[(idx + 1) % len(items)].focus()
 
     def action_select_or_enter(self) -> None:
         """Select leaf item or enter submenu."""
@@ -311,7 +289,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if focused.has_submenu:
             self._open_submenu(focused)._focus_first_enabled()
         else:
-            self.post_message(self.ItemSelected(focused, self))
+            self.post_message(self.ItemSelected(focused))
             self.dismiss(focused)
 
     def action_close_submenu(self) -> None:
@@ -334,7 +312,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if item.has_submenu:
             self._open_submenu(item)._focus_first_enabled()
         else:
-            self.post_message(self.ItemSelected(item, self))
+            self.post_message(self.ItemSelected(item))
             self.dismiss(item)
 
     def on_click(self, event: Click) -> None:
