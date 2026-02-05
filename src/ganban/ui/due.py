@@ -8,7 +8,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.ui.cal import DateButton, date_diff
-from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
 class DueDateLabel(Static):
@@ -48,7 +48,7 @@ class DueDateLabel(Static):
             return
         event.stop()
         menu = ContextMenu(
-            [MenuItem("🔙", item_id="cancel"), MenuItem("🚫", item_id="confirm")],
+            [MenuRow(MenuItem("🔙", item_id="cancel"), MenuItem("🚫", item_id="confirm"))],
             event.screen_x,
             event.screen_y,
         )

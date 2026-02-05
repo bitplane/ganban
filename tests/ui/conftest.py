@@ -2,7 +2,7 @@
 
 import pytest
 
-from ganban.ui.menu import MenuItem, MenuSeparator
+from ganban.ui.menu import MenuItem, MenuRow, MenuSeparator
 
 
 @pytest.fixture
@@ -59,6 +59,26 @@ def menu_items():
         ),
         MenuSeparator(),
         MenuItem("Quit", item_id="quit"),
+    ]
+
+
+@pytest.fixture
+def menu_with_row():
+    """A menu with a horizontal row in the middle.
+
+    Structure:
+    - Normal
+    - [A] [B] [C]   (MenuRow)
+    - Below
+    """
+    return [
+        MenuItem("Normal", item_id="normal"),
+        MenuRow(
+            MenuItem("A", item_id="a"),
+            MenuItem("B", item_id="b"),
+            MenuItem("C", item_id="c"),
+        ),
+        MenuItem("Below", item_id="below"),
     ]
 
 

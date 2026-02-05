@@ -404,3 +404,181 @@ async def test_submenu_flips_left_near_right_edge(menu_items):
 
         # Submenu should be positioned to the left of root menu
         assert submenu.styles.offset.x.value < root_menu.styles.offset.x.value
+
+
+# --- MenuRow tests ---
+
+
+@pytest.mark.asyncio
+async def test_down_enters_row(menu_with_row):
+    """Down from above a row focuses the row's first item."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        assert app.focused.item_id == "normal"
+
+        await pilot.press("down")
+        assert app.focused.item_id == "a"
+
+
+@pytest.mark.asyncio
+async def test_down_from_row_exits(menu_with_row):
+    """Down from inside a row moves to next item below."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # into row -> "a"
+        await pilot.press("right")  # -> "b"
+        assert app.focused.item_id == "b"
+
+        await pilot.press("down")
+        assert app.focused.item_id == "below"
+
+
+@pytest.mark.asyncio
+async def test_up_enters_row_from_below(menu_with_row):
+    """Up from below a row focuses the row's active item."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        # Navigate down to "below"
+        await pilot.press("down")  # -> "a"
+        await pilot.press("down")  # -> "below"
+        assert app.focused.item_id == "below"
+
+        await pilot.press("up")
+        assert app.focused.item_id == "a"
+
+
+@pytest.mark.asyncio
+async def test_up_from_row_exits(menu_with_row):
+    """Up from inside a row moves to previous item above."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        assert app.focused.item_id == "a"
+
+        await pilot.press("up")
+        assert app.focused.item_id == "normal"
+
+
+@pytest.mark.asyncio
+async def test_right_moves_within_row(menu_with_row):
+    """Right arrow moves to next item in row."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        assert app.focused.item_id == "a"
+
+        await pilot.press("right")
+        assert app.focused.item_id == "b"
+
+        await pilot.press("right")
+        assert app.focused.item_id == "c"
+
+
+@pytest.mark.asyncio
+async def test_left_moves_within_row(menu_with_row):
+    """Left arrow moves to previous item in row."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        await pilot.press("right")  # -> "b"
+        await pilot.press("right")  # -> "c"
+        assert app.focused.item_id == "c"
+
+        await pilot.press("left")
+        assert app.focused.item_id == "b"
+
+        await pilot.press("left")
+        assert app.focused.item_id == "a"
+
+
+@pytest.mark.asyncio
+async def test_right_at_row_end_selects(menu_with_row):
+    """Right at end of row selects the item (no submenu)."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        await pilot.press("right")  # -> "b"
+        await pilot.press("right")  # -> "c"
+        assert app.focused.item_id == "c"
+
+        await pilot.press("right")
+        # "c" has no submenu, so it gets selected and menu dismisses
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_left_at_row_start_does_close_submenu(menu_with_row):
+    """Left at start of row does close submenu behavior (noop at root)."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        assert app.focused.item_id == "a"
+
+        await pilot.press("left")
+        # At root level, close submenu is a no-op, focus stays
+        assert app.focused.item_id == "a"
+        assert isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_row_remembers_active_item(menu_with_row):
+    """Row remembers which item was last focused."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        await pilot.press("right")  # -> "b"
+        assert app.focused.item_id == "b"
+
+        await pilot.press("down")  # -> "below"
+        assert app.focused.item_id == "below"
+
+        await pilot.press("up")  # -> back to row, should be "b"
+        assert app.focused.item_id == "b"
+
+
+@pytest.mark.asyncio
+async def test_enter_selects_row_item(menu_with_row):
+    """Enter on item in row selects it and dismisses."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        await pilot.press("right")  # -> "b"
+        assert app.focused.item_id == "b"
+
+        await pilot.press("enter")
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_click_row_item(menu_with_row):
+    """Clicking an item in a row selects it."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        b_item = find_item(app.screen, "b")
+        await pilot.click(b_item)
+
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_row_wrapping_up_from_top(menu_with_row):
+    """Up from first item wraps to last."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        assert app.focused.item_id == "normal"
+
+        await pilot.press("up")
+        assert app.focused.item_id == "below"
+
+
+@pytest.mark.asyncio
+async def test_row_wrapping_down_from_bottom(menu_with_row):
+    """Down from last item wraps to first."""
+    app = MenuTestApp(menu_with_row)
+    async with app.run_test() as pilot:
+        await pilot.press("down")  # -> "a"
+        await pilot.press("down")  # -> "below"
+        assert app.focused.item_id == "below"
+
+        await pilot.press("down")
+        assert app.focused.item_id == "normal"

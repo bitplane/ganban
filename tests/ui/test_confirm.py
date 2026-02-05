@@ -70,35 +70,28 @@ async def test_menu_has_cancel_and_confirm(app):
 
 @pytest.mark.asyncio
 async def test_confirm_emits_message(app):
-    """Clicking confirm emits Confirmed message."""
+    """Selecting confirm emits Confirmed message."""
     async with app.run_test() as pilot:
         btn = app.query_one(ConfirmButton)
         await pilot.click(btn)
 
-        confirm_item = None
-        for item in app.screen.query(MenuItem):
-            if item.item_id == "confirm":
-                confirm_item = item
-                break
-
-        await pilot.click(confirm_item)
+        # Navigate right to confirm item and select it
+        await pilot.press("right")
+        assert app.focused.item_id == "confirm"
+        await pilot.press("enter")
         assert app.confirmed is True
 
 
 @pytest.mark.asyncio
 async def test_cancel_does_not_emit(app):
-    """Clicking cancel does not emit Confirmed message."""
+    """Selecting cancel does not emit Confirmed message."""
     async with app.run_test() as pilot:
         btn = app.query_one(ConfirmButton)
         await pilot.click(btn)
 
-        cancel_item = None
-        for item in app.screen.query(MenuItem):
-            if item.item_id == "cancel":
-                cancel_item = item
-                break
-
-        await pilot.click(cancel_item)
+        # Cancel is first item (already focused), select it
+        assert app.focused.item_id == "cancel"
+        await pilot.press("enter")
         assert app.confirmed is False
 
 

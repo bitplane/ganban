@@ -3,7 +3,7 @@
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
 class ConfirmButton(Static):
@@ -37,8 +37,10 @@ class ConfirmButton(Static):
         event.stop()
         menu = ContextMenu(
             [
-                MenuItem("❌", item_id="cancel"),
-                MenuItem("✅", item_id="confirm"),
+                MenuRow(
+                    MenuItem("🔙", item_id="cancel"),
+                    MenuItem("🗑️", item_id="confirm"),
+                ),
             ],
             event.screen_x,
             event.screen_y,

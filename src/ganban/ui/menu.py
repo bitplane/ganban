@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from rich.cells import cell_len
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.screen import ModalScreen
@@ -82,6 +82,59 @@ class MenuSeparator(Static):
     """
 
 
+class MenuRow(Horizontal):
+    """A horizontal row of menu items within a vertical menu."""
+
+    DEFAULT_CSS = """
+    MenuRow {
+        width: 100%;
+        height: auto;
+        padding: 0 1;
+    }
+    """
+
+    def __init__(self, *items: MenuItem) -> None:
+        super().__init__()
+        self._items = list(items)
+        self._active_index: int = 0
+
+    def compose(self) -> ComposeResult:
+        for item in self._items:
+            item.styles.width = cell_len(item.label)
+            item.styles.padding = (0, 0)
+            yield item
+
+    @property
+    def active_item(self) -> MenuItem | None:
+        """The currently active (last-focused) item in this row."""
+        enabled = self.get_focusable_items()
+        if not enabled:
+            return None
+        self._active_index = min(self._active_index, len(enabled) - 1)
+        return enabled[self._active_index]
+
+    def get_focusable_items(self) -> list[MenuItem]:
+        """Return enabled items in this row."""
+        return [item for item in self._items if not item.disabled]
+
+    def navigate(self, direction: int) -> MenuItem | None:
+        """Move active index by direction (+1/-1). Return new item, or None at edge."""
+        enabled = self.get_focusable_items()
+        if not enabled:
+            return None
+        new_index = self._active_index + direction
+        if new_index < 0 or new_index >= len(enabled):
+            return None
+        self._active_index = new_index
+        return enabled[self._active_index]
+
+    def activate(self, item: MenuItem) -> None:
+        """Set the given item as the active one."""
+        enabled = self.get_focusable_items()
+        if item in enabled:
+            self._active_index = enabled.index(item)
+
+
 class MenuList(VerticalScroll):
     """Container for menu items."""
 
@@ -108,7 +161,7 @@ class MenuList(VerticalScroll):
 
     def __init__(
         self,
-        items: list[MenuItem | MenuSeparator],
+        items: list[MenuItem | MenuSeparator | MenuRow],
         parent_item: MenuItem | None = None,
     ) -> None:
         super().__init__()
@@ -140,6 +193,9 @@ class MenuList(VerticalScroll):
                 max_len = max(max_len, cell_len(item.label))
                 if item.has_submenu:
                     has_submenu = True
+            elif isinstance(item, MenuRow):
+                row_width = sum(cell_len(child.label) for child in item._items if isinstance(child, MenuItem))
+                max_len = max(max_len, row_width)
             elif not isinstance(item, MenuSeparator):
                 # Custom widget - let it determine its own width
                 has_custom_widget = True
@@ -157,8 +213,19 @@ class MenuList(VerticalScroll):
                 break
 
     def get_focusable_items(self) -> list[MenuItem]:
-        """Return list of enabled menu items."""
-        return [item for item in self.query(MenuItem) if not item.disabled]
+        """Return list of items for vertical navigation.
+
+        Each MenuRow is collapsed to its active item.
+        """
+        result: list[MenuItem] = []
+        for item in self._items:
+            if isinstance(item, MenuRow):
+                active = item.active_item
+                if active is not None:
+                    result.append(active)
+            elif isinstance(item, MenuItem) and not item.disabled:
+                result.append(item)
+        return result
 
 
 class ContextMenu(ModalScreen[MenuItem | None]):
@@ -180,16 +247,16 @@ class ContextMenu(ModalScreen[MenuItem | None]):
     BINDINGS = [
         ("up", "focus_prev", "Up"),
         ("down", "focus_next", "Down"),
-        ("enter", "select_or_enter", "Select"),
-        ("right", "select_or_enter", "Enter submenu"),
-        ("left", "close_submenu", "Back"),
+        ("enter", "select_item", "Select"),
+        ("right", "navigate_right", "Right"),
+        ("left", "navigate_left", "Left"),
         ("escape", "close", "Close"),
         ("tab", "close", "Close"),
     ]
 
     def __init__(
         self,
-        items: list[MenuItem | MenuSeparator],
+        items: list[MenuItem | MenuSeparator | MenuRow],
         x: int,
         y: int,
     ) -> None:
@@ -292,9 +359,18 @@ class ContextMenu(ModalScreen[MenuItem | None]):
             if item.has_submenu and not coming_back:
                 self._open_submenu(item)
 
+    @staticmethod
+    def _containing_row(item: MenuItem) -> MenuRow | None:
+        """Return the MenuRow containing this item, or None."""
+        parent = item.parent
+        return parent if isinstance(parent, MenuRow) else None
+
     def on_descendant_focus(self, event) -> None:
         """React to any focus change within the menu."""
         if isinstance(event.widget, MenuItem):
+            row = self._containing_row(event.widget)
+            if row:
+                row.activate(event.widget)
             self._on_item_focused(event.widget)
 
     def action_focus_prev(self) -> None:
@@ -317,7 +393,7 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         idx = items.index(focused)
         items[(idx + 1) % len(items)].focus()
 
-    def action_select_or_enter(self) -> None:
+    def action_select_item(self) -> None:
         """Select leaf item or enter submenu."""
         focused = self._focused_item
         if not focused:
@@ -328,14 +404,39 @@ class ContextMenu(ModalScreen[MenuItem | None]):
             self.post_message(self.ItemSelected(focused))
             self.dismiss(focused)
 
-    def action_close_submenu(self) -> None:
+    def action_navigate_right(self) -> None:
+        """Move right in row, or enter submenu / select."""
+        focused = self._focused_item
+        if not focused:
+            return
+        row = self._containing_row(focused)
+        if row:
+            next_item = row.navigate(1)
+            if next_item:
+                next_item.focus()
+                return
+        self.action_select_item()
+
+    def action_navigate_left(self) -> None:
+        """Move left in row, or close submenu."""
+        focused = self._focused_item
+        if not focused:
+            return
+        row = self._containing_row(focused)
+        if row:
+            prev_item = row.navigate(-1)
+            if prev_item:
+                prev_item.focus()
+                return
+        self._action_close_submenu()
+
+    def _action_close_submenu(self) -> None:
         """Move focus back to parent item."""
         if len(self._open_menus) <= 1:
             return
         parent_item = self._open_menus[-1].parent_item
         if parent_item:
             parent_item.focus()
-            # on_descendant_focus will clean up via _close_menus_after
 
     def action_close(self) -> None:
         """Close the entire menu."""
