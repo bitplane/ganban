@@ -401,3 +401,34 @@ async def test_tab_in_escape_out_shift_tab_tab_back_in(app):
         await pilot.pause()
 
         assert editable.value == "new"
+
+
+@pytest.mark.asyncio
+async def test_click_escape_click_edits_again(app):
+    """Click to edit, escape to cancel, click again should enter edit mode."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+
+        # Click to start editing
+        await pilot.click(editable)
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Escape to cancel
+        await pilot.press("escape")
+        await pilot.pause()
+        assert editable._editing is False
+
+        # Click again to edit
+        await pilot.click(editable)
+        await pilot.pause()
+        assert editable._editing is True
+
+        # Type to verify editing works
+        editor = editable.query_one("#edit", TextEditor)
+        editor.select_all()
+        await pilot.press("x", "y", "z")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert editable.value == "xyz"

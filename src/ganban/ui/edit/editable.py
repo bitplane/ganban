@@ -129,6 +129,13 @@ class EditableText(Container):
         else:
             self.query_one("#view", _FocusableView).focus(scroll_visible)
 
+    def on_mouse_down(self, event) -> None:
+        # Stop mouse events from bubbling to parent DraggableMixin
+        # Only if click is actually on this widget (respects clipping)
+        widget, _ = self.app.get_widget_at(event.screen_x, event.screen_y)
+        if widget is self or self in widget.ancestors:
+            event.stop()
+
     def on_click(self, event) -> None:
         if not self.disabled and not self._editing:
             self._start_edit(x=event.x, y=event.y)
