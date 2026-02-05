@@ -8,6 +8,7 @@ from textual.events import Click
 from textual.screen import ModalScreen
 
 from ganban.models import Board, Card, Column
+from ganban.ui.color import ColorButton
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor
 
@@ -89,13 +90,31 @@ class CardDetailModal(DetailModal):
 class ColumnDetailModal(DetailModal):
     """Modal screen showing full column details."""
 
+    DEFAULT_CSS = """
+    ColumnDetailModal #column-metadata {
+        width: 100%;
+        height: 1;
+    }
+    """
+
     def __init__(self, column: Column) -> None:
         super().__init__()
         self.column = column
 
     def compose(self) -> ComposeResult:
+        color = self.column.content.meta.get("color")
         with Vertical(id="detail-container"):
-            yield MarkdownDocEditor(self.column.content)
+            yield DocHeader(self.column.content)
+            with Horizontal(id="column-metadata"):
+                yield ColorButton(color=color)
+            yield MarkdownDocEditor(self.column.content, include_header=False)
+
+    def on_color_button_color_selected(self, event: ColorButton.ColorSelected) -> None:
+        event.stop()
+        if event.color:
+            self.column.content.meta["color"] = event.color
+        else:
+            self.column.content.meta.pop("color", None)
 
 
 class BoardDetailModal(DetailModal):

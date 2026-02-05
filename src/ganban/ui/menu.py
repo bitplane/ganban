@@ -45,7 +45,7 @@ class MenuItem(Static, can_focus=True):
         self,
         label: str,
         item_id: str | None = None,
-        submenu: list[MenuItem | MenuSeparator] | None = None,
+        submenu: list[MenuItem | MenuSeparator | MenuRow] | None = None,
         disabled: bool = False,
     ) -> None:
         super().__init__(disabled=disabled)

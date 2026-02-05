@@ -8,8 +8,11 @@ from textual.geometry import Offset
 from textual.message import Message
 from textual.widgets import Rule, Static
 
+from textual.color import Color
+
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
+from ganban.ui.color import build_color_menu
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
@@ -120,6 +123,7 @@ class ColumnWidget(DraggableMixin, Vertical):
 
             items = [
                 MenuItem("Edit", "edit"),
+                MenuItem("\U0001f3a8 Color", "color", submenu=build_color_menu()),
                 MenuSeparator(),
                 MenuItem("Move Left", "move_left", disabled=(col_index == 0)),
                 MenuItem("Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
@@ -130,13 +134,40 @@ class ColumnWidget(DraggableMixin, Vertical):
             menu = ContextMenu(items, event.screen_x, event.screen_y)
             self.app.push_screen(menu, self._on_menu_closed)
 
+    def on_mount(self) -> None:
+        self._apply_color()
+
+    def _set_color(self, color: str | None) -> None:
+        """Update model and re-apply background."""
+        if color:
+            self.column.content.meta["color"] = color
+        else:
+            self.column.content.meta.pop("color", None)
+        self._apply_color()
+
+    def _apply_color(self) -> None:
+        color_hex = self.column.content.meta.get("color")
+        if color_hex:
+            self.styles.background = Color.parse(color_hex)
+        else:
+            self.styles.clear_rule("background")
+
+    def _on_detail_closed(self, result) -> None:
+        """Re-apply styling after detail modal closes."""
+        self._apply_color()
+        title = self.query_one("#column-title", EditableText)
+        title.value = self.column.name
+
     def _on_menu_closed(self, item: MenuItem | None) -> None:
         """Handle context menu selection."""
         if item is None:
             return
+        if item.item_id == "none" or item.item_id.startswith("#"):
+            self._set_color(None if item.item_id == "none" else item.item_id)
+            return
         match item.item_id:
             case "edit":
-                self.app.push_screen(ColumnDetailModal(self.column))
+                self.app.push_screen(ColumnDetailModal(self.column), self._on_detail_closed)
             case "move_left":
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":
