@@ -6,12 +6,12 @@ from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.geometry import Offset
 from textual.message import Message
-from textual.widgets import Static
+from textual.widgets import Rule, Static
 
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
 from ganban.ui.detail import ColumnDetailModal
-from ganban.ui.drag import DraggableMixin, DragStarted
+from ganban.ui.drag import DraggableMixin
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 
@@ -19,39 +19,7 @@ if TYPE_CHECKING:
     pass
 
 
-class ColumnHeader(DraggableMixin, Static):
-    """Draggable column header."""
-
-    DEFAULT_CSS = """
-    ColumnHeader {
-        width: 100%;
-        height: auto;
-    }
-    ColumnHeader > EditableText > ContentSwitcher > Static {
-        width: 100%;
-        text-align: center;
-        text-style: bold;
-    }
-    """
-
-    HORIZONTAL_ONLY = True
-
-    def __init__(self, column_name: str):
-        Static.__init__(self)
-        self._init_draggable()
-        self.column_name = column_name
-
-    def compose(self) -> ComposeResult:
-        yield EditableText(self.column_name, Static(self.column_name), TextEditor())
-
-    def draggable_drag_started(self, mouse_pos: Offset) -> None:
-        self.post_message(DragStarted(self, mouse_pos))
-
-    def draggable_clicked(self, click_pos: Offset) -> None:
-        self.query_one(EditableText).focus()
-
-
-class ColumnWidget(Vertical):
+class ColumnWidget(DraggableMixin, Vertical):
     """A single column on the board."""
 
     DEFAULT_CSS = """
@@ -68,11 +36,21 @@ class ColumnWidget(Vertical):
         border: solid $primary;
         opacity: 0.8;
     }
+    ColumnWidget > EditableText > ContentSwitcher > Static {
+        width: 100%;
+        text-align: center;
+        text-style: bold;
+    }
+    ColumnWidget > Rule.-horizontal {
+        margin: 0;
+    }
     .column-body {
         width: 100%;
         height: 1fr;
     }
     """
+
+    HORIZONTAL_ONLY = True
 
     class DragStarted(Message):
         """Posted when a column drag begins."""
@@ -103,14 +81,16 @@ class ColumnWidget(Vertical):
             self.column_widget = column_widget
 
     def __init__(self, column: Column, board: Board):
-        super().__init__()
+        Vertical.__init__(self)
+        self._init_draggable()
         self.column = column
         self.board = board
 
     def compose(self) -> ComposeResult:
         from ganban.ui.card import AddCard, CardWidget
 
-        yield ColumnHeader(self.column.name)
+        yield EditableText(self.column.name, Static(self.column.name), TextEditor(), id="column-title")
+        yield Rule()
         with VerticalScroll(classes="column-body"):
             for link in self.column.links:
                 card = self.board.cards.get(link.card_id)
@@ -118,11 +98,11 @@ class ColumnWidget(Vertical):
                 yield CardWidget(link, title, self.board)
             yield AddCard(self.column, self.board)
 
-    def on_drag_started(self, event: DragStarted) -> None:
-        """Convert header DragStarted to ColumnWidget.DragStarted."""
-        if isinstance(event.widget, ColumnHeader):
-            event.stop()
-            self.post_message(self.DragStarted(self, event.mouse_offset))
+    def draggable_drag_started(self, mouse_pos: Offset) -> None:
+        self.post_message(self.DragStarted(self, mouse_pos))
+
+    def draggable_clicked(self, click_pos: Offset) -> None:
+        pass  # Click without drag - no action needed
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update column name when header is edited."""
