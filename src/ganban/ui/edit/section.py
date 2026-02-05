@@ -38,6 +38,10 @@ class SectionEditor(Container):
         height: 100%;
         padding: 0;
     }
+    SectionEditor > .section-body #view Markdown {
+        padding: 0;
+        margin: 0;
+    }
     SectionEditor > .section-body #edit {
         height: 100%;
     }
