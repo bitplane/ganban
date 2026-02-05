@@ -257,3 +257,42 @@ async def test_setting_value_while_editing_updates_editor(app):
 
         assert editor.text == "external update"
         assert editable.value == "external update"
+
+
+@pytest.mark.asyncio
+async def test_start_edit_while_editing_is_noop(app):
+    """Calling _start_edit when already editing does nothing."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+
+        assert editable._editing is True
+        editor = editable.query_one("#edit", TextEditor)
+        editor.text = "modified"
+
+        # Try to start editing again
+        editable._start_edit()
+        await pilot.pause()
+
+        # Should still be editing with the same text (not reset)
+        assert editable._editing is True
+        assert editor.text == "modified"
+
+
+@pytest.mark.asyncio
+async def test_stop_edit_when_not_editing_is_noop(app):
+    """Calling _stop_edit when not editing does nothing."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+
+        assert editable._editing is False
+        original_value = editable.value
+
+        # Try to stop editing when not editing
+        editable._stop_edit(save=True, value="should not save")
+        await pilot.pause()
+
+        # Should still not be editing and value unchanged
+        assert editable._editing is False
+        assert editable.value == original_value

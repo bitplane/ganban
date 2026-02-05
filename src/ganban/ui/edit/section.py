@@ -5,10 +5,11 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Container
 from textual.message import Message
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
 
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import MarkdownEditor, TextEditor
+from ganban.ui.edit.viewers import MarkdownViewer
 
 
 class SectionEditor(Container):
@@ -37,6 +38,10 @@ class SectionEditor(Container):
     SectionEditor > .section-body #view {
         height: 100%;
         padding: 0;
+    }
+    SectionEditor > .section-body #view MarkdownViewer {
+        padding: 0;
+        margin: 0;
     }
     SectionEditor > .section-body #view Markdown {
         padding: 0;
@@ -93,7 +98,7 @@ class SectionEditor(Container):
         )
         yield EditableText(
             self._body,
-            Markdown(self._body),
+            MarkdownViewer(self._body),
             MarkdownEditor(),
             classes="section-body",
             clean=False,

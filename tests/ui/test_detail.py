@@ -210,3 +210,61 @@ async def test_renaming_section_updates_doc(card):
         assert "Notes" not in card.content.sections
         assert "Comments" in card.content.sections
         assert card.content.sections["Comments"] == "Some notes"
+
+
+@pytest.mark.asyncio
+async def test_editing_main_body_updates_doc(card):
+    """Editing the main section body updates the underlying document."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test() as pilot:
+        editor = app.screen.query_one("#main-section", SectionEditor)
+        body = editor.query_one(".section-body", EditableText)
+
+        body.focus()
+        await pilot.pause()
+
+        text_area = body.query_one("#edit")
+        text_area.text = "Updated body content"
+
+        # Blur to save
+        heading = editor.query_one(".section-heading", EditableText)
+        heading.focus()
+        await pilot.pause()
+
+        assert card.content.body == "Updated body content"
+
+
+@pytest.mark.asyncio
+async def test_action_close_via_escape(card):
+    """Escape key triggers action_close to dismiss modal."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test() as pilot:
+        assert isinstance(app.screen, DetailModal)
+
+        # Press escape without clicking first
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert not isinstance(app.screen, DetailModal)
+
+
+@pytest.mark.asyncio
+async def test_action_quit_exits_app(card):
+    """action_quit exits the app."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test() as pilot:
+        assert isinstance(app.screen, DetailModal)
+
+        app.screen.action_quit()
+        await pilot.pause()
+
+        assert app.return_code is not None
+
+
+@pytest.mark.asyncio
+async def test_section_editor_body_property(card):
+    """SectionEditor.body property returns the current body text."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test():
+        editor = app.screen.query_one("#main-section", SectionEditor)
+        assert editor.body == "Card body content"
