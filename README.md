@@ -1,6 +1,6 @@
 # ganban
 
-TUI for git-based Trello replacement.
+git-based Trello replacement TUI
 
 ## Overview
 
@@ -133,8 +133,3 @@ Operates on the `ganban` branch without checking it out, using git plumbing:
 - **Resilient**: handle broken states gracefully, offer to fix
 - **Minimal**: derive what you can (titles, order), front-matter is opt-in
 - **Portable**: works with any markdown renderer, any git host, any editor
-
-## TODO
-
-- BASIC-style numbering (10, 20, 30) to minimize renames on reorder
-- Batch updates for bulk moves
