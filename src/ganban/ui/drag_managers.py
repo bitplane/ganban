@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from ganban.ui.column import ColumnWidget
 
 
-class DropPlaceholder(Static):
+class CardPlaceholder(Static):
     """Placeholder showing where a dragged card will drop."""
 
     DEFAULT_CSS = """
-    DropPlaceholder {
+    CardPlaceholder {
         width: 100%;
         height: 3;
         border: dashed $primary;
@@ -27,11 +27,11 @@ class DropPlaceholder(Static):
     """
 
 
-class DragOverlay(Static):
+class DragGhost(Static):
     """Floating overlay showing the card being dragged."""
 
     DEFAULT_CSS = """
-    DragOverlay {
+    DragGhost {
         layer: overlay;
         width: 22;
         height: auto;
@@ -60,7 +60,7 @@ class ColumnPlaceholder(Static):
     """
 
 
-def _renumber_column_links(column) -> None:
+def renumber_links(column) -> None:
     """Renumber all links in a column to sequential zero-padded positions."""
     width = len(str(len(column.links))) if column.links else 1
     for i, link in enumerate(column.links):
@@ -73,8 +73,8 @@ class CardDragManager:
     def __init__(self, screen: BoardScreen):
         self.screen = screen
         self.dragging: CardWidget | None = None
-        self.overlay: DragOverlay | None = None
-        self.placeholder: DropPlaceholder | None = None
+        self.overlay: DragGhost | None = None
+        self.placeholder: CardPlaceholder | None = None
         self.drag_offset: Offset = Offset(0, 0)
         self.target_scroll: VerticalScroll | None = None
         self.insert_before: Static | None = None
@@ -93,11 +93,11 @@ class CardDragManager:
             mouse_offset.y - card_region.y,
         )
 
-        self.overlay = DragOverlay(card.title)
+        self.overlay = DragGhost(card.title)
         self.overlay.styles.offset = (card_region.x, card_region.y)
         self.screen.mount(self.overlay)
 
-        self.placeholder = DropPlaceholder()
+        self.placeholder = CardPlaceholder()
         card.parent.mount(self.placeholder, after=card)
 
         self.screen.capture_mouse()
@@ -146,9 +146,9 @@ class CardDragManager:
         return min(columns, key=column_distance)
 
     def _calculate_insert_position(self, scroll: VerticalScroll, screen_y: int) -> Static:
-        from ganban.ui.card import AddCardWidget, CardWidget
+        from ganban.ui.card import AddCard, CardWidget
 
-        add_widget = scroll.query_one(AddCardWidget)
+        add_widget = scroll.query_one(AddCard)
         visible_cards = [c for c in scroll.children if isinstance(c, CardWidget) and c is not self.dragging]
 
         for card in visible_cards:
@@ -187,11 +187,11 @@ class CardDragManager:
         source_column = self._find_source_column(card)
         if source_column and card.link in source_column.links:
             source_column.links.remove(card.link)
-            _renumber_column_links(source_column)
+            renumber_links(source_column)
 
         actual_pos = self._calculate_model_position(target_scroll, insert_before, card)
         target_column.links.insert(actual_pos, card.link)
-        _renumber_column_links(target_column)
+        renumber_links(target_column)
 
         new_card = CardWidget(card.link, card.title, self.screen.board)
         target_scroll.mount(new_card, before=insert_before)
@@ -283,14 +283,14 @@ class ColumnDragManager:
         if not self.placeholder:
             return
 
-        from ganban.ui.column import AddColumnWidget, ColumnWidget
+        from ganban.ui.column import AddColumn, ColumnWidget
 
         columns_container = self.screen.query_one("#columns", Horizontal)
         visible_columns = [
             c for c in columns_container.children if isinstance(c, ColumnWidget) and c is not self.dragging
         ]
 
-        add_column = columns_container.query_one(AddColumnWidget)
+        add_column = columns_container.query_one(AddColumn)
 
         if not visible_columns:
             self.insert_before = add_column

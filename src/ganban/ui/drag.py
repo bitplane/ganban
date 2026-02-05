@@ -5,7 +5,7 @@ from textual.message import Message
 from textual.widget import Widget
 
 
-class DragStart(Message):
+class DragStarted(Message):
     """Posted when any draggable widget starts being dragged."""
 
     def __init__(self, widget: Widget, mouse_offset: Offset) -> None:

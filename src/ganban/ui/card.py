@@ -8,9 +8,9 @@ from textual.widgets import Static
 from ganban.models import Board, CardLink, Column
 from ganban.writer import create_card
 from ganban.ui.detail import CardDetailModal
-from ganban.ui.drag import DraggableMixin, DragStart
+from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.widgets import EditableLabel, NonSelectableStatic
+from ganban.ui.widgets import EditableLabel, PlainStatic
 
 
 class CardWidget(DraggableMixin, Static):
@@ -55,10 +55,10 @@ class CardWidget(DraggableMixin, Static):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield NonSelectableStatic(self.title or self.link.slug)
+        yield PlainStatic(self.title or self.link.slug)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
-        self.post_message(DragStart(self, mouse_pos))
+        self.post_message(DragStarted(self, mouse_pos))
 
     def draggable_clicked(self, click_pos: Offset) -> None:
         card = self.board.cards.get(self.link.card_id)
@@ -69,7 +69,7 @@ class CardWidget(DraggableMixin, Static):
         card = self.board.cards.get(self.link.card_id)
         if card:
             self.title = card.content.title
-            self.query_one(NonSelectableStatic).update(self.title or self.link.slug)
+            self.query_one(PlainStatic).update(self.title or self.link.slug)
 
     def _find_column(self) -> Column | None:
         """Find the column containing this card's link."""
@@ -123,7 +123,7 @@ class CardWidget(DraggableMixin, Static):
         self.post_message(self.MoveRequested(self, col_name))
 
 
-class AddCardWidget(Static):
+class AddCard(Static):
     """Widget to add a new card to a column."""
 
     class CardCreated(Message):
@@ -136,14 +136,14 @@ class AddCardWidget(Static):
             self.title = title
 
     DEFAULT_CSS = """
-    AddCardWidget {
+    AddCard {
         width: 100%;
         height: auto;
         padding: 0 1;
         margin-bottom: 1;
         border: dashed $surface-lighten-2;
     }
-    AddCardWidget > EditableLabel > Static {
+    AddCard > EditableLabel > Static {
         text-align: center;
         color: $text-muted;
     }

@@ -6,10 +6,10 @@ from textual.screen import Screen
 
 from ganban.models import Board
 from ganban.writer import save_board
-from ganban.ui.card import AddCardWidget, CardWidget
-from ganban.ui.column import AddColumnWidget, ColumnWidget
-from ganban.ui.drag import DragStart
-from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, _renumber_column_links
+from ganban.ui.card import AddCard, CardWidget
+from ganban.ui.column import AddColumn, ColumnWidget
+from ganban.ui.drag import DragStarted
+from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, renumber_links
 from ganban.ui.widgets import EditableLabel
 
 
@@ -60,15 +60,15 @@ class BoardScreen(Screen):
         with Horizontal(id="columns"):
             for column in visible_columns:
                 yield ColumnWidget(column, self.board)
-            yield AddColumnWidget(self.board)
+            yield AddColumn(self.board)
 
-    def on_drag_start(self, event: DragStart) -> None:
+    def on_drag_started(self, event: DragStarted) -> None:
         """Handle drag start from a card."""
         if isinstance(event.widget, CardWidget):
             event.stop()
             self._card_drag.start(event.widget, event.mouse_offset)
 
-    def on_column_widget_drag_start(self, event: ColumnWidget.DragStart) -> None:
+    def on_column_widget_drag_started(self, event: ColumnWidget.DragStarted) -> None:
         """Handle the start of a column drag."""
         event.stop()
         self._column_drag.start(event.column_widget, event.mouse_offset)
@@ -121,16 +121,16 @@ class BoardScreen(Screen):
         # Update model
         if source_col and card.link in source_col.links:
             source_col.links.remove(card.link)
-            _renumber_column_links(source_col)
+            renumber_links(source_col)
 
         target_col.links.append(card.link)
-        _renumber_column_links(target_col)
+        renumber_links(target_col)
 
         # Update UI - find target column widget and mount new card
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is target_col:
                 scroll = col_widget.query_one(VerticalScroll)
-                add_widget = scroll.query_one(AddCardWidget)
+                add_widget = scroll.query_one(AddCard)
                 new_card = CardWidget(card.link, card.title, self.board)
                 scroll.mount(new_card, before=add_widget)
                 break
@@ -144,25 +144,25 @@ class BoardScreen(Screen):
         col = card._find_column()
         if col and card.link in col.links:
             col.links.remove(card.link)
-            _renumber_column_links(col)
+            renumber_links(col)
             card.remove()
 
-    def on_add_card_widget_card_created(self, event: AddCardWidget.CardCreated) -> None:
+    def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
         """Handle new card creation."""
         event.stop()
         # Find the column widget for this column and mount the new card
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is event.column:
                 scroll = col_widget.query_one(VerticalScroll)
-                add_widget = scroll.query_one(AddCardWidget)
+                add_widget = scroll.query_one(AddCard)
                 card_widget = CardWidget(event.card_link, event.title, self.board)
                 scroll.mount(card_widget, before=add_widget)
                 break
 
-    def on_add_column_widget_column_created(self, event: AddColumnWidget.ColumnCreated) -> None:
+    def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
         """Handle new column creation."""
         event.stop()
         columns_container = self.query_one("#columns", Horizontal)
-        add_widget = columns_container.query_one(AddColumnWidget)
+        add_widget = columns_container.query_one(AddColumn)
         new_widget = ColumnWidget(event.column, self.board)
         columns_container.mount(new_widget, before=add_widget)

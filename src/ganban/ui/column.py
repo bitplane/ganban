@@ -10,7 +10,7 @@ from textual.widgets import Static
 
 from ganban.models import Board, Column
 from ganban.writer import build_column_path, create_column
-from ganban.ui.drag import DraggableMixin, DragStart
+from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.widgets import EditableLabel
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ class ColumnHeader(DraggableMixin, Static):
         yield EditableLabel(self.column_name, click_to_edit=True)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
-        self.post_message(DragStart(self, mouse_pos))
+        self.post_message(DragStarted(self, mouse_pos))
 
     def draggable_clicked(self, click_pos: Offset) -> None:
         self.query_one(EditableLabel).start_editing(cursor_col=click_pos.x)
@@ -72,7 +72,7 @@ class ColumnWidget(Vertical):
     }
     """
 
-    class DragStart(Message):
+    class DragStarted(Message):
         """Posted when a column drag begins."""
 
         def __init__(self, column_widget: "ColumnWidget", mouse_offset: Offset) -> None:
@@ -91,7 +91,7 @@ class ColumnWidget(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        from ganban.ui.card import AddCardWidget, CardWidget
+        from ganban.ui.card import AddCard, CardWidget
 
         yield ColumnHeader(self.column.name)
         with VerticalScroll(classes="column-body"):
@@ -99,13 +99,13 @@ class ColumnWidget(Vertical):
                 card = self.board.cards.get(link.card_id)
                 title = card.content.title if card else link.slug
                 yield CardWidget(link, title, self.board)
-            yield AddCardWidget(self.column, self.board)
+            yield AddCard(self.column, self.board)
 
-    def on_drag_start(self, event: DragStart) -> None:
-        """Convert header DragStart to ColumnWidget.DragStart."""
+    def on_drag_started(self, event: DragStarted) -> None:
+        """Convert header DragStarted to ColumnWidget.DragStarted."""
         if isinstance(event.widget, ColumnHeader):
             event.stop()
-            self.post_message(self.DragStart(self, event.mouse_offset))
+            self.post_message(self.DragStarted(self, event.mouse_offset))
 
     def on_editable_label_changed(self, event: EditableLabel.Changed) -> None:
         """Update column name when header is edited."""
@@ -115,7 +115,7 @@ class ColumnWidget(Vertical):
             self.column.path = build_column_path(self.column.order, event.new_value, self.column.hidden)
 
 
-class AddColumnWidget(Vertical):
+class AddColumn(Vertical):
     """Widget to add a new column."""
 
     class ColumnCreated(Message):
@@ -126,14 +126,14 @@ class AddColumnWidget(Vertical):
             self.column = column
 
     DEFAULT_CSS = """
-    AddColumnWidget {
+    AddColumn {
         width: 1fr;
         height: 100%;
         min-width: 20;
         max-width: 25;
         padding: 0 1;
     }
-    AddColumnWidget .column-header > Static {
+    AddColumn .column-header > Static {
         text-align: center;
         text-style: bold;
     }

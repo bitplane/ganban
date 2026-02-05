@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from textual.events import Key
 
 
-class NonSelectableStatic(Static):
+class PlainStatic(Static):
     """Static that doesn't allow text selection."""
 
     ALLOW_SELECT = False
@@ -28,29 +28,29 @@ class ValueChanged(Message):
         self.new_value = new_value
 
 
-class _SubmittableTextArea(TextArea):
+class SubmittingTextArea(TextArea):
     """TextArea that submits on Enter and blur, cancels on Escape."""
 
-    class Submit(Message):
+    class Submitted(Message):
         """Emitted when Enter is pressed or focus lost."""
 
-    class Cancel(Message):
+    class Cancelled(Message):
         """Emitted when Escape is pressed."""
 
     async def _on_key(self, event: Key) -> None:
         if event.key == "enter":
             event.prevent_default()
             event.stop()
-            self.post_message(self.Submit())
+            self.post_message(self.Submitted())
         elif event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(self.Cancel())
+            self.post_message(self.Cancelled())
         else:
             await super()._on_key(event)
 
     def on_blur(self) -> None:
-        self.post_message(self.Submit())
+        self.post_message(self.Submitted())
 
 
 class EditableLabel(Container):
@@ -106,8 +106,8 @@ class EditableLabel(Container):
 
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
-            yield NonSelectableStatic(self._value, id="view")
-            yield _SubmittableTextArea(self._value, id="edit", soft_wrap=True, compact=True, disabled=True)
+            yield PlainStatic(self._value, id="view")
+            yield SubmittingTextArea(self._value, id="edit", soft_wrap=True, compact=True, disabled=True)
 
     def on_click(self, event) -> None:
         if self._click_to_edit and not self._editing:
@@ -124,7 +124,7 @@ class EditableLabel(Container):
             return
         self._editing = True
         edit_text = self._value if text is None else text
-        text_area = self.query_one("#edit", _SubmittableTextArea)
+        text_area = self.query_one("#edit", SubmittingTextArea)
         text_area.disabled = False
         text_area.text = edit_text
         text_area.cursor_location = (0, min(cursor_col, len(edit_text)))
@@ -135,7 +135,7 @@ class EditableLabel(Container):
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one("#edit", _SubmittableTextArea)
+        text_area = self.query_one("#edit", SubmittingTextArea)
         new_value = self._clean(text_area.text)
 
         if save and new_value != self._value:
@@ -147,21 +147,21 @@ class EditableLabel(Container):
         self.query_one(ContentSwitcher).current = "view"
         text_area.disabled = True
 
-    def on__submittable_text_area_submit(self) -> None:
+    def on_submitting_text_area_submitted(self) -> None:
         self._stop_editing(save=True)
 
-    def on__submittable_text_area_cancel(self) -> None:
+    def on_submitting_text_area_cancelled(self) -> None:
         self._stop_editing(save=False)
 
 
-class _MarkdownTextArea(_SubmittableTextArea):
+class MarkdownTextArea(SubmittingTextArea):
     """TextArea for markdown - submits on blur only, Enter inserts newline."""
 
     async def _on_key(self, event: Key) -> None:
         if event.key == "escape":
             event.prevent_default()
             event.stop()
-            self.post_message(self.Cancel())
+            self.post_message(self.Cancelled())
         else:
             await TextArea._on_key(self, event)
 
@@ -216,7 +216,7 @@ class EditableMarkdown(Container):
     def compose(self) -> ComposeResult:
         with ContentSwitcher(initial="view"):
             yield Markdown(self._value, id="view")
-            yield _MarkdownTextArea(self._value, id="edit", disabled=True)
+            yield MarkdownTextArea(self._value, id="edit", disabled=True)
 
     def on_click(self, event) -> None:
         if not self._editing:
@@ -231,7 +231,7 @@ class EditableMarkdown(Container):
         if self._editing:
             return
         self._editing = True
-        text_area = self.query_one("#edit", _MarkdownTextArea)
+        text_area = self.query_one("#edit", MarkdownTextArea)
         text_area.disabled = False
         text_area.text = self._value
         lines = self._value.split("\n")
@@ -245,7 +245,7 @@ class EditableMarkdown(Container):
         if not self._editing:
             return
         self._editing = False
-        text_area = self.query_one("#edit", _MarkdownTextArea)
+        text_area = self.query_one("#edit", MarkdownTextArea)
         new_value = text_area.text
 
         if save and new_value != self._value:
@@ -257,10 +257,10 @@ class EditableMarkdown(Container):
         self.query_one(ContentSwitcher).current = "view"
         text_area.disabled = True
 
-    def on__submittable_text_area_submit(self) -> None:
+    def on_submitting_text_area_submitted(self) -> None:
         self._stop_editing(save=True)
 
-    def on__submittable_text_area_cancel(self) -> None:
+    def on_submitting_text_area_cancelled(self) -> None:
         self._stop_editing(save=False)
 
 
