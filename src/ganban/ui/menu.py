@@ -36,11 +36,11 @@ class MenuItem(Static):
         background: $primary-darken-1;
     }
 
-    MenuItem.-disabled {
+    MenuItem:disabled {
         color: $text-muted;
     }
 
-    MenuItem.-disabled:hover, MenuItem.-disabled.-highlighted {
+    MenuItem:disabled:hover, MenuItem:disabled.-highlighted {
         background: transparent;
     }
 
@@ -56,19 +56,14 @@ class MenuItem(Static):
         submenu: list[MenuItem | MenuSeparator] | None = None,
         disabled: bool = False,
     ) -> None:
-        super().__init__()
+        super().__init__(disabled=disabled)
         self.label = label
         self.item_id = item_id
         self.submenu = submenu
-        self.disabled = disabled
 
     def compose(self) -> ComposeResult:
         arrow = " >" if self.has_submenu else ""
         yield Static(f"{self.label}{arrow}")
-
-    def on_mount(self) -> None:
-        if self.disabled:
-            self.add_class("-disabled")
 
     @property
     def has_submenu(self) -> bool:

@@ -83,18 +83,17 @@ class CardWidget(DraggableMixin, Static):
             event.stop()
             current_col = self._find_column()
 
-            # Build move submenu from visible columns (excluding current)
+            # Build move submenu from visible columns (current disabled)
             move_items = [
-                MenuItem(col.name, f"move:{col.name}")
+                MenuItem(col.name, f"move:{col.name}", disabled=(col is current_col))
                 for col in self.board.columns
-                if not col.hidden and col is not current_col
+                if not col.hidden
             ]
 
             items = [
                 MenuItem("Edit", "edit"),
+                MenuItem("Move to", submenu=move_items),
             ]
-            if move_items:
-                items.append(MenuItem("Move to", submenu=move_items))
             items.append(MenuSeparator())
             items.append(MenuItem("Delete", "delete"))
 
