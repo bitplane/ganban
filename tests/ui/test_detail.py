@@ -1,10 +1,14 @@
 """Tests for detail modals."""
 
+from datetime import date
+
 import pytest
 from textual.app import App
 
 from ganban.models import Board, Card, Column, MarkdownDoc
+from ganban.ui.cal import Calendar, CalendarDay
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
+from ganban.ui.due import DueDateLabel, DueDateWidget
 from ganban.ui.edit import EditableText, MarkdownDocEditor, SectionEditor
 
 
@@ -28,6 +32,18 @@ def card():
             title="Test Card",
             body="Card body content",
             sections={"Notes": "Some notes", "Tasks": "- [ ] Task 1"},
+        ),
+    )
+
+
+@pytest.fixture
+def card_with_due():
+    """A card with a due date."""
+    return Card(
+        id="due-card",
+        content=MarkdownDoc(
+            title="Due Card",
+            meta={"due": "2026-06-15"},
         ),
     )
 
@@ -274,3 +290,48 @@ async def test_section_editor_body_property(card):
     async with app.run_test():
         editor = app.screen.query_one("#main-section", SectionEditor)
         assert editor.body == "Card body content"
+
+
+@pytest.mark.asyncio
+async def test_card_with_due_date_shows_due_widget(card_with_due):
+    """Card with due date shows DueDateWidget with correct date."""
+    app = DetailTestApp(CardDetailModal(card_with_due))
+    async with app.run_test():
+        widget = app.screen.query_one(DueDateWidget)
+        assert widget.due == date(2026, 6, 15)
+
+
+@pytest.mark.asyncio
+async def test_setting_due_date_updates_card_meta(card):
+    """Selecting a due date updates card.content.meta."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test() as pilot:
+        widget = app.screen.query_one(DueDateWidget)
+        picker = widget.query_one("#due-picker")
+
+        await pilot.click(picker)
+
+        cal = app.screen.query_one(Calendar)
+        target_day = None
+        for day in cal.query(CalendarDay):
+            if day.date.month == date.today().month:
+                target_day = day
+                break
+
+        await pilot.click(target_day)
+        assert card.content.meta["due"] == target_day.date.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_clearing_due_date_removes_meta(card_with_due):
+    """Clearing due date removes 'due' from card meta."""
+    app = DetailTestApp(CardDetailModal(card_with_due))
+    async with app.run_test() as pilot:
+        widget = app.screen.query_one(DueDateWidget)
+        label = widget.query_one("#due-label", DueDateLabel)
+
+        # Directly post Confirmed to trigger the clear path
+        label.post_message(DueDateLabel.Confirmed())
+        await pilot.pause()
+
+        assert "due" not in card_with_due.content.meta

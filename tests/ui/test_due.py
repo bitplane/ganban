@@ -7,7 +7,7 @@ from textual.app import App, ComposeResult
 
 from ganban.ui.cal import Calendar, CalendarDay
 from ganban.ui.due import DueDateLabel, DueDateWidget
-from ganban.ui.menu import ContextMenu
+from ganban.ui.menu import ContextMenu, MenuItem
 
 
 class DueDateApp(App):
@@ -17,12 +17,14 @@ class DueDateApp(App):
         super().__init__()
         self._due = due
         self.due_changed: date | None = ...  # sentinel to distinguish None from not-set
+        self.changed_control = None
 
     def compose(self) -> ComposeResult:
         yield DueDateWidget(due=self._due)
 
     def on_due_date_widget_changed(self, event: DueDateWidget.Changed) -> None:
         self.due_changed = event.due
+        self.changed_control = event.control
 
 
 @pytest.mark.asyncio
@@ -217,3 +219,87 @@ async def test_has_due_class_when_due():
     async with app.run_test():
         widget = app.query_one(DueDateWidget)
         assert "has-due" in widget.classes
+
+
+@pytest.mark.asyncio
+async def test_click_hovering_label_opens_menu():
+    """Clicking the due label while hovering opens context menu."""
+    due = date.today() + timedelta(days=5)
+    app = DueDateApp(due=due)
+    async with app.run_test() as pilot:
+        await pilot.hover(DueDateLabel)
+        await pilot.click(DueDateLabel)
+        assert isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_click_label_confirm_clears_due():
+    """Clicking label then confirming clears due date."""
+    due = date.today() + timedelta(days=5)
+    app = DueDateApp(due=due)
+    async with app.run_test() as pilot:
+        widget = app.query_one(DueDateWidget)
+        await pilot.hover(DueDateLabel)
+        await pilot.click(DueDateLabel)
+
+        confirm_item = None
+        for item in app.screen.query(MenuItem):
+            if item.item_id == "confirm":
+                confirm_item = item
+                break
+
+        await pilot.click(confirm_item)
+        assert widget.due is None
+        assert app.due_changed is None
+
+
+@pytest.mark.asyncio
+async def test_click_label_cancel_keeps_due():
+    """Clicking label then cancelling keeps due date."""
+    due = date.today() + timedelta(days=5)
+    app = DueDateApp(due=due)
+    async with app.run_test() as pilot:
+        widget = app.query_one(DueDateWidget)
+        await pilot.hover(DueDateLabel)
+        await pilot.click(DueDateLabel)
+
+        cancel_item = None
+        for item in app.screen.query(MenuItem):
+            if item.item_id == "cancel":
+                cancel_item = item
+                break
+
+        await pilot.click(cancel_item)
+        assert widget.due == due
+        assert app.due_changed is ...
+
+
+@pytest.mark.asyncio
+async def test_click_label_not_hovering_noop():
+    """Clicking label without hovering does nothing."""
+    due = date.today() + timedelta(days=5)
+    app = DueDateApp(due=due)
+    async with app.run_test() as pilot:
+        await pilot.click(DueDateLabel)
+        assert not isinstance(app.screen, ContextMenu)
+
+
+@pytest.mark.asyncio
+async def test_changed_event_control_is_widget():
+    """Changed event's control property returns the DueDateWidget."""
+    app = DueDateApp()
+    async with app.run_test() as pilot:
+        widget = app.query_one(DueDateWidget)
+        picker = widget.query_one("#due-picker")
+
+        await pilot.click(picker)
+
+        cal = app.screen.query_one(Calendar)
+        target_day = None
+        for day in cal.query(CalendarDay):
+            if day.date.month == date.today().month:
+                target_day = day
+                break
+
+        await pilot.click(target_day)
+        assert app.changed_control is widget

@@ -13,12 +13,14 @@ class ConfirmApp(App):
     def __init__(self):
         super().__init__()
         self.confirmed = False
+        self.confirmed_control = None
 
     def compose(self) -> ComposeResult:
         yield ConfirmButton()
 
     def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
         self.confirmed = True
+        self.confirmed_control = event.control
 
 
 @pytest.fixture
@@ -111,3 +113,20 @@ async def test_escape_dismisses_without_confirm(app):
         await pilot.press("escape")
         assert not isinstance(app.screen, ContextMenu)
         assert app.confirmed is False
+
+
+@pytest.mark.asyncio
+async def test_confirmed_event_control_is_button(app):
+    """Confirmed event's control property returns the ConfirmButton."""
+    async with app.run_test() as pilot:
+        btn = app.query_one(ConfirmButton)
+        await pilot.click(btn)
+
+        confirm_item = None
+        for item in app.screen.query(MenuItem):
+            if item.item_id == "confirm":
+                confirm_item = item
+                break
+
+        await pilot.click(confirm_item)
+        assert app.confirmed_control is btn
