@@ -158,6 +158,10 @@ class AddCard(Static):
     def compose(self) -> ComposeResult:
         yield EditableText("", Static("+"), TextEditor(), placeholder="+")
 
+    def on_click(self, event) -> None:
+        if event.button == 3:
+            event.stop()
+
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
         if event.new_value:

@@ -118,7 +118,12 @@ class BoardScreen(Screen):
     def _on_header_menu_closed(self, item: MenuItem | None) -> None:
         """Handle board header context menu selection."""
         if item and item.item_id == "edit":
-            self.app.push_screen(BoardDetailModal(self.board))
+            self.app.push_screen(BoardDetailModal(self.board), self._on_board_detail_closed)
+
+    def _on_board_detail_closed(self, result: None) -> None:
+        """Update header after board detail modal closes."""
+        header = self.query_one("#board-header", EditableText)
+        header.value = self.board.content.title or "ganban"
 
     async def action_save(self) -> None:
         """Save the board to git."""

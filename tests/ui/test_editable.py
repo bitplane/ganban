@@ -239,3 +239,21 @@ async def test_placeholder_editor_starts_empty():
 
         editor = editable.query_one("#edit", TextEditor)
         assert editor.text == ""
+
+
+@pytest.mark.asyncio
+async def test_setting_value_while_editing_updates_editor(app):
+    """Setting value programmatically while editing updates the editor text."""
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+
+        editor = editable.query_one("#edit", TextEditor)
+        assert editor.text == "test value"
+
+        editable.value = "external update"
+        await pilot.pause()
+
+        assert editor.text == "external update"
+        assert editable.value == "external update"

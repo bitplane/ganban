@@ -104,6 +104,8 @@ class EditableText(Container):
         old_value = self._value
         self._value = new_value
         self._update_viewer()
+        if self._editing:
+            self._editor.text = new_value
         self.post_message(self.Changed(old_value, new_value))
 
     def _update_viewer(self) -> None:
