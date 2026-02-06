@@ -127,6 +127,21 @@ class ColumnWidget(DraggableMixin, Vertical):
 
     def on_mount(self) -> None:
         self._apply_color()
+        self._unwatch_sections = self.column.watch("sections", self._on_sections_changed)
+        self._unwatch_meta = self.column.watch("meta", self._on_meta_changed)
+
+    def _on_meta_changed(self, node, key, old, new) -> None:
+        """Re-apply color when meta changes."""
+        self._apply_color()
+
+    def _on_sections_changed(self, node, key, old, new) -> None:
+        """Sync column name and UI when sections title changes."""
+        keys = self.column.sections.keys() if self.column.sections else []
+        new_name = keys[0] if keys else ""
+        if new_name and new_name != self.column.name:
+            self.column.name = new_name
+            self.column.dir_path = build_column_path(self.column.order, new_name, self.column.hidden)
+            self.query_one("#column-title", EditableText).value = new_name
 
     def _set_color(self, color: str | None) -> None:
         """Update model and re-apply background."""
@@ -140,12 +155,6 @@ class ColumnWidget(DraggableMixin, Vertical):
         else:
             self.styles.clear_rule("background")
 
-    def _on_detail_closed(self, result) -> None:
-        """Re-apply styling after detail modal closes."""
-        self._apply_color()
-        title = self.query_one("#column-title", EditableText)
-        title.value = self.column.name
-
     def _on_menu_closed(self, item: MenuItem | None) -> None:
         """Handle context menu selection."""
         if item is None:
@@ -155,7 +164,7 @@ class ColumnWidget(DraggableMixin, Vertical):
             return
         match item.item_id:
             case "edit":
-                self.app.push_screen(ColumnDetailModal(self.column), self._on_detail_closed)
+                self.app.push_screen(ColumnDetailModal(self.column))
             case "move_left":
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":

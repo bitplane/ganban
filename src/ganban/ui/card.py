@@ -68,17 +68,25 @@ class CardWidget(DraggableMixin, Static):
     def compose(self) -> ComposeResult:
         yield PlainStatic(self.title or self.card_id)
 
+    def on_mount(self) -> None:
+        card = self.board.cards[self.card_id]
+        if card:
+            self._unwatch_sections = card.watch("sections", self._on_sections_changed)
+
+    def _on_sections_changed(self, node, key, old, new) -> None:
+        """Update card display when title changes."""
+        new_title = _card_title(self.board, self.card_id)
+        if new_title != self.title:
+            self.title = new_title
+            self.query_one(PlainStatic).update(self.title or self.card_id)
+
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStarted(self, mouse_pos))
 
     def draggable_clicked(self, click_pos: Offset) -> None:
         card = self.board.cards[self.card_id]
         if card:
-            self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
-
-    def _on_modal_closed(self, result: None) -> None:
-        self.title = _card_title(self.board, self.card_id)
-        self.query_one(PlainStatic).update(self.title or self.card_id)
+            self.app.push_screen(CardDetailModal(card))
 
     def _find_column(self) -> Node | None:
         """Find the column containing this card."""
@@ -116,7 +124,7 @@ class CardWidget(DraggableMixin, Static):
             case "edit":
                 card = self.board.cards[self.card_id]
                 if card:
-                    self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
+                    self.app.push_screen(CardDetailModal(card))
             case "delete":
                 self._delete_card()
             case s if s and s.startswith("move:"):

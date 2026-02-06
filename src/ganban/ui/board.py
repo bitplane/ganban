@@ -62,6 +62,18 @@ class BoardScreen(Screen):
                 yield ColumnWidget(column, self.board)
             yield AddColumn(self.board)
 
+    def on_mount(self) -> None:
+        if self.board.sections:
+            self._unwatch_sections = self.board.watch("sections", self._on_board_sections_changed)
+
+    def _on_board_sections_changed(self, node, key, old, new) -> None:
+        """Update board header when title changes."""
+        keys = self.board.sections.keys() if self.board.sections else []
+        new_title = keys[0] if keys else "ganban"
+        header = self.query_one("#board-header", EditableText)
+        if header.value != new_title:
+            header.value = new_title
+
     def on_drag_started(self, event: DragStarted) -> None:
         """Handle drag start from a card."""
         if isinstance(event.widget, CardWidget):
@@ -116,13 +128,7 @@ class BoardScreen(Screen):
     def _on_header_menu_closed(self, item: MenuItem | None) -> None:
         """Handle board header context menu selection."""
         if item and item.item_id == "edit":
-            self.app.push_screen(BoardDetailModal(self.board), self._on_board_detail_closed)
-
-    def _on_board_detail_closed(self, result: None) -> None:
-        """Update header after board detail modal closes."""
-        header = self.query_one("#board-header", EditableText)
-        keys = self.board.sections.keys() if self.board.sections else []
-        header.value = keys[0] if keys else "ganban"
+            self.app.push_screen(BoardDetailModal(self.board))
 
     def action_save(self) -> None:
         """Save the board to git."""
