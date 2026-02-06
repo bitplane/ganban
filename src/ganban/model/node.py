@@ -1,0 +1,184 @@
+"""Reactive tree nodes with change notification and bubbling."""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+Callback = Callable[["Node | ListNode", str, Any, Any], None]
+
+
+def _wrap(value: Any, parent: Node | ListNode, key: str) -> Any:
+    """Auto-wrap dicts as Nodes. Reparent existing Nodes/ListNodes."""
+    if isinstance(value, dict) and not isinstance(value, Node):
+        return Node(_parent=parent, _key=key, **value)
+    if isinstance(value, (Node, ListNode)):
+        object.__setattr__(value, "_parent", parent)
+        object.__setattr__(value, "_key", key)
+    return value
+
+
+def _emit(node: Node | ListNode, key: str, old: Any, new: Any) -> None:
+    """Fire local watchers for key, then bubble up the parent chain."""
+    for cb in node._watchers.get(key, ()):
+        cb(node, key, old, new)
+    child = node
+    while child._parent is not None:
+        parent = child._parent
+        for cb in parent._watchers.get(child._key, ()):
+            cb(node, key, old, new)
+        child = parent
+
+
+class Node:
+    """Reactive dict-like tree node.
+
+    Stores data in an internal dict, accessed via attribute syntax.
+    Setting a value to None deletes the key. Dict values are
+    auto-wrapped as child Nodes. Changes fire watchers and bubble
+    up through the parent chain.
+    """
+
+    def __init__(
+        self,
+        _parent: Node | ListNode | None = None,
+        _key: str | None = None,
+        **data: Any,
+    ) -> None:
+        object.__setattr__(self, "_children", {})
+        object.__setattr__(self, "_watchers", {})
+        object.__setattr__(self, "_parent", None)
+        object.__setattr__(self, "_key", _key)
+        object.__setattr__(self, "_version", 0)
+        for k, v in data.items():
+            setattr(self, k, v)
+        object.__setattr__(self, "_parent", _parent)
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return self._children.get(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+        old = self._children.get(name)
+        if value is None:
+            self._children.pop(name, None)
+        else:
+            value = _wrap(value, parent=self, key=name)
+            self._children[name] = value
+        if old is not value:
+            self._version += 1
+            _emit(self, name, old, value)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._children
+
+    def watch(self, key: str, callback: Callback) -> Callable[[], None]:
+        """Watch a key for changes. Returns an unwatch callable."""
+        self._watchers.setdefault(key, []).append(callback)
+        return lambda: self._watchers.get(key, []) and self._watchers[key].remove(callback)
+
+    def keys(self):
+        """Return children keys."""
+        return self._children.keys()
+
+    def items(self):
+        """Return children items."""
+        return self._children.items()
+
+    def values(self):
+        """Return children values."""
+        return self._children.values()
+
+    @property
+    def path(self) -> str:
+        """Dotted path from root to this node."""
+        parts: list[str] = []
+        current: Node | ListNode | None = self
+        while current is not None and current._key is not None:
+            parts.append(current._key)
+            current = current._parent
+        return ".".join(reversed(parts))
+
+    def __repr__(self) -> str:
+        p = self.path
+        keys = ", ".join(self._children.keys())
+        label = f"Node({p})" if p else "Node"
+        return f"<{label} [{keys}]>"
+
+
+class ListNode:
+    """Ordered, id-keyed collection with change notification.
+
+    Items are accessed by string id. Setting to None deletes.
+    Dicts are auto-wrapped as Nodes. Changes fire watchers and
+    bubble up through the parent chain.
+    """
+
+    def __init__(
+        self,
+        _parent: Node | None = None,
+        _key: str | None = None,
+    ) -> None:
+        object.__setattr__(self, "_items", [])
+        object.__setattr__(self, "_by_id", {})
+        object.__setattr__(self, "_watchers", {})
+        object.__setattr__(self, "_parent", _parent)
+        object.__setattr__(self, "_key", _key)
+        object.__setattr__(self, "_version", 0)
+
+    def __getitem__(self, key: str) -> Any:
+        return self._by_id.get(str(key))
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        key = str(key)
+        old = self._by_id.get(key)
+        if value is None:
+            if old is not None:
+                self._items.remove(old)
+                del self._by_id[key]
+            self._version += 1
+            _emit(self, key, old, None)
+        else:
+            value = _wrap(value, parent=self, key=key)
+            if old is not None:
+                idx = self._items.index(old)
+                self._items[idx] = value
+            else:
+                self._items.append(value)
+            self._by_id[key] = value
+            self._version += 1
+            _emit(self, key, old, value)
+
+    def __iter__(self):
+        return iter(self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __contains__(self, key: str) -> bool:
+        return str(key) in self._by_id
+
+    def watch(self, key: str, callback: Callback) -> Callable[[], None]:
+        """Watch an item id for changes. Returns an unwatch callable."""
+        key = str(key)
+        self._watchers.setdefault(key, []).append(callback)
+        return lambda: self._watchers.get(key, []) and self._watchers[key].remove(callback)
+
+    @property
+    def path(self) -> str:
+        """Dotted path from root to this node."""
+        parts: list[str] = []
+        current: Node | ListNode | None = self
+        while current is not None and current._key is not None:
+            parts.append(current._key)
+            current = current._parent
+        return ".".join(reversed(parts))
+
+    def __repr__(self) -> str:
+        p = self.path
+        ids = ", ".join(self._by_id.keys())
+        label = f"ListNode({p})" if p else "ListNode"
+        return f"<{label} [{ids}]>"
