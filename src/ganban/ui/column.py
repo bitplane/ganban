@@ -13,6 +13,7 @@ from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
+from ganban.ui.edit.document import _rename_first_key
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 
@@ -85,10 +86,11 @@ class ColumnWidget(DraggableMixin, Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        yield EditableText(self.column.name, Static(self.column.name), TextEditor(), id="column-title")
+        name = self.column.sections.keys()[0]
+        yield EditableText(name, Static(name), TextEditor(), id="column-title")
         yield Rule()
         with VerticalScroll(classes="column-body"):
-            for card_id in self.column.links or []:
+            for card_id in self.column.links:
                 yield CardWidget(card_id, self.board)
             yield AddCard(self.column, self.board)
 
@@ -102,7 +104,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         """Update column name when header is edited."""
         event.stop()
         if event.new_value:
-            self.column.name = event.new_value
+            _rename_first_key(self.column.sections, event.new_value)
             self.column.dir_path = build_column_path(self.column.order, event.new_value, self.column.hidden)
 
     def on_click(self, event) -> None:
@@ -135,13 +137,15 @@ class ColumnWidget(DraggableMixin, Vertical):
         self._apply_color()
 
     def _on_sections_changed(self, node, key, old, new) -> None:
-        """Sync column name and UI when sections title changes."""
-        keys = self.column.sections.keys() if self.column.sections else []
-        new_name = keys[0] if keys else ""
-        if new_name and new_name != self.column.name:
-            self.column.name = new_name
-            self.column.dir_path = build_column_path(self.column.order, new_name, self.column.hidden)
-            self.query_one("#column-title", EditableText).value = new_name
+        """Sync column dir_path and UI when sections title changes."""
+        keys = self.column.sections.keys()
+        if not keys:
+            return  # transient empty state during _rename_first_key rebuild
+        new_name = keys[0]
+        self.column.dir_path = build_column_path(self.column.order, new_name, self.column.hidden)
+        title_widget = self.query_one("#column-title", EditableText)
+        if title_widget.value != new_name:
+            title_widget.value = new_name
 
     def _set_color(self, color: str | None) -> None:
         """Update model and re-apply background."""
@@ -149,7 +153,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         self._apply_color()
 
     def _apply_color(self) -> None:
-        color_hex = self.column.meta.color if self.column.meta else None
+        color_hex = self.column.meta.color
         if color_hex:
             self.styles.background = Color.parse(color_hex)
         else:

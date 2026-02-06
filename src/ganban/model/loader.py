@@ -95,6 +95,7 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         board.meta = meta
     else:
         board.sections = ListNode()
+        board.sections["ganban"] = ""
         board.meta = {}
 
     # Load all cards from .all/
@@ -133,17 +134,15 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
     col_entries.sort(key=cmp_to_key(lambda a, b: compare_ids(a[0], b[0])))
 
     for order, name, dirname, hidden, col_tree in col_entries:
-        col_sections = ListNode()
         col_meta: dict = {}
 
         index_blob = _tree_get(col_tree, "index.md")
         if index_blob is not None:
             text = index_blob.data_stream.read().decode("utf-8")
             col_sections, col_meta = _build_sections_list(text)
-            # Title from index.md overrides dirname-derived name
-            first_key = col_sections.keys()[0] if col_sections.keys() else ""
-            if first_key:
-                name = first_key
+        else:
+            col_sections = ListNode()
+            col_sections[name] = ""
 
         # Build links list
         links: list[str] = []
@@ -170,7 +169,6 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         links = [card_id for _, card_id in link_entries]
 
         col = Node(
-            name=name,
             order=order,
             dir_path=dirname,
             hidden=hidden,

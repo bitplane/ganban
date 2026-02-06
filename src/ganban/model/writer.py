@@ -29,17 +29,8 @@ def _sections_to_text(sections: ListNode, meta) -> str:
 
 
 def _first_section_title(sections: ListNode) -> str:
-    """Get the title of the first section, or empty string."""
-    keys = sections.keys()
-    return keys[0] if keys else ""
-
-
-def _has_content(sections: ListNode) -> bool:
-    """Check if a sections ListNode has any real content."""
-    for key, value in sections.items():
-        if key or value:
-            return True
-    return False
+    """Get the title of the first section."""
+    return sections.keys()[0]
 
 
 # --- Git plumbing (copied verbatim from writer.py) ---
@@ -169,9 +160,8 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
     for dir_path, tree_sha in column_trees:
         root_entries.append(("040000", "tree", tree_sha, dir_path))
 
-    if board.sections and _has_content(board.sections):
-        index_blob = _hash_object(repo_path, _sections_to_text(board.sections, board.meta))
-        root_entries.append(("100644", "blob", index_blob, "index.md"))
+    index_blob = _hash_object(repo_path, _sections_to_text(board.sections, board.meta))
+    root_entries.append(("100644", "blob", index_blob, "index.md"))
 
     return _mktree(repo_path, root_entries)
 
@@ -180,13 +170,11 @@ def _build_column_tree(repo_path: Path, col: Node, board: Node) -> str:
     """Build a git tree for a column directory."""
     entries = []
 
-    # Add index.md if column has content
-    if col.sections and _has_content(col.sections):
-        index_blob = _hash_object(repo_path, _sections_to_text(col.sections, col.meta))
-        entries.append(("100644", "blob", index_blob, "index.md"))
+    index_blob = _hash_object(repo_path, _sections_to_text(col.sections, col.meta))
+    entries.append(("100644", "blob", index_blob, "index.md"))
 
     # Add symlinks for card links
-    for i, card_id in enumerate(col.links or []):
+    for i, card_id in enumerate(col.links):
         card = board.cards[card_id]
         title = _first_section_title(card.sections) if card else ""
         slug = slugify(title)
@@ -365,7 +353,7 @@ def create_card(
             break
 
     if target_column is not None:
-        links = list(target_column.links or [])
+        links = list(target_column.links)
         if position is not None:
             links.insert(position, card_id)
         else:
@@ -389,12 +377,13 @@ def create_column(
         existing_orders = board.columns.keys()
         order = next_id(max_id(existing_orders)) if existing_orders else "1"
 
+    sections = ListNode()
+    sections[name] = ""
     col = Node(
-        name=name,
         order=order,
         dir_path=build_column_path(order, name, hidden),
         hidden=hidden,
-        sections=ListNode(),
+        sections=sections,
         meta={},
         links=[],
     )

@@ -92,7 +92,7 @@ def test_load_board_has_cards(sample_board):
 def test_load_board_column_properties(sample_board):
     board = load_board(str(sample_board))
     col = board.columns["1"]
-    assert col.name == "Backlog"
+    assert col.sections.keys()[0] == "Backlog"
     assert col.order == "1"
     assert col.dir_path == "1.backlog"
     assert col.hidden is False
@@ -144,7 +144,7 @@ def test_load_board_root_sections(sample_board):
 def test_load_board_column_name_from_index(sample_board):
     board = load_board(str(sample_board))
     doing = board.columns["2"]
-    assert doing.name == "Doing"
+    assert doing.sections.keys()[0] == "Doing"
 
 
 def test_load_board_commit(sample_board):

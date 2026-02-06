@@ -55,8 +55,7 @@ class DocHeader(Container):
         self.sections = sections
 
     def compose(self) -> ComposeResult:
-        keys = self.sections.keys()
-        title = keys[0] if keys else ""
+        title = self.sections.keys()[0]
         yield EditableText(
             title,
             Static(title),
@@ -111,7 +110,7 @@ class MarkdownDocEditor(Container):
         if self._include_header:
             yield DocHeader(self.sections)
         items = self.sections.items()
-        body = items[0][1] if items else ""
+        body = items[0][1]
         subsections = items[1:]
         with Horizontal(id="doc-editor-container"):
             with VerticalScroll(id="doc-editor-left"):
@@ -139,9 +138,7 @@ class MarkdownDocEditor(Container):
         event.stop()
         editor = event.control
         if editor.id == "main-section":
-            keys = self.sections.keys()
-            if keys:
-                self.sections[keys[0]] = event.new_value
+            self.sections[self.sections.keys()[0]] = event.new_value
         else:
             self.sections[editor.heading] = event.new_value
         self.post_message(self.Changed())

@@ -16,12 +16,7 @@ from ganban.ui.static import PlainStatic
 
 def _card_title(board: Node, card_id: str) -> str:
     """Get the display title for a card."""
-    card = board.cards[card_id]
-    if card and card.sections:
-        keys = card.sections.keys()
-        if keys:
-            return keys[0]
-    return card_id
+    return board.cards[card_id].sections.keys()[0]
 
 
 class CardWidget(DraggableMixin, Static):
@@ -70,8 +65,7 @@ class CardWidget(DraggableMixin, Static):
 
     def on_mount(self) -> None:
         card = self.board.cards[self.card_id]
-        if card:
-            self._unwatch_sections = card.watch("sections", self._on_sections_changed)
+        self._unwatch_sections = card.watch("sections", self._on_sections_changed)
 
     def _on_sections_changed(self, node, key, old, new) -> None:
         """Update card display when title changes."""
@@ -85,13 +79,12 @@ class CardWidget(DraggableMixin, Static):
 
     def draggable_clicked(self, click_pos: Offset) -> None:
         card = self.board.cards[self.card_id]
-        if card:
-            self.app.push_screen(CardDetailModal(card))
+        self.app.push_screen(CardDetailModal(card))
 
     def _find_column(self) -> Node | None:
         """Find the column containing this card."""
         for col in self.board.columns:
-            if self.card_id in (col.links or []):
+            if self.card_id in col.links:
                 return col
         return None
 
@@ -102,7 +95,7 @@ class CardWidget(DraggableMixin, Static):
 
             # Build move submenu from visible columns (current disabled)
             move_items = [
-                MenuItem(col.name, f"move:{col.name}", disabled=(col is current_col))
+                MenuItem(col.sections.keys()[0], f"move:{col.sections.keys()[0]}", disabled=(col is current_col))
                 for col in self.board.columns
                 if not col.hidden
             ]
@@ -123,8 +116,7 @@ class CardWidget(DraggableMixin, Static):
         match item.item_id:
             case "edit":
                 card = self.board.cards[self.card_id]
-                if card:
-                    self.app.push_screen(CardDetailModal(card))
+                self.app.push_screen(CardDetailModal(card))
             case "delete":
                 self._delete_card()
             case s if s and s.startswith("move:"):

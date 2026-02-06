@@ -179,13 +179,13 @@ class CardDragManager:
 
         source_column = card._find_column()
         if source_column:
-            links = list(source_column.links or [])
+            links = list(source_column.links)
             if card.card_id in links:
                 links.remove(card.card_id)
                 source_column.links = links
 
         actual_pos = self._calculate_model_position(target_scroll, insert_before, card)
-        links = list(target_column.links or [])
+        links = list(target_column.links)
         links.insert(actual_pos, card.card_id)
         target_column.links = links
 

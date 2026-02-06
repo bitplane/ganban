@@ -86,6 +86,7 @@ class GanbanApp(App):
         if not await has_branch(self.repo_path):
             board = Node(repo_path=str(self.repo_path))
             board.sections = ListNode()
+            board.sections["ganban"] = ""
             board.meta = {}
             board.cards = ListNode()
             board.columns = ListNode()

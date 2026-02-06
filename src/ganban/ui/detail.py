@@ -46,9 +46,9 @@ class DetailModal(ModalScreen[None]):
         """Close the modal."""
         self.dismiss()
 
-    def action_quit(self) -> None:
-        """Quit the app."""
-        self.app.exit()
+    async def action_quit(self) -> None:
+        """Quit the app via the main save-and-exit path."""
+        await self.app.run_action("quit")
 
 
 class CardDetailModal(DetailModal):
@@ -74,7 +74,7 @@ class CardDetailModal(DetailModal):
             yield MarkdownDocEditor(self.card.sections, include_header=False)
 
     def _get_due_date(self) -> date | None:
-        due_str = self.card.meta.due if self.card.meta else None
+        due_str = self.card.meta.due
         if due_str:
             return date.fromisoformat(due_str)
         return None
@@ -99,7 +99,7 @@ class ColumnDetailModal(DetailModal):
         self.column = column
 
     def compose(self) -> ComposeResult:
-        color = self.column.meta.color if self.column.meta else None
+        color = self.column.meta.color
         with Vertical(id="detail-container"):
             yield DocHeader(self.column.sections)
             with Horizontal(id="column-metadata"):

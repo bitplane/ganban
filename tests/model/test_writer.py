@@ -50,13 +50,15 @@ def _make_board(repo_path, columns=None, cards=None, sections=None, meta=None):
 
 def _make_column(order, name, links=None, hidden=False, sections=None, meta=None):
     """Helper to build a column Node."""
+    if sections is None:
+        sections = ListNode()
+        sections[name] = ""
     return Node(
         order=order,
-        name=name,
         dir_path=build_column_path(order, name, hidden),
         hidden=hidden,
         links=links or [],
-        sections=sections or ListNode(),
+        sections=sections,
         meta=meta or {},
     )
 
@@ -699,7 +701,7 @@ def test_create_column_basic(repo_with_ganban):
 
     column = create_column(board, "Archive")
 
-    assert column.name == "Archive"
+    assert column.sections.keys()[0] == "Archive"
     assert column.order == "2"
     assert column.dir_path == "2.archive"
     assert column.hidden is False
@@ -734,7 +736,7 @@ def test_create_column_saves(repo_with_ganban):
     save_board(board)
 
     loaded = load_board(str(repo_with_ganban))
-    names = [col.name for col in loaded.columns]
+    names = [col.sections.keys()[0] for col in loaded.columns]
     assert "Archive" in names
 
 

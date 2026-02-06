@@ -51,8 +51,7 @@ class BoardScreen(Screen):
         self._column_drag = ColumnDragManager(self)
 
     def compose(self) -> ComposeResult:
-        keys = self.board.sections.keys() if self.board.sections else []
-        title = keys[0] if keys else "ganban"
+        title = self.board.sections.keys()[0]
         yield EditableText(title, Static(title), TextEditor(), id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
@@ -63,13 +62,14 @@ class BoardScreen(Screen):
             yield AddColumn(self.board)
 
     def on_mount(self) -> None:
-        if self.board.sections:
-            self._unwatch_sections = self.board.watch("sections", self._on_board_sections_changed)
+        self._unwatch_sections = self.board.watch("sections", self._on_board_sections_changed)
 
     def _on_board_sections_changed(self, node, key, old, new) -> None:
         """Update board header when title changes."""
-        keys = self.board.sections.keys() if self.board.sections else []
-        new_title = keys[0] if keys else "ganban"
+        keys = self.board.sections.keys()
+        if not keys:
+            return  # transient empty state during _rename_first_key rebuild
+        new_title = keys[0]
         header = self.query_one("#board-header", EditableText)
         if header.value != new_title:
             header.value = new_title
@@ -111,8 +111,7 @@ class BoardScreen(Screen):
         header = self.query_one("#board-header", EditableText)
         if event.control is header:
             event.stop()
-            if self.board.sections:
-                _rename_first_key(self.board.sections, event.new_value)
+            _rename_first_key(self.board.sections, event.new_value)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click on board header."""
@@ -143,19 +142,19 @@ class BoardScreen(Screen):
         col_name = event.target_column
 
         source_col = card._find_column()
-        target_col = next((c for c in self.board.columns if c.name == col_name), None)
+        target_col = next((c for c in self.board.columns if c.sections.keys()[0] == col_name), None)
         if not target_col or target_col is source_col:
             return
 
         # Update model - remove from source
         if source_col:
-            links = list(source_col.links or [])
+            links = list(source_col.links)
             if card.card_id in links:
                 links.remove(card.card_id)
                 source_col.links = links
 
         # Add to target
-        links = list(target_col.links or [])
+        links = list(target_col.links)
         links.append(card.card_id)
         target_col.links = links
 
@@ -176,7 +175,7 @@ class BoardScreen(Screen):
         card = event.card
         col = card._find_column()
         if col:
-            links = list(col.links or [])
+            links = list(col.links)
             if card.card_id in links:
                 links.remove(card.card_id)
                 col.links = links
@@ -217,7 +216,7 @@ class BoardScreen(Screen):
 
         for i, col in enumerate(all_cols):
             col.order = str(i + 1)
-            col.dir_path = build_column_path(col.order, col.name, col.hidden)
+            col.dir_path = build_column_path(col.order, col.sections.keys()[0], col.hidden)
             self.board.columns[col.order] = col
 
         # Sync UI to match model

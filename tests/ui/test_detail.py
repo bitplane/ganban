@@ -47,7 +47,7 @@ def column():
     sections = ListNode()
     sections["Column Title"] = "Column description"
     sections["Guidelines"] = "Some guidelines"
-    return Node(order="01", name="Test Column", sections=sections, meta={})
+    return Node(order="01", sections=sections, meta={})
 
 
 @pytest.fixture
@@ -262,7 +262,7 @@ async def test_action_quit_exits_app(card):
     async with app.run_test() as pilot:
         assert isinstance(app.screen, DetailModal)
 
-        app.screen.action_quit()
+        await app.screen.action_quit()
         await pilot.pause()
 
         assert app.return_code is not None
