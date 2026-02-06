@@ -8,10 +8,10 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
 from ganban.git import has_branch, init_repo, is_git_repo
-from ganban.loader import load_board
-from ganban.models import Board
+from ganban.model.loader import load_board
+from ganban.model.node import ListNode, Node
+from ganban.model.writer import create_column, save_board
 from ganban.ui.board import BoardScreen
-from ganban.writer import create_column, save_board
 
 
 class ConfirmInitScreen(ModalScreen[bool]):
@@ -66,7 +66,7 @@ class GanbanApp(App):
     def __init__(self, repo_path: Path):
         super().__init__()
         self.repo_path = repo_path
-        self.board: Board | None = None
+        self.board: Node | None = None
 
     async def on_mount(self) -> None:
         if not is_git_repo(self.repo_path):
@@ -84,17 +84,21 @@ class GanbanApp(App):
     async def _load_board(self) -> None:
         """Load or create the board and show it."""
         if not await has_branch(self.repo_path):
-            board = Board(repo_path=str(self.repo_path))
+            board = Node(repo_path=str(self.repo_path))
+            board.sections = ListNode()
+            board.meta = {}
+            board.cards = ListNode()
+            board.columns = ListNode()
             create_column(board, "Backlog", order="1")
             create_column(board, "Doing", order="2")
             create_column(board, "Done", order="3")
-            await save_board(board, message="Initialize ganban board")
+            save_board(board, message="Initialize ganban board")
 
-        self.board = await load_board(str(self.repo_path))
+        self.board = load_board(str(self.repo_path))
         self.push_screen(BoardScreen(self.board))
 
-    async def action_quit(self) -> None:
+    def action_quit(self) -> None:
         """Save and quit."""
         if self.board:
-            await save_board(self.board)
+            save_board(self.board)
         self.exit()

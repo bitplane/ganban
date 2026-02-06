@@ -4,8 +4,6 @@ import re
 
 import yaml
 
-from ganban.models import MarkdownDoc
-
 _H1_OR_H2 = re.compile(r"^(#{1,2}) ", re.MULTILINE)
 
 
@@ -14,87 +12,71 @@ def _demote_headings(text: str) -> str:
     return _H1_OR_H2.sub("### ", text)
 
 
-def parse_markdown(text: str) -> MarkdownDoc:
-    """Parse a markdown document into a MarkdownDoc."""
-    raw = text
-    meta: dict = {}
-    title = ""
-    body = ""
-    sections: dict[str, str] = {}
+def parse_sections(text: str) -> tuple[list[tuple[str, str]], dict]:
+    """Parse markdown into an ordered list of (title, body) sections plus meta.
 
-    # Extract front-matter
+    Returns (sections, meta) where:
+    - sections is a list of (title, body) tuples
+    - First section is the h1 (title may be "" if no h1)
+    - Subsequent sections are h2s
+    - meta is the front-matter dict (or {})
+    """
     text, meta = _extract_front_matter(text)
-
-    # Split into lines for processing
     lines = text.split("\n")
 
-    current_section: str | None = None
-    current_content: list[str] = []
-    found_title = False
+    sections: list[tuple[str, str]] = []
+    current_title: str | None = None
+    current_lines: list[str] = []
+    preamble_lines: list[str] = []
+    in_heading = False
 
     for line in lines:
-        # Check for h1 heading (title)
-        if not found_title and line.startswith("# "):
-            title = line[2:].strip()
-            found_title = True
+        if line.startswith("# ") or line.startswith("## "):
+            if in_heading:
+                sections.append((current_title or "", "\n".join(current_lines).strip()))
+            is_h1 = line.startswith("# ") and not line.startswith("## ")
+            current_title = line[2:].strip() if is_h1 else line[3:].strip()
+            current_lines = []
+            in_heading = True
             continue
+        if in_heading:
+            current_lines.append(line)
+        else:
+            preamble_lines.append(line)
 
-        # Check for h2 heading (section)
-        if line.startswith("## "):
-            # Save previous section/body
-            if current_section is None and found_title:
-                body = "\n".join(current_content).strip()
-            elif current_section is not None:
-                sections[current_section] = "\n".join(current_content).strip()
-
-            current_section = line[3:].strip()
-            current_content = []
-            continue
-
-        current_content.append(line)
-
-    # Save final section/body
-    if current_section is None:
-        body = "\n".join(current_content).strip()
+    if in_heading:
+        # Prepend preamble as ("", body) if there was text before the first heading
+        preamble = "\n".join(preamble_lines).strip()
+        if preamble:
+            sections.insert(0, ("", preamble))
+        sections.append((current_title or "", "\n".join(current_lines).strip()))
     else:
-        sections[current_section] = "\n".join(current_content).strip()
+        sections.append(("", "\n".join(preamble_lines).strip()))
 
-    return MarkdownDoc(
-        title=title,
-        body=body,
-        sections=sections,
-        meta=meta,
-        raw=raw,
-    )
+    return sections, meta
 
 
-def serialize_markdown(doc: MarkdownDoc) -> str:
-    """Serialize a MarkdownDoc back to markdown text."""
+def serialize_sections(sections: list[tuple[str, str]], meta: dict | None = None) -> str:
+    """Serialize sections and meta back to markdown text.
+
+    First section becomes # heading, rest become ## headings.
+    Meta becomes YAML front-matter if non-empty.
+    """
     parts: list[str] = []
 
-    # Front-matter
-    if doc.meta:
+    if meta:
         parts.append("---")
-        parts.append(yaml.dump(doc.meta, default_flow_style=False, sort_keys=False).rstrip())
+        parts.append(yaml.dump(meta, default_flow_style=False, sort_keys=False).rstrip())
         parts.append("---")
         parts.append("")
 
-    # Title
-    if doc.title:
-        parts.append(f"# {doc.title}")
-        parts.append("")
-
-    # Body
-    if doc.body:
-        parts.append(_demote_headings(doc.body))
-        parts.append("")
-
-    # Sections
-    for heading, content in doc.sections.items():
-        parts.append(f"## {heading}")
-        parts.append("")
-        if content:
-            parts.append(_demote_headings(content))
+    for i, (title, body) in enumerate(sections):
+        if title:
+            prefix = "#" if i == 0 else "##"
+            parts.append(f"{prefix} {title}")
+            parts.append("")
+        if body:
+            parts.append(_demote_headings(body))
             parts.append("")
 
     return "\n".join(parts).rstrip() + "\n"

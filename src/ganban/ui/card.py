@@ -5,13 +5,23 @@ from textual.geometry import Offset
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.models import Board, CardLink, Column
-from ganban.writer import create_card
+from ganban.model.node import Node
+from ganban.model.writer import create_card
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
+
+
+def _card_title(board: Node, card_id: str) -> str:
+    """Get the display title for a card."""
+    card = board.cards[card_id]
+    if card and card.sections:
+        keys = card.sections.keys()
+        if keys:
+            return keys[0]
+    return card_id
 
 
 class CardWidget(DraggableMixin, Static):
@@ -48,34 +58,32 @@ class CardWidget(DraggableMixin, Static):
     }
     """
 
-    def __init__(self, link: CardLink, title: str, board: Board):
+    def __init__(self, card_id: str, board: Node):
         Static.__init__(self)
         self._init_draggable()
-        self.link = link
-        self.title = title
+        self.card_id = card_id
         self.board = board
+        self.title = _card_title(board, card_id)
 
     def compose(self) -> ComposeResult:
-        yield PlainStatic(self.title or self.link.slug)
+        yield PlainStatic(self.title or self.card_id)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStarted(self, mouse_pos))
 
     def draggable_clicked(self, click_pos: Offset) -> None:
-        card = self.board.cards.get(self.link.card_id)
+        card = self.board.cards[self.card_id]
         if card:
             self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
 
     def _on_modal_closed(self, result: None) -> None:
-        card = self.board.cards.get(self.link.card_id)
-        if card:
-            self.title = card.content.title
-            self.query_one(PlainStatic).update(self.title or self.link.slug)
+        self.title = _card_title(self.board, self.card_id)
+        self.query_one(PlainStatic).update(self.title or self.card_id)
 
-    def _find_column(self) -> Column | None:
-        """Find the column containing this card's link."""
+    def _find_column(self) -> Node | None:
+        """Find the column containing this card."""
         for col in self.board.columns:
-            if self.link in col.links:
+            if self.card_id in (col.links or []):
                 return col
         return None
 
@@ -106,7 +114,7 @@ class CardWidget(DraggableMixin, Static):
             return
         match item.item_id:
             case "edit":
-                card = self.board.cards.get(self.link.card_id)
+                card = self.board.cards[self.card_id]
                 if card:
                     self.app.push_screen(CardDetailModal(card), self._on_modal_closed)
             case "delete":
@@ -130,10 +138,10 @@ class AddCard(Static):
     class CardCreated(Message):
         """Posted when a new card is created."""
 
-        def __init__(self, column: Column, card_link: CardLink, title: str):
+        def __init__(self, column: Node, card_id: str, title: str):
             super().__init__()
             self.column = column
-            self.card_link = card_link
+            self.card_id = card_id
             self.title = title
 
     DEFAULT_CSS = """
@@ -150,7 +158,7 @@ class AddCard(Static):
     }
     """
 
-    def __init__(self, column: Column, board: Board):
+    def __init__(self, column: Node, board: Node):
         super().__init__()
         self.column = column
         self.board = board
@@ -165,7 +173,6 @@ class AddCard(Static):
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
         if event.new_value:
-            new_card = create_card(self.board, event.new_value, column=self.column)
-            link = self.column.links[-1]  # create_card adds link to end
-            self.post_message(self.CardCreated(self.column, link, new_card.content.title))
+            card_id, card = create_card(self.board, event.new_value, column=self.column)
+            self.post_message(self.CardCreated(self.column, card_id, event.new_value))
         self.query_one(EditableText).value = ""

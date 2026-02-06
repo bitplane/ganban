@@ -5,15 +5,16 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Static
 
-from ganban.models import Board
-from ganban.writer import build_column_path, save_board
+from ganban.model.node import Node
+from ganban.model.writer import build_column_path, save_board
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import DragStarted
-from ganban.ui.drag_managers import CardDragManager, ColumnDragManager, renumber_links
-from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
 from ganban.ui.edit import EditableText, TextEditor
+from ganban.ui.edit.document import _rename_first_key
+from ganban.ui.menu import ContextMenu, MenuItem
 
 
 class BoardScreen(Screen):
@@ -36,11 +37,6 @@ class BoardScreen(Screen):
         height: auto;
         background: $primary;
     }
-    #board-header #view {
-        width: 100%;
-        text-align: center;
-        text-style: bold;
-    }
     #columns {
         width: 100%;
         height: 1fr;
@@ -48,14 +44,15 @@ class BoardScreen(Screen):
     }
     """
 
-    def __init__(self, board: Board):
+    def __init__(self, board: Node):
         super().__init__()
         self.board = board
         self._card_drag = CardDragManager(self)
         self._column_drag = ColumnDragManager(self)
 
     def compose(self) -> ComposeResult:
-        title = self.board.content.title or "ganban"
+        keys = self.board.sections.keys() if self.board.sections else []
+        title = keys[0] if keys else "ganban"
         yield EditableText(title, Static(title), TextEditor(), id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
@@ -102,7 +99,8 @@ class BoardScreen(Screen):
         header = self.query_one("#board-header", EditableText)
         if event.control is header:
             event.stop()
-            self.board.content.title = event.new_value
+            if self.board.sections:
+                _rename_first_key(self.board.sections, event.new_value)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click on board header."""
@@ -123,11 +121,12 @@ class BoardScreen(Screen):
     def _on_board_detail_closed(self, result: None) -> None:
         """Update header after board detail modal closes."""
         header = self.query_one("#board-header", EditableText)
-        header.value = self.board.content.title or "ganban"
+        keys = self.board.sections.keys() if self.board.sections else []
+        header.value = keys[0] if keys else "ganban"
 
-    async def action_save(self) -> None:
+    def action_save(self) -> None:
         """Save the board to git."""
-        new_commit = await save_board(self.board)
+        new_commit = save_board(self.board)
         self.board.commit = new_commit
         self.notify("Saved")
 
@@ -142,20 +141,24 @@ class BoardScreen(Screen):
         if not target_col or target_col is source_col:
             return
 
-        # Update model
-        if source_col and card.link in source_col.links:
-            source_col.links.remove(card.link)
-            renumber_links(source_col)
+        # Update model - remove from source
+        if source_col:
+            links = list(source_col.links or [])
+            if card.card_id in links:
+                links.remove(card.card_id)
+                source_col.links = links
 
-        target_col.links.append(card.link)
-        renumber_links(target_col)
+        # Add to target
+        links = list(target_col.links or [])
+        links.append(card.card_id)
+        target_col.links = links
 
         # Update UI - find target column widget and mount new card
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is target_col:
                 scroll = col_widget.query_one(VerticalScroll)
                 add_widget = scroll.query_one(AddCard)
-                new_card = CardWidget(card.link, card.title, self.board)
+                new_card = CardWidget(card.card_id, self.board)
                 scroll.mount(new_card, before=add_widget)
                 break
 
@@ -166,20 +169,21 @@ class BoardScreen(Screen):
         event.stop()
         card = event.card
         col = card._find_column()
-        if col and card.link in col.links:
-            col.links.remove(card.link)
-            renumber_links(col)
-            card.remove()
+        if col:
+            links = list(col.links or [])
+            if card.card_id in links:
+                links.remove(card.card_id)
+                col.links = links
+                card.remove()
 
     def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
         """Handle new card creation."""
         event.stop()
-        # Find the column widget for this column and mount the new card
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is event.column:
                 scroll = col_widget.query_one(VerticalScroll)
                 add_widget = scroll.query_one(AddCard)
-                card_widget = CardWidget(event.card_link, event.title, self.board)
+                card_widget = CardWidget(event.card_id, self.board)
                 scroll.mount(card_widget, before=add_widget)
                 break
 
@@ -195,14 +199,20 @@ class BoardScreen(Screen):
         """Move column to new position in both model and UI."""
         column = col_widget.column
 
-        # Update model
-        self.board.columns.remove(column)
-        self.board.columns.insert(new_index, column)
+        # Rebuild columns ListNode with new order
+        all_cols = list(self.board.columns)
+        all_cols.remove(column)
+        all_cols.insert(new_index, column)
 
-        # Renumber all columns
-        for i, col in enumerate(self.board.columns):
+        # Clear and rebuild the columns ListNode
+        old_keys = self.board.columns.keys()
+        for key in old_keys:
+            self.board.columns[key] = None
+
+        for i, col in enumerate(all_cols):
             col.order = str(i + 1)
-            col.path = build_column_path(col.order, col.name, col.hidden)
+            col.dir_path = build_column_path(col.order, col.name, col.hidden)
+            self.board.columns[col.order] = col
 
         # Sync UI to match model
         self._sync_column_order()
@@ -214,7 +224,7 @@ class BoardScreen(Screen):
         widgets_by_column = {id(cw.column): cw for cw in self.query(ColumnWidget)}
 
         insert_before = add_column
-        for column in reversed(self.board.columns):
+        for column in reversed(list(self.board.columns)):
             if id(column) not in widgets_by_column:
                 continue  # skip hidden columns
             widget = widgets_by_column[id(column)]
@@ -227,10 +237,11 @@ class BoardScreen(Screen):
         col_widget = event.column_widget
         direction = event.direction
 
-        current_index = self.board.columns.index(col_widget.column)
+        all_cols = list(self.board.columns)
+        current_index = next(i for i, c in enumerate(all_cols) if c is col_widget.column)
         new_index = current_index + direction
 
-        if new_index < 0 or new_index >= len(self.board.columns):
+        if new_index < 0 or new_index >= len(all_cols):
             return
 
         self._move_column_to_index(col_widget, new_index)
@@ -241,8 +252,9 @@ class BoardScreen(Screen):
         col_widget = event.column_widget
 
         # Remove from model
-        if col_widget.column in self.board.columns:
-            self.board.columns.remove(col_widget.column)
+        order = col_widget.column.order
+        if order in self.board.columns:
+            self.board.columns[order] = None
 
         # Remove from UI
         col_widget.remove()

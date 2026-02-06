@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.model.node import ListNode
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor
 
-if TYPE_CHECKING:
-    from ganban.models import MarkdownDoc
+
+def _rename_first_key(sections: ListNode, new_title: str) -> None:
+    """Rename the first key in a sections ListNode by rebuilding it."""
+    items = sections.items()
+    for key, _ in items:
+        sections[key] = None
+    if items:
+        items[0] = (new_title, items[0][1])
+    for key, val in items:
+        sections[key] = val
 
 
 class DocHeader(Container):
@@ -43,26 +50,28 @@ class DocHeader(Container):
             super().__init__()
             self.new_title = new_title
 
-    def __init__(self, doc: MarkdownDoc) -> None:
+    def __init__(self, sections: ListNode) -> None:
         super().__init__()
-        self.doc = doc
+        self.sections = sections
 
     def compose(self) -> ComposeResult:
+        keys = self.sections.keys()
+        title = keys[0] if keys else ""
         yield EditableText(
-            self.doc.title,
-            Static(self.doc.title),
+            title,
+            Static(title),
             TextEditor(),
             id="doc-title",
         )
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        self.doc.title = event.new_value
+        _rename_first_key(self.sections, event.new_value)
         self.post_message(self.TitleChanged(event.new_value))
 
 
 class MarkdownDocEditor(Container):
-    """Two-panel editor for MarkdownDoc content."""
+    """Two-panel editor for markdown sections content."""
 
     DEFAULT_CSS = """
     MarkdownDocEditor {
@@ -93,19 +102,22 @@ class MarkdownDocEditor(Container):
     class Changed(Message):
         """Emitted when the document content changes."""
 
-    def __init__(self, doc: MarkdownDoc, include_header: bool = True) -> None:
+    def __init__(self, sections: ListNode, include_header: bool = True) -> None:
         super().__init__()
-        self.doc = doc
+        self.sections = sections
         self._include_header = include_header
 
     def compose(self) -> ComposeResult:
         if self._include_header:
-            yield DocHeader(self.doc)
+            yield DocHeader(self.sections)
+        items = self.sections.items()
+        body = items[0][1] if items else ""
+        subsections = items[1:]
         with Horizontal(id="doc-editor-container"):
             with VerticalScroll(id="doc-editor-left"):
-                yield SectionEditor(None, self.doc.body, id="main-section")
+                yield SectionEditor(None, body, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
-                for heading, content in self.doc.sections.items():
+                for heading, content in subsections:
                     yield SectionEditor(heading, content, classes="subsection")
 
     def on_doc_header_title_changed(self, event: DocHeader.TitleChanged) -> None:
@@ -113,18 +125,23 @@ class MarkdownDocEditor(Container):
         self.post_message(self.Changed())
 
     def on_section_editor_heading_changed(self, event: SectionEditor.HeadingChanged) -> None:
-        """Update doc when a section heading changes."""
+        """Update sections when a section heading changes."""
         event.stop()
-        content = self.doc.sections.pop(event.old_value, "")
-        self.doc.sections[event.new_value] = content
+        old_key = event.old_value
+        new_key = event.new_value
+        content = self.sections[old_key] or ""
+        self.sections[old_key] = None
+        self.sections[new_key] = content
         self.post_message(self.Changed())
 
     def on_section_editor_body_changed(self, event: SectionEditor.BodyChanged) -> None:
-        """Update doc when a body changes."""
+        """Update sections when a body changes."""
         event.stop()
         editor = event.control
         if editor.id == "main-section":
-            self.doc.body = event.new_value
+            keys = self.sections.keys()
+            if keys:
+                self.sections[keys[0]] = event.new_value
         else:
-            self.doc.sections[editor.heading] = event.new_value
+            self.sections[editor.heading] = event.new_value
         self.post_message(self.Changed())

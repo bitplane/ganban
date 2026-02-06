@@ -60,13 +60,6 @@ class ColumnPlaceholder(Static):
     """
 
 
-def renumber_links(column) -> None:
-    """Renumber all links in a column to sequential zero-padded positions."""
-    width = len(str(len(column.links))) if column.links else 1
-    for i, link in enumerate(column.links):
-        link.position = str(i + 1).zfill(width)
-
-
 class CardDragManager:
     """Manages card drag-and-drop state and operations."""
 
@@ -184,26 +177,23 @@ class CardDragManager:
         insert_before = self.insert_before
         target_column = target_scroll.parent.column
 
-        source_column = self._find_source_column(card)
-        if source_column and card.link in source_column.links:
-            source_column.links.remove(card.link)
-            renumber_links(source_column)
+        source_column = card._find_column()
+        if source_column:
+            links = list(source_column.links or [])
+            if card.card_id in links:
+                links.remove(card.card_id)
+                source_column.links = links
 
         actual_pos = self._calculate_model_position(target_scroll, insert_before, card)
-        target_column.links.insert(actual_pos, card.link)
-        renumber_links(target_column)
+        links = list(target_column.links or [])
+        links.insert(actual_pos, card.card_id)
+        target_column.links = links
 
-        new_card = CardWidget(card.link, card.title, self.screen.board)
+        new_card = CardWidget(card.card_id, self.screen.board)
         target_scroll.mount(new_card, before=insert_before)
         card.remove()
 
         self._cleanup()
-
-    def _find_source_column(self, card: CardWidget):
-        for col in self.screen.board.columns:
-            if any(link.card_id == card.link.card_id for link in col.links):
-                return col
-        return None
 
     def _calculate_model_position(self, scroll: VerticalScroll, insert_before: Static, card: CardWidget) -> int:
         from ganban.ui.card import CardWidget

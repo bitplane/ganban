@@ -3,7 +3,7 @@
 import pytest
 from textual.app import App, ComposeResult
 
-from ganban.models import MarkdownDoc
+from ganban.model.node import ListNode
 from ganban.ui.edit import EditableText, MarkdownDocEditor
 
 
@@ -12,11 +12,12 @@ class DocEditorApp(App):
 
     def __init__(self):
         super().__init__()
-        self.doc = MarkdownDoc(title="Test Doc", body="Body text")
+        self.sections = ListNode()
+        self.sections["Test Doc"] = "Body text"
         self.doc_changed = False
 
     def compose(self) -> ComposeResult:
-        yield MarkdownDocEditor(self.doc)
+        yield MarkdownDocEditor(self.sections)
 
     def on_markdown_doc_editor_changed(self, event: MarkdownDocEditor.Changed) -> None:
         self.doc_changed = True

@@ -1,25 +1,20 @@
 """Column widgets for ganban UI."""
 
-from typing import TYPE_CHECKING
-
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.geometry import Offset
 from textual.message import Message
+from textual.color import Color
 from textual.widgets import Rule, Static
 
-from textual.color import Color
-
-from ganban.models import Board, Column
-from ganban.writer import build_column_path, create_column
+from ganban.model.node import Node
+from ganban.model.writer import build_column_path, create_column
+from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
-
-if TYPE_CHECKING:
-    pass
 
 
 class ColumnWidget(DraggableMixin, Vertical):
@@ -83,22 +78,18 @@ class ColumnWidget(DraggableMixin, Vertical):
             super().__init__()
             self.column_widget = column_widget
 
-    def __init__(self, column: Column, board: Board):
+    def __init__(self, column: Node, board: Node):
         Vertical.__init__(self)
         self._init_draggable()
         self.column = column
         self.board = board
 
     def compose(self) -> ComposeResult:
-        from ganban.ui.card import AddCard, CardWidget
-
         yield EditableText(self.column.name, Static(self.column.name), TextEditor(), id="column-title")
         yield Rule()
         with VerticalScroll(classes="column-body"):
-            for link in self.column.links:
-                card = self.board.cards.get(link.card_id)
-                title = card.content.title if card else link.slug
-                yield CardWidget(link, title, self.board)
+            for card_id in self.column.links or []:
+                yield CardWidget(card_id, self.board)
             yield AddCard(self.column, self.board)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
@@ -112,7 +103,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         event.stop()
         if event.new_value:
             self.column.name = event.new_value
-            self.column.path = build_column_path(self.column.order, event.new_value, self.column.hidden)
+            self.column.dir_path = build_column_path(self.column.order, event.new_value, self.column.hidden)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click."""
@@ -139,14 +130,11 @@ class ColumnWidget(DraggableMixin, Vertical):
 
     def _set_color(self, color: str | None) -> None:
         """Update model and re-apply background."""
-        if color:
-            self.column.content.meta["color"] = color
-        else:
-            self.column.content.meta.pop("color", None)
+        self.column.meta.color = color
         self._apply_color()
 
     def _apply_color(self) -> None:
-        color_hex = self.column.content.meta.get("color")
+        color_hex = self.column.meta.color if self.column.meta else None
         if color_hex:
             self.styles.background = Color.parse(color_hex)
         else:
@@ -190,7 +178,7 @@ class AddColumn(Vertical):
     class ColumnCreated(Message):
         """Posted when a new column is created."""
 
-        def __init__(self, column: Column):
+        def __init__(self, column: Node):
             super().__init__()
             self.column = column
 
@@ -208,7 +196,7 @@ class AddColumn(Vertical):
     }
     """
 
-    def __init__(self, board: Board):
+    def __init__(self, board: Node):
         super().__init__()
         self.board = board
 

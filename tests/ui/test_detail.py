@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 from textual.app import App
 
-from ganban.models import Board, Card, Column, MarkdownDoc
+from ganban.model.node import ListNode, Node
 from ganban.ui.cal import Calendar, CalendarDay
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
 from ganban.ui.due import DueDateLabel, DueDateWidget
@@ -26,53 +26,37 @@ class DetailTestApp(App):
 @pytest.fixture
 def card():
     """A card with sections."""
-    return Card(
-        id="test-card",
-        content=MarkdownDoc(
-            title="Test Card",
-            body="Card body content",
-            sections={"Notes": "Some notes", "Tasks": "- [ ] Task 1"},
-        ),
-    )
+    sections = ListNode()
+    sections["Test Card"] = "Card body content"
+    sections["Notes"] = "Some notes"
+    sections["Tasks"] = "- [ ] Task 1"
+    return Node(sections=sections, meta={})
 
 
 @pytest.fixture
 def card_with_due():
     """A card with a due date."""
-    return Card(
-        id="due-card",
-        content=MarkdownDoc(
-            title="Due Card",
-            meta={"due": "2026-06-15"},
-        ),
-    )
+    sections = ListNode()
+    sections["Due Card"] = ""
+    return Node(sections=sections, meta={"due": "2026-06-15"})
 
 
 @pytest.fixture
 def column():
     """A column with content."""
-    return Column(
-        order="01",
-        name="Test Column",
-        content=MarkdownDoc(
-            title="Column Title",
-            body="Column description",
-            sections={"Guidelines": "Some guidelines"},
-        ),
-    )
+    sections = ListNode()
+    sections["Column Title"] = "Column description"
+    sections["Guidelines"] = "Some guidelines"
+    return Node(order="01", name="Test Column", sections=sections, meta={})
 
 
 @pytest.fixture
 def board():
     """A board with content."""
-    return Board(
-        repo_path="/tmp/test",
-        content=MarkdownDoc(
-            title="Test Board",
-            body="Board description",
-            sections={"About": "About this board"},
-        ),
-    )
+    sections = ListNode()
+    sections["Test Board"] = "Board description"
+    sections["About"] = "About this board"
+    return Node(repo_path="/tmp/test", sections=sections, meta={})
 
 
 @pytest.mark.asyncio
@@ -84,7 +68,7 @@ async def test_card_detail_modal_shows_content(card):
         assert isinstance(screen, CardDetailModal)
 
         editor = screen.query_one(MarkdownDocEditor)
-        assert editor.doc is card.content
+        assert editor.sections is card.sections
 
         # Should have main section + subsections
         sections = screen.query(SectionEditor)
@@ -100,7 +84,7 @@ async def test_column_detail_modal_shows_content(column):
         assert isinstance(screen, ColumnDetailModal)
 
         editor = screen.query_one(MarkdownDocEditor)
-        assert editor.doc is column.content
+        assert editor.sections is column.sections
 
 
 @pytest.mark.asyncio
@@ -112,7 +96,7 @@ async def test_board_detail_modal_shows_content(board):
         assert isinstance(screen, BoardDetailModal)
 
         editor = screen.query_one(MarkdownDocEditor)
-        assert editor.doc is board.content
+        assert editor.sections is board.sections
 
 
 @pytest.mark.asyncio
@@ -147,8 +131,8 @@ async def test_click_outside_closes_modal(card):
 
 
 @pytest.mark.asyncio
-async def test_editing_title_updates_doc(card):
-    """Editing the title updates the underlying document."""
+async def test_editing_title_updates_sections(card):
+    """Editing the title updates the underlying sections ListNode."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         title = app.screen.query_one("#doc-title", EditableText)
@@ -165,12 +149,12 @@ async def test_editing_title_updates_doc(card):
         await pilot.press("enter")
         await pilot.pause()
 
-        assert card.content.title == "New Title"
+        assert card.sections.keys()[0] == "New Title"
 
 
 @pytest.mark.asyncio
-async def test_editing_section_updates_doc(card):
-    """Editing a section body updates the underlying document."""
+async def test_editing_section_updates_sections(card):
+    """Editing a section body updates the underlying sections ListNode."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         # Find the Notes section
@@ -196,12 +180,12 @@ async def test_editing_section_updates_doc(card):
         await pilot.click(main_section)
         await pilot.pause()
 
-        assert card.content.sections["Notes"] == "Updated notes"
+        assert card.sections["Notes"] == "Updated notes"
 
 
 @pytest.mark.asyncio
-async def test_renaming_section_updates_doc(card):
-    """Renaming a section heading updates the document's sections dict."""
+async def test_renaming_section_updates_sections(card):
+    """Renaming a section heading updates the sections ListNode."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         # Find the Notes section
@@ -226,14 +210,14 @@ async def test_renaming_section_updates_doc(card):
         await pilot.pause()
 
         # Old key should be gone, new key should have content
-        assert "Notes" not in card.content.sections
-        assert "Comments" in card.content.sections
-        assert card.content.sections["Comments"] == "Some notes"
+        assert "Notes" not in card.sections
+        assert "Comments" in card.sections
+        assert card.sections["Comments"] == "Some notes"
 
 
 @pytest.mark.asyncio
-async def test_editing_main_body_updates_doc(card):
-    """Editing the main section body updates the underlying document."""
+async def test_editing_main_body_updates_sections(card):
+    """Editing the main section body updates the underlying sections ListNode."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         editor = app.screen.query_one("#main-section", SectionEditor)
@@ -250,7 +234,8 @@ async def test_editing_main_body_updates_doc(card):
         title.focus()
         await pilot.pause()
 
-        assert card.content.body == "Updated body content"
+        # First key's value should be updated
+        assert card.sections[card.sections.keys()[0]] == "Updated body content"
 
 
 @pytest.mark.asyncio
@@ -303,7 +288,7 @@ async def test_card_with_due_date_shows_due_widget(card_with_due):
 
 @pytest.mark.asyncio
 async def test_setting_due_date_updates_card_meta(card):
-    """Selecting a due date updates card.content.meta."""
+    """Selecting a due date updates card.meta."""
     app = DetailTestApp(CardDetailModal(card))
     async with app.run_test() as pilot:
         widget = app.screen.query_one(DueDateWidget)
@@ -319,7 +304,7 @@ async def test_setting_due_date_updates_card_meta(card):
                 break
 
         await pilot.click(target_day)
-        assert card.content.meta["due"] == target_day.date.isoformat()
+        assert card.meta.due == target_day.date.isoformat()
 
 
 @pytest.mark.asyncio
@@ -334,4 +319,4 @@ async def test_clearing_due_date_removes_meta(card_with_due):
         label.post_message(DueDateLabel.Confirmed())
         await pilot.pause()
 
-        assert "due" not in card_with_due.content.meta
+        assert card_with_due.meta.due is None

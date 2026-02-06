@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+BRANCH_NAME = "ganban"
+
 Callback = Callable[["Node | ListNode", str, Any, Any], None]
 
 
@@ -176,6 +178,14 @@ class ListNode:
             parts.append(current._key)
             current = current._parent
         return ".".join(reversed(parts))
+
+    def keys(self):
+        """Return ordered keys."""
+        return list(self._by_id.keys())
+
+    def items(self):
+        """Return ordered (key, value) pairs."""
+        return list(zip(self._by_id.keys(), self._items))
 
     def __repr__(self) -> str:
         p = self.path

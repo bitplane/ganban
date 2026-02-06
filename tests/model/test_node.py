@@ -300,6 +300,31 @@ def test_list_node_path():
     assert root.columns["1"].path == "columns.1"
 
 
+def test_list_node_keys():
+    lst = ListNode()
+    lst["a"] = "first"
+    lst["b"] = "second"
+    lst["c"] = "third"
+    assert lst.keys() == ["a", "b", "c"]
+
+
+def test_list_node_keys_empty():
+    lst = ListNode()
+    assert lst.keys() == []
+
+
+def test_list_node_items():
+    lst = ListNode()
+    lst["a"] = "first"
+    lst["b"] = "second"
+    assert lst.items() == [("a", "first"), ("b", "second")]
+
+
+def test_list_node_items_empty():
+    lst = ListNode()
+    assert lst.items() == []
+
+
 # --- Integration ---
 
 

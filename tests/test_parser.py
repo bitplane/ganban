@@ -1,168 +1,93 @@
 """Tests for markdown parser."""
 
-from ganban.models import MarkdownDoc
-from ganban.parser import parse_markdown, serialize_markdown
+from ganban.parser import parse_sections, serialize_sections
 
 
-def test_parse_empty():
-    doc = parse_markdown("")
-    assert doc.title == ""
-    assert doc.body == ""
-    assert doc.sections == {}
-    assert doc.meta == {}
+def test_parse_sections_title_and_body():
+    sections, meta = parse_sections("# Hello\n\nWorld")
+    assert sections == [("Hello", "World")]
+    assert meta == {}
 
 
-def test_parse_title_only():
-    doc = parse_markdown("# My Title")
-    assert doc.title == "My Title"
-    assert doc.body == ""
+def test_parse_sections_with_h2s():
+    text = "# Title\n\nBody\n\n## Notes\n\nStuff\n\n## Links\n\nMore"
+    sections, meta = parse_sections(text)
+    assert sections == [("Title", "Body"), ("Notes", "Stuff"), ("Links", "More")]
 
 
-def test_parse_title_and_body():
-    doc = parse_markdown("# My Title\n\nSome body text here.")
-    assert doc.title == "My Title"
-    assert doc.body == "Some body text here."
+def test_parse_sections_no_title():
+    sections, meta = parse_sections("Just text\n\n## Section\n\nContent")
+    assert sections[0] == ("", "Just text")
+    assert sections[1] == ("Section", "Content")
 
 
-def test_parse_sections():
-    text = """# Title
-
-Body content.
-
-## Notes
-
-Some notes here.
-
-## Comments
-
-A comment.
-"""
-    doc = parse_markdown(text)
-    assert doc.title == "Title"
-    assert doc.body == "Body content."
-    assert doc.sections["Notes"] == "Some notes here."
-    assert doc.sections["Comments"] == "A comment."
+def test_parse_sections_front_matter():
+    text = "---\ncolor: red\n---\n# Fix bug\n\nDetails"
+    sections, meta = parse_sections(text)
+    assert meta == {"color": "red"}
+    assert sections == [("Fix bug", "Details")]
 
 
-def test_parse_front_matter():
-    text = """---
-tags:
- - one
- - two
-color: red
----
-# Title
-
-Body.
-"""
-    doc = parse_markdown(text)
-    assert doc.meta["tags"] == ["one", "two"]
-    assert doc.meta["color"] == "red"
-    assert doc.title == "Title"
-    assert doc.body == "Body."
+def test_parse_sections_empty():
+    sections, meta = parse_sections("")
+    assert sections == [("", "")]
+    assert meta == {}
 
 
-def test_parse_preserves_raw():
-    text = "# Hello\n\nWorld"
-    doc = parse_markdown(text)
-    assert doc.raw == text
+def test_parse_sections_body_only():
+    sections, meta = parse_sections("Some text with no headings at all.")
+    assert sections == [("", "Some text with no headings at all.")]
 
 
-def test_parse_no_title():
-    doc = parse_markdown("Just some text without a heading.")
-    assert doc.title == ""
-    assert doc.body == "Just some text without a heading."
+def test_parse_sections_invalid_front_matter():
+    text = "---\ninvalid: yaml: content: [\n---\n# Title\n"
+    sections, meta = parse_sections(text)
+    assert meta == {}
+    assert sections[0][0] == "Title"
 
 
-def test_parse_invalid_front_matter():
-    text = """---
-invalid: yaml: content: [
----
-# Title
-"""
-    doc = parse_markdown(text)
-    assert doc.meta == {}
-    assert doc.title == "Title"
-
-
-def test_parse_unclosed_front_matter():
+def test_parse_sections_unclosed_front_matter():
     """Front-matter that starts with --- but has no closing --- is ignored."""
-    text = """---
-key: value
-# Title
-"""
-    doc = parse_markdown(text)
-    # The unclosed front-matter becomes body content
-    assert doc.meta == {}
-    assert doc.title == "Title"
-    assert "key: value" in doc.body
+    text = "---\nkey: value\n# Title\n"
+    sections, meta = parse_sections(text)
+    assert meta == {}
+    # Unclosed front-matter becomes preamble, title is in second section
+    assert sections[0] == ("", "---\nkey: value")
+    assert sections[1][0] == "Title"
 
 
-def test_serialize_empty():
-    doc = MarkdownDoc()
-    assert serialize_markdown(doc) == "\n"
+def test_serialize_sections_basic():
+    text = serialize_sections([("Title", "Body"), ("Notes", "Stuff")])
+    assert "# Title" in text
+    assert "## Notes" in text
+    assert "Body" in text
+    assert "Stuff" in text
 
 
-def test_serialize_title_only():
-    doc = MarkdownDoc(title="My Title")
-    assert serialize_markdown(doc) == "# My Title\n"
+def test_serialize_sections_with_meta():
+    text = serialize_sections([("Title", "Body")], {"color": "red"})
+    assert text.startswith("---\n")
+    assert "color: red" in text
 
 
-def test_serialize_title_and_body():
-    doc = MarkdownDoc(title="My Title", body="Some body text.")
-    assert serialize_markdown(doc) == "# My Title\n\nSome body text.\n"
+def test_serialize_sections_first_is_h1():
+    text = serialize_sections([("First", ""), ("Second", "")])
+    lines = text.split("\n")
+    h_lines = [line for line in lines if line.startswith("#")]
+    assert h_lines[0] == "# First"
+    assert h_lines[1] == "## Second"
 
 
-def test_serialize_sections():
-    doc = MarkdownDoc(
-        title="Title",
-        body="Body.",
-        sections={"Notes": "Some notes.", "Comments": "A comment."},
-    )
-    result = serialize_markdown(doc)
-    assert "# Title" in result
-    assert "Body." in result
-    assert "## Notes" in result
-    assert "Some notes." in result
-    assert "## Comments" in result
+def test_serialize_sections_empty_title():
+    text = serialize_sections([("", "Just body")])
+    assert "# " not in text
+    assert "Just body" in text
 
 
-def test_serialize_front_matter():
-    doc = MarkdownDoc(
-        title="Title",
-        body="Body.",
-        meta={"tags": ["one", "two"], "color": "red"},
-    )
-    result = serialize_markdown(doc)
-    assert result.startswith("---\n")
-    assert "tags:" in result
-    assert "- one" in result
-    assert "color: red" in result
-
-
-def test_roundtrip():
-    original = """---
-tags:
-- alpha
-- beta
----
-# Test Title
-
-This is the body.
-
-## Notes
-
-Some notes here.
-
-## Links
-
-- link one
-"""
-    doc = parse_markdown(original)
-    result = serialize_markdown(doc)
-    doc2 = parse_markdown(result)
-
-    assert doc2.title == doc.title
-    assert doc2.body == doc.body
-    assert doc2.sections == doc.sections
-    assert doc2.meta == doc.meta
+def test_sections_roundtrip():
+    original = "---\ntags:\n- a\n- b\n---\n# Board\n\nDesc\n\n## Notes\n\nStuff\n"
+    sections, meta = parse_sections(original)
+    text = serialize_sections(sections, meta)
+    sections2, meta2 = parse_sections(text)
+    assert sections == sections2
+    assert meta == meta2

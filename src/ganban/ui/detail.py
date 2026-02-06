@@ -7,7 +7,7 @@ from textual.containers import Horizontal, Vertical
 from textual.events import Click
 from textual.screen import ModalScreen
 
-from ganban.models import Board, Card, Column
+from ganban.model.node import Node
 from ganban.ui.color import ColorButton
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor
@@ -61,30 +61,27 @@ class CardDetailModal(DetailModal):
     }
     """
 
-    def __init__(self, card: Card) -> None:
+    def __init__(self, card: Node) -> None:
         super().__init__()
         self.card = card
 
     def compose(self) -> ComposeResult:
         due = self._get_due_date()
         with Vertical(id="detail-container"):
-            yield DocHeader(self.card.content)
+            yield DocHeader(self.card.sections)
             with Horizontal(id="card-metadata"):
                 yield DueDateWidget(due=due)
-            yield MarkdownDocEditor(self.card.content, include_header=False)
+            yield MarkdownDocEditor(self.card.sections, include_header=False)
 
     def _get_due_date(self) -> date | None:
-        due_str = self.card.content.meta.get("due")
+        due_str = self.card.meta.due if self.card.meta else None
         if due_str:
             return date.fromisoformat(due_str)
         return None
 
     def on_due_date_widget_changed(self, event: DueDateWidget.Changed) -> None:
         event.stop()
-        if event.due:
-            self.card.content.meta["due"] = event.due.isoformat()
-        else:
-            self.card.content.meta.pop("due", None)
+        self.card.meta.due = event.due.isoformat() if event.due else None
 
 
 class ColumnDetailModal(DetailModal):
@@ -97,33 +94,30 @@ class ColumnDetailModal(DetailModal):
     }
     """
 
-    def __init__(self, column: Column) -> None:
+    def __init__(self, column: Node) -> None:
         super().__init__()
         self.column = column
 
     def compose(self) -> ComposeResult:
-        color = self.column.content.meta.get("color")
+        color = self.column.meta.color if self.column.meta else None
         with Vertical(id="detail-container"):
-            yield DocHeader(self.column.content)
+            yield DocHeader(self.column.sections)
             with Horizontal(id="column-metadata"):
                 yield ColorButton(color=color)
-            yield MarkdownDocEditor(self.column.content, include_header=False)
+            yield MarkdownDocEditor(self.column.sections, include_header=False)
 
     def on_color_button_color_selected(self, event: ColorButton.ColorSelected) -> None:
         event.stop()
-        if event.color:
-            self.column.content.meta["color"] = event.color
-        else:
-            self.column.content.meta.pop("color", None)
+        self.column.meta.color = event.color
 
 
 class BoardDetailModal(DetailModal):
     """Modal screen showing full board details."""
 
-    def __init__(self, board: Board) -> None:
+    def __init__(self, board: Node) -> None:
         super().__init__()
         self.board = board
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            yield MarkdownDocEditor(self.board.content)
+            yield MarkdownDocEditor(self.board.sections)
