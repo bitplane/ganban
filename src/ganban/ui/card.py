@@ -3,10 +3,11 @@
 from textual.app import ComposeResult
 from textual.geometry import Offset
 from textual.message import Message
-from textual.widgets import Static
+from textual.widgets import Rule, Static
 
 from ganban.model.node import Node
 from ganban.model.writer import create_card
+from ganban.ui.card_indicators import build_footer_text
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
@@ -42,14 +43,21 @@ class CardWidget(DraggableMixin, Static):
         width: 100%;
         height: auto;
         padding: 0 1;
-        border: solid $primary-lighten-2;
+        margin-bottom: 1;
         background: $surface;
-    }
-    CardWidget:hover {
-        border: solid $primary;
     }
     CardWidget.dragging {
         display: none;
+    }
+    CardWidget #card-header {
+        width: 100%;
+        height: 1;
+        margin: 0;
+    }
+    CardWidget #card-footer {
+        width: 100%;
+        height: 1;
+        color: $text-muted;
     }
     """
 
@@ -61,18 +69,33 @@ class CardWidget(DraggableMixin, Static):
         self.title = _card_title(board, card_id)
 
     def compose(self) -> ComposeResult:
-        yield PlainStatic(self.title or self.card_id)
+        yield Rule(id="card-header")
+        yield PlainStatic(self.title or self.card_id, id="card-title")
+        yield PlainStatic(id="card-footer")
 
     def on_mount(self) -> None:
         card = self.board.cards[self.card_id]
-        self._unwatch_sections = card.watch("sections", self._on_sections_changed)
+        self._unwatch_sections = card.watch("sections", self._on_card_changed)
+        self._unwatch_meta = card.watch("meta", self._on_card_changed)
+        self._refresh_indicators()
 
-    def _on_sections_changed(self, node, key, old, new) -> None:
-        """Update card display when title changes."""
+    def on_unmount(self) -> None:
+        self._unwatch_sections()
+        self._unwatch_meta()
+
+    def _on_card_changed(self, node, key, old, new) -> None:
+        """Update card display when sections or meta change."""
         new_title = _card_title(self.board, self.card_id)
         if new_title != self.title:
             self.title = new_title
-            self.query_one(PlainStatic).update(self.title or self.card_id)
+            self.query_one("#card-title", PlainStatic).update(self.title or self.card_id)
+        self._refresh_indicators()
+
+    def _refresh_indicators(self) -> None:
+        """Update footer indicator text."""
+        card = self.board.cards[self.card_id]
+        footer_text = build_footer_text(card.sections, card.meta)
+        self.query_one("#card-footer", PlainStatic).update(footer_text)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStarted(self, mouse_pos))

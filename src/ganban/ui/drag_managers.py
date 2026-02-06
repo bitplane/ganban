@@ -21,6 +21,7 @@ class CardPlaceholder(Static):
     CardPlaceholder {
         width: 100%;
         height: 3;
+        margin-bottom: 1;
         border: dashed $primary;
         background: $surface-darken-1;
     }
@@ -33,16 +34,18 @@ class DragGhost(Static):
     DEFAULT_CSS = """
     DragGhost {
         layer: overlay;
-        width: 22;
         height: auto;
-        padding: 0 1;
-        border: solid $primary;
-        background: $surface;
     }
     """
 
-    def __init__(self, title: str):
-        super().__init__(title)
+    def __init__(self, card: CardWidget):
+        super().__init__()
+        self._card = card
+
+    def compose(self):
+        from ganban.ui.card import CardWidget
+
+        yield CardWidget(self._card.card_id, self._card.board)
 
 
 class ColumnPlaceholder(Static):
@@ -51,7 +54,7 @@ class ColumnPlaceholder(Static):
     DEFAULT_CSS = """
     ColumnPlaceholder {
         width: 1fr;
-        min-width: 20;
+        min-width: 25;
         max-width: 25;
         height: 100%;
         border: dashed $primary;
@@ -86,7 +89,8 @@ class CardDragManager:
             mouse_offset.y - card_region.y,
         )
 
-        self.overlay = DragGhost(card.title)
+        self.overlay = DragGhost(card)
+        self.overlay.styles.width = card_region.width
         self.overlay.styles.offset = (card_region.x, card_region.y)
         self.screen.mount(self.overlay)
 

@@ -97,7 +97,7 @@ class DueDateWidget(Container):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            yield DateButton(selected=self._due, icon="⏰", id="due-picker")
+            yield DateButton(selected=self._due, icon="📅", id="due-picker")
             yield DueDateLabel("", id="due-label")
 
     def on_mount(self) -> None:

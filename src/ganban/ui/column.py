@@ -25,7 +25,7 @@ class ColumnWidget(DraggableMixin, Vertical):
     ColumnWidget {
         width: 1fr;
         height: 100%;
-        min-width: 20;
+        min-width: 25;
         max-width: 25;
         padding: 0 1;
         border-right: tall $surface-lighten-1;
@@ -199,7 +199,7 @@ class AddColumn(Vertical):
     AddColumn {
         width: 1fr;
         height: 100%;
-        min-width: 20;
+        min-width: 25;
         max-width: 25;
         padding: 0 1;
     }

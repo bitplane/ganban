@@ -1,0 +1,81 @@
+"""Tests for card indicator pure functions."""
+
+from datetime import date, timedelta
+
+from ganban.model.node import ListNode, Node
+from ganban.ui.card_indicators import build_footer_text
+
+
+def _make_card(body="", due=None):
+    """Create a card node with given body and optional due date."""
+    sections = ListNode()
+    sections["Title"] = body
+    meta_dict = {}
+    if due is not None:
+        meta_dict["due"] = due.isoformat()
+    return sections, Node(**meta_dict)
+
+
+def _has_red(text):
+    """Check if a Rich Text has red styling (on .style or in spans)."""
+    if "red" in str(text.style):
+        return True
+    return any("red" in str(span.style) for span in text._spans)
+
+
+def test_footer_empty_card():
+    """Empty card produces empty footer text."""
+    sections, meta = _make_card()
+    result = build_footer_text(sections, meta)
+    assert result.plain == ""
+
+
+def test_footer_body_only():
+    """Card with body content shows 📝 indicator."""
+    sections, meta = _make_card(body="some content")
+    result = build_footer_text(sections, meta)
+    assert "📝" in result.plain
+    assert "📅" not in result.plain
+
+
+def test_footer_body_whitespace_only():
+    """Card with whitespace-only body shows no body indicator."""
+    sections, meta = _make_card(body="   \n\t  ")
+    result = build_footer_text(sections, meta)
+    assert "📝" not in result.plain
+
+
+def test_footer_due_date():
+    """Card with future due date shows 📅 indicator."""
+    future = date.today() + timedelta(days=5)
+    sections, meta = _make_card(due=future)
+    result = build_footer_text(sections, meta)
+    assert "📅" in result.plain
+    assert "5d" in result.plain
+    assert "📝" not in result.plain
+
+
+def test_footer_overdue_styling():
+    """Overdue due date is styled red."""
+    past = date.today() - timedelta(days=3)
+    sections, meta = _make_card(due=past)
+    result = build_footer_text(sections, meta)
+    assert "📅" in result.plain
+    assert _has_red(result)
+
+
+def test_footer_due_today_is_overdue():
+    """Due date of today is treated as overdue (red)."""
+    sections, meta = _make_card(due=date.today())
+    result = build_footer_text(sections, meta)
+    assert "📅0d" in result.plain
+    assert _has_red(result)
+
+
+def test_footer_combined():
+    """Card with body and due date shows both indicators."""
+    future = date.today() + timedelta(days=2)
+    sections, meta = _make_card(body="has body", due=future)
+    result = build_footer_text(sections, meta)
+    assert "📝" in result.plain
+    assert "📅2d" in result.plain
