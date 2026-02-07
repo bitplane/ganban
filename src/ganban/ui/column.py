@@ -127,6 +127,36 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             menu = ContextMenu(items, event.screen_x, event.screen_y)
             self.app.push_screen(menu, self._on_menu_closed)
 
+    def on_key(self, event) -> None:
+        """Arrow key navigation between focusable children and adjacent siblings."""
+        if event.key not in ("up", "down", "left", "right"):
+            return
+
+        focused = self.screen.focused
+        focusable = [c for c in self.children if c.can_focus]
+        if focused not in focusable:
+            return
+
+        idx = focusable.index(focused)
+
+        if event.key == "up" and idx > 0:
+            focusable[idx - 1].focus()
+        elif event.key == "down" and idx < len(focusable) - 1:
+            focusable[idx + 1].focus()
+        elif event.key in ("left", "right"):
+            direction = -1 if event.key == "left" else 1
+            siblings = list(self.parent.children)
+            my_idx = siblings.index(self)
+            new_idx = my_idx + direction
+            if 0 <= new_idx < len(siblings):
+                target = siblings[new_idx]
+                target_focusable = [c for c in target.children if c.can_focus]
+                if target_focusable:
+                    target_focusable[min(idx, len(target_focusable) - 1)].focus()
+
+        event.prevent_default()
+        event.stop()
+
     def on_mouse_move(self, event) -> None:
         """Focus the child widget under the mouse cursor."""
         for child in self.children:
