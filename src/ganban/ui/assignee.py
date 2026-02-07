@@ -12,7 +12,7 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.constants import ICON_BACK, ICON_DELETE, ICON_PERSON
-from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_emoji
+from ganban.ui.emoji import emoji_for_email, find_user_by_email, parse_committer
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
@@ -23,14 +23,13 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
     name and emoji from the stored string.
     """
     _, name, email = parse_committer(assigned)
-    users = board.meta.users if board.meta else None
-    if users is not None:
-        for user_name, user_node in users.items():
-            emails = user_node.emails
-            if isinstance(emails, list) and email in emails:
-                name = user_name
-                break
-    emoji = resolve_email_emoji(email, board.meta) if board.meta else emoji_for_email(email)
+    result = find_user_by_email(email, board.meta)
+    if result:
+        user_name, user_node = result
+        name = user_name
+        emoji = user_node.emoji if user_node.emoji else emoji_for_email(email)
+    else:
+        emoji = emoji_for_email(email)
     return emoji, name, email
 
 

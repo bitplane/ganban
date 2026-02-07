@@ -116,16 +116,25 @@ class EmojiButton(Static):
         self.post_message(self.EmojiSelected(emoji))
 
 
+def find_user_by_email(email: str, meta: Node | None) -> tuple[str, Node] | None:
+    """Find the (user_name, user_node) for an email in meta.users."""
+    users = meta.users if meta else None
+    if users is None:
+        return None
+    for user_name, user_node in users.items():
+        emails = user_node.emails
+        if isinstance(emails, list) and email in emails:
+            return user_name, user_node
+    return None
+
+
 def resolve_email_emoji(email: str, meta: Node) -> str:
     """Look up the emoji for an email from meta.users, falling back to hash."""
-    users = meta.users
-    if users is not None:
-        for _, user_node in users.items():
-            emails = user_node.emails
-            if isinstance(emails, list) and email in emails:
-                if user_node.emoji is not None:
-                    return user_node.emoji
-                break
+    result = find_user_by_email(email, meta)
+    if result:
+        _, user_node = result
+        if user_node.emoji is not None:
+            return user_node.emoji
     return emoji_for_email(email)
 
 
