@@ -204,9 +204,10 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
 
     def on_mouse_move(self, event) -> None:
         """Focus the child widget under the mouse cursor."""
+        focused = self.screen.focused
         for child in self.children:
             if child.can_focus and child.region.contains(event.screen_x, event.screen_y):
-                if child is not self.screen.focused:
+                if child is not focused and (focused is None or child not in focused.ancestors):
                     child.focus()
                 return
 

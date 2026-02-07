@@ -161,6 +161,8 @@ class EditableText(Container):
         self._skip_next_focus = focus_inside
         self.query_one(ContentSwitcher).current = "view"
         self._editing = False
+        if focus_inside and self.parent and self.parent.can_focus:
+            self.parent.focus()
 
     def on_save(self, event: Save) -> None:
         event.stop()

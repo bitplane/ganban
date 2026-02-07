@@ -173,6 +173,14 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
 class AddCard(Static, can_focus=True):
     """Widget to add a new card to a column."""
 
+    BINDINGS = [
+        ("space", "start_editing"),
+        ("enter", "start_editing"),
+    ]
+
+    def action_start_editing(self) -> None:
+        self.query_one(EditableText)._start_edit()
+
     class CardCreated(Message):
         """Posted when a new card is created."""
 
@@ -217,3 +225,4 @@ class AddCard(Static, can_focus=True):
             card_id, card = create_card(self.board, event.new_value, column=self.column)
             self.post_message(self.CardCreated(self.column, card_id, event.new_value))
         self.query_one(EditableText).value = ""
+        self.focus()
