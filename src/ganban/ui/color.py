@@ -6,6 +6,7 @@ from textual.color import Color
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.ui.constants import ICON_PALETTE
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 COLORS: dict[str, str] = {
@@ -71,7 +72,7 @@ class ColorButton(Static):
     """
 
     def __init__(self, color: str | None = None, **kwargs) -> None:
-        super().__init__("\U0001f3a8", **kwargs)
+        super().__init__(ICON_PALETTE, **kwargs)
         self._color = color
 
     def on_click(self, event) -> None:

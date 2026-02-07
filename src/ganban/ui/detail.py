@@ -10,6 +10,7 @@ from textual.widgets import ContentSwitcher, Static
 from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.color import ColorButton
+from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_META, ICON_TAB_RAW, ICON_TAB_USERS
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
 from ganban.ui.users import UsersEditor
@@ -123,9 +124,9 @@ class CardDetailModal(DetailModal):
                 if self.board:
                     yield AssigneeWidget(self.card.meta, self.board)
                 with Horizontal(id="detail-tabs"):
-                    yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
-                    yield TabButton("\U0001f527", "tab-meta")
-                    yield TabButton("\U0001f440", "tab-raw")
+                    yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
+                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(self.card.sections, include_header=False, id="tab-doc")
                 yield MetaEditor(self.card.meta, id="tab-meta")
@@ -146,9 +147,9 @@ class ColumnDetailModal(DetailModal):
             with Horizontal(id="detail-bar"):
                 yield ColorButton(color=color)
                 with Horizontal(id="detail-tabs"):
-                    yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
-                    yield TabButton("\U0001f527", "tab-meta")
-                    yield TabButton("\U0001f440", "tab-raw")
+                    yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
+                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(self.column.sections, include_header=False, id="tab-doc")
                 yield MetaEditor(self.column.meta, id="tab-meta")
@@ -170,10 +171,10 @@ class BoardDetailModal(DetailModal):
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-bar"):
                 with Horizontal(id="detail-tabs"):
-                    yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
-                    yield TabButton("\U0001f527", "tab-meta")
-                    yield TabButton("😃", "tab-users")
-                    yield TabButton("\U0001f440", "tab-raw")
+                    yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
+                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_TAB_USERS, "tab-users")
+                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(self.board.sections, id="tab-doc")
                 yield MetaEditor(self.board.meta, id="tab-meta")

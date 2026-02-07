@@ -1,0 +1,13 @@
+"""Shared UI icon constants."""
+
+ICON_BACK = "🔙"
+ICON_DELETE = "🚫"
+ICON_CONFIRM = "❌"
+ICON_CALENDAR = "📅"
+ICON_PALETTE = "🎨"
+ICON_BODY = "📝"
+ICON_PERSON = "🧑"
+ICON_TAB_DOC = "📝"
+ICON_TAB_META = "🔧"
+ICON_TAB_RAW = "👀"
+ICON_TAB_USERS = "😃"

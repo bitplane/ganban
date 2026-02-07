@@ -12,6 +12,7 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.cal import DateButton, date_diff
+from ganban.ui.constants import ICON_BACK, ICON_CALENDAR, ICON_DELETE
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
@@ -40,7 +41,7 @@ class DueDateLabel(Static):
     def on_enter(self, event) -> None:
         if event.node is self and self._label_text:
             self._hovering = True
-            self.update("🚫")
+            self.update(ICON_DELETE)
 
     def on_leave(self, event) -> None:
         if event.node is self:
@@ -52,7 +53,7 @@ class DueDateLabel(Static):
             return
         event.stop()
         menu = ContextMenu(
-            [MenuRow(MenuItem("🔙", item_id="cancel"), MenuItem("🚫", item_id="confirm"))],
+            [MenuRow(MenuItem(ICON_BACK, item_id="cancel"), MenuItem(ICON_DELETE, item_id="confirm"))],
             event.screen_x,
             event.screen_y,
         )
@@ -103,7 +104,7 @@ class DueDateWidget(Container):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            yield DateButton(selected=self.due, icon="\U0001f4c5", id="due-picker")
+            yield DateButton(selected=self.due, icon=ICON_CALENDAR, id="due-picker")
             yield DueDateLabel("", id="due-label")
 
     def on_mount(self) -> None:

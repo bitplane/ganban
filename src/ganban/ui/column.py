@@ -12,6 +12,7 @@ from ganban.model.writer import build_column_path, create_column
 from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
+from ganban.ui.constants import ICON_PALETTE
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
 from ganban.ui.edit.document import _rename_first_key
@@ -98,7 +99,7 @@ class ColumnWidget(DraggableMixin, Vertical):
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(self.DragStarted(self, mouse_pos))
 
-    def draggable_clicked(self, click_pos: Offset) -> None:
+    def draggable_clicked(self) -> None:
         pass  # Click without drag - no action needed
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
@@ -117,7 +118,7 @@ class ColumnWidget(DraggableMixin, Vertical):
 
             items = [
                 MenuItem("Edit", "edit"),
-                MenuItem("\U0001f3a8 Color", "color", submenu=build_color_menu()),
+                MenuItem(f"{ICON_PALETTE} Color", "color", submenu=build_color_menu()),
                 MenuSeparator(),
                 MenuItem("Move Left", "move_left", disabled=(col_index == 0)),
                 MenuItem("Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
@@ -158,7 +159,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         if color_hex:
             try:
                 self.styles.background = Color.parse(color_hex)
-            except Exception:
+            except ValueError:
                 self.styles.clear_rule("background")
         else:
             self.styles.clear_rule("background")

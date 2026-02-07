@@ -7,6 +7,7 @@ from rich.text import Text
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
 from ganban.ui.cal import date_diff
+from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
 
 
@@ -14,8 +15,8 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
     """Build footer indicators from card sections and meta.
 
     Shows assignee emoji if meta.assigned is set.
-    Shows 📝 (dim) if first section has body content.
-    Shows 📅Xd if meta.due is set, red if overdue.
+    Shows body icon (dim) if first section has body content.
+    Shows calendar icon + Xd if meta.due is set, red if overdue.
     """
     parts: list[Text] = []
 
@@ -28,7 +29,7 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
     # Body indicator
     body = first_body(sections)
     if body.strip():
-        parts.append(Text("📝", style="dim"))
+        parts.append(Text(ICON_BODY, style="dim"))
 
     # Due date indicator
     due_str = meta.due if meta else None
@@ -41,7 +42,7 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
             today = date.today()
             diff = date_diff(due, today)
             style = "red" if due <= today else ""
-            parts.append(Text(f"\U0001f4c5{diff}", style=style))
+            parts.append(Text(f"{ICON_CALENDAR}{diff}", style=style))
 
     if not parts:
         return Text()

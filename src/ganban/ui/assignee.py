@@ -11,6 +11,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import Node
+from ganban.ui.constants import ICON_BACK, ICON_DELETE, ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_emoji
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
@@ -91,7 +92,7 @@ class AssigneeLabel(Horizontal):
 
     def compose(self) -> ComposeResult:
         yield Static("", classes="assignee-name")
-        clear = Static("🚫", classes="assignee-clear")
+        clear = Static(ICON_DELETE, classes="assignee-clear")
         clear.display = False
         yield clear
 
@@ -106,7 +107,7 @@ class AssigneeLabel(Horizontal):
             return
         event.stop()
         menu = ContextMenu(
-            [MenuRow(MenuItem("🔙", item_id="cancel"), MenuItem("🚫", item_id="confirm"))],
+            [MenuRow(MenuItem(ICON_BACK, item_id="cancel"), MenuItem(ICON_DELETE, item_id="confirm"))],
             event.screen_x,
             event.screen_y,
         )
@@ -130,7 +131,7 @@ class AssigneeButton(Static):
     AssigneeButton:hover { background: $primary-darken-2; }
     """
 
-    def __init__(self, board: Node, emoji: str = "🧑", **kwargs) -> None:
+    def __init__(self, board: Node, emoji: str = ICON_PERSON, **kwargs) -> None:
         super().__init__(emoji, **kwargs)
         self._board = board
 
@@ -178,7 +179,7 @@ class AssigneeWidget(Container):
         if assigned:
             emoji, _, _ = resolve_assignee(assigned, self.board)
         else:
-            emoji = "🧑"
+            emoji = ICON_PERSON
         with Horizontal():
             yield AssigneeButton(self.board, emoji=emoji, id="assignee-picker")
             yield AssigneeLabel(id="assignee-label")
@@ -206,7 +207,7 @@ class AssigneeWidget(Container):
             picker.update(emoji)
             label.set_label(name)
         else:
-            picker.update("🧑")
+            picker.update(ICON_PERSON)
             label.set_label("")
 
     def _set_assigned(self, value: str | None) -> None:

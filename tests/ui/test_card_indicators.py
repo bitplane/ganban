@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from ganban.model.node import ListNode, Node
 from ganban.ui.card_indicators import build_footer_text
+from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
 from ganban.ui.emoji import emoji_for_email
 
 
@@ -35,15 +36,15 @@ def test_footer_body_only():
     """Card with body content shows 📝 indicator."""
     sections, meta = _make_card(body="some content")
     result = build_footer_text(sections, meta)
-    assert "📝" in result.plain
-    assert "📅" not in result.plain
+    assert ICON_BODY in result.plain
+    assert ICON_CALENDAR not in result.plain
 
 
 def test_footer_body_whitespace_only():
     """Card with whitespace-only body shows no body indicator."""
     sections, meta = _make_card(body="   \n\t  ")
     result = build_footer_text(sections, meta)
-    assert "📝" not in result.plain
+    assert ICON_BODY not in result.plain
 
 
 def test_footer_due_date():
@@ -51,9 +52,9 @@ def test_footer_due_date():
     future = date.today() + timedelta(days=5)
     sections, meta = _make_card(due=future)
     result = build_footer_text(sections, meta)
-    assert "📅" in result.plain
+    assert ICON_CALENDAR in result.plain
     assert "5d" in result.plain
-    assert "📝" not in result.plain
+    assert ICON_BODY not in result.plain
 
 
 def test_footer_overdue_styling():
@@ -61,7 +62,7 @@ def test_footer_overdue_styling():
     past = date.today() - timedelta(days=3)
     sections, meta = _make_card(due=past)
     result = build_footer_text(sections, meta)
-    assert "📅" in result.plain
+    assert ICON_CALENDAR in result.plain
     assert _has_red(result)
 
 
@@ -69,7 +70,7 @@ def test_footer_due_today_is_overdue():
     """Due date of today is treated as overdue (red)."""
     sections, meta = _make_card(due=date.today())
     result = build_footer_text(sections, meta)
-    assert "📅0d" in result.plain
+    assert f"{ICON_CALENDAR}0d" in result.plain
     assert _has_red(result)
 
 
@@ -78,8 +79,8 @@ def test_footer_combined():
     future = date.today() + timedelta(days=2)
     sections, meta = _make_card(body="has body", due=future)
     result = build_footer_text(sections, meta)
-    assert "📝" in result.plain
-    assert "📅2d" in result.plain
+    assert ICON_BODY in result.plain
+    assert f"{ICON_CALENDAR}2d" in result.plain
 
 
 def test_footer_assigned_with_custom_emoji():

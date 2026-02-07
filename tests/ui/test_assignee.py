@@ -5,6 +5,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Button, Static
 
 from ganban.model.node import Node
+from ganban.ui.constants import ICON_PERSON
 from ganban.ui.assignee import (
     AssigneeButton,
     AssigneeLabel,
@@ -131,7 +132,7 @@ async def test_shows_default_when_unassigned():
     app = AssigneeApp()
     async with app.run_test():
         picker = app.query_one(AssigneeButton)
-        assert picker.content == "🧑"
+        assert picker.content == ICON_PERSON
         name_widget = app.query_one(".assignee-name", Static)
         assert name_widget.content == ""
 

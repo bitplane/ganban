@@ -8,6 +8,7 @@ from textual.widgets import Rule
 
 from ganban.model.node import ListNode, Node
 from ganban.ui.card import CardWidget
+from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
 from ganban.ui.static import PlainStatic
 
 
@@ -74,7 +75,7 @@ async def test_footer_shows_body_indicator():
     async with app.run_test():
         footer = app.query_one("#card-footer", PlainStatic)
         rendered = footer.render()
-        assert "📝" in str(rendered)
+        assert ICON_BODY in str(rendered)
 
 
 @pytest.mark.asyncio
@@ -86,7 +87,7 @@ async def test_footer_shows_due_indicator():
     async with app.run_test():
         footer = app.query_one("#card-footer", PlainStatic)
         rendered = footer.render()
-        assert "📅" in str(rendered)
+        assert ICON_CALENDAR in str(rendered)
 
 
 @pytest.mark.asyncio
@@ -96,13 +97,13 @@ async def test_reactive_meta_due_updates_footer():
     app = CardTestApp(board)
     async with app.run_test() as pilot:
         footer = app.query_one("#card-footer", PlainStatic)
-        assert "📅" not in str(footer.render())
+        assert ICON_CALENDAR not in str(footer.render())
 
         future = date.today() + timedelta(days=3)
         board.cards["1"].meta.due = future.isoformat()
         await pilot.pause()
 
-        assert "📅" in str(footer.render())
+        assert ICON_CALENDAR in str(footer.render())
 
 
 @pytest.mark.asyncio

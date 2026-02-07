@@ -81,13 +81,14 @@ class CardWidget(DraggableMixin, Static):
         card = self.board.cards[self.card_id]
         self._unwatch_sections = card.watch("sections", self._on_card_changed)
         self._unwatch_meta = card.watch("meta", self._on_card_changed)
-        self._unwatch_users = self.board.meta.watch("users", self._on_card_changed)
+        self._unwatch_users = self.board.meta.watch("users", self._on_card_changed) if self.board.meta else None
         self._refresh_indicators()
 
     def on_unmount(self) -> None:
         self._unwatch_sections()
         self._unwatch_meta()
-        self._unwatch_users()
+        if self._unwatch_users:
+            self._unwatch_users()
 
     def _on_card_changed(self, node, key, old, new) -> None:
         """Update card display when sections or meta change."""
@@ -106,7 +107,7 @@ class CardWidget(DraggableMixin, Static):
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(DragStarted(self, mouse_pos))
 
-    def draggable_clicked(self, click_pos: Offset) -> None:
+    def draggable_clicked(self) -> None:
         card = self.board.cards[self.card_id]
         self.app.push_screen(CardDetailModal(card, self.board))
 
