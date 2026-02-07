@@ -25,7 +25,7 @@ def _card_title(board: Node, card_id: str) -> str:
     return first_title(card.sections) or card_id
 
 
-class CardWidget(NodeWatcherMixin, DraggableMixin, Static):
+class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     """A single card in a column."""
 
     class MoveRequested(Message):
@@ -50,6 +50,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static):
         padding: 0 1;
         margin-bottom: 1;
         background: $surface;
+    }
+    CardWidget:focus {
+        background: $primary;
     }
     CardWidget.dragging {
         display: none;
@@ -78,6 +81,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static):
         yield Rule(id="card-header")
         yield PlainStatic(self.title or self.card_id, id="card-title")
         yield PlainStatic(id="card-footer")
+
+    def on_enter(self) -> None:
+        self.focus()
 
     def on_mount(self) -> None:
         card = self.board.cards[self.card_id]
@@ -159,7 +165,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static):
         self.post_message(self.MoveRequested(self, col_name))
 
 
-class AddCard(Static):
+class AddCard(Static, can_focus=True):
     """Widget to add a new card to a column."""
 
     class CardCreated(Message):
@@ -179,6 +185,9 @@ class AddCard(Static):
         margin-bottom: 1;
         border: dashed $surface-lighten-2;
     }
+    AddCard:focus {
+        background: $primary;
+    }
     AddCard > EditableText > ContentSwitcher > Static {
         text-align: center;
         color: $text-muted;
@@ -192,6 +201,9 @@ class AddCard(Static):
 
     def compose(self) -> ComposeResult:
         yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+
+    def on_enter(self) -> None:
+        self.focus()
 
     def on_click(self, event) -> None:
         if event.button == 3:

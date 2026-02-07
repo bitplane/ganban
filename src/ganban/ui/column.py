@@ -93,7 +93,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         name = first_title(self.column.sections)
         yield EditableText(name, Static(name), TextEditor(), id="column-title")
         yield Rule()
-        with VerticalScroll(classes="column-body"):
+        with VerticalScroll(classes="column-body", can_focus=False):
             for card_id in self.column.links:
                 yield CardWidget(card_id, self.board)
             yield AddCard(self.column, self.board)
