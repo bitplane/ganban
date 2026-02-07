@@ -9,6 +9,7 @@ from ganban.model.node import Node
 from ganban.model.writer import create_card
 from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text
+from ganban.ui.constants import ICON_CARD, ICON_CONFIRM, ICON_DELETE, ICON_EDIT, ICON_MOVE_TO
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
@@ -31,6 +32,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     BINDINGS = [
         ("space", "open_card"),
         ("enter", "open_card"),
+        ("delete", "confirm_delete"),
     ]
 
     def action_open_card(self) -> None:
@@ -129,24 +131,28 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     def on_click(self, event) -> None:
         if event.button == 3:  # Right click
             event.stop()
-            current_col = self._find_column()
+            self.show_context_menu(event.screen_x, event.screen_y)
 
-            # Build move submenu from visible columns (current disabled)
-            move_items = [
-                MenuItem(first_title(col.sections), f"move:{first_title(col.sections)}", disabled=(col is current_col))
-                for col in self.board.columns
-                if not col.hidden
-            ]
-
-            items = [
-                MenuItem("Edit", "edit"),
-                MenuItem("Move to", submenu=move_items),
-            ]
-            items.append(MenuSeparator())
-            items.append(MenuItem("Delete", "delete"))
-
-            menu = ContextMenu(items, event.screen_x, event.screen_y)
-            self.app.push_screen(menu, self._on_menu_closed)
+    def show_context_menu(self, x: int | None = None, y: int | None = None) -> None:
+        if x is None or y is None:
+            region = self.region
+            x = region.x + region.width // 2
+            y = region.y + region.height // 2
+        current_col = self._find_column()
+        move_items = [
+            MenuItem(first_title(col.sections), f"move:{first_title(col.sections)}", disabled=(col is current_col))
+            for col in self.board.columns
+            if not col.hidden
+        ]
+        items = [
+            MenuItem(f"{ICON_CARD} {self.title}", disabled=True),
+            MenuSeparator(),
+            MenuItem(f"{ICON_EDIT} Edit", "edit"),
+            MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),
+            MenuSeparator(),
+            MenuItem(f"{ICON_DELETE} Delete", "delete"),
+        ]
+        self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
     def _on_menu_closed(self, item: MenuItem | None) -> None:
         if item is None:
@@ -156,14 +162,29 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
                 card = self.board.cards[self.card_id]
                 self.app.push_screen(CardDetailModal(card, self.board))
             case "delete":
-                self._delete_card()
+                self._confirm_delete()
             case s if s and s.startswith("move:"):
                 col_name = s[5:]
                 self._move_to_column(col_name)
 
-    def _delete_card(self) -> None:
-        """Request deletion of this card."""
-        self.post_message(self.DeleteRequested(self))
+    def action_confirm_delete(self) -> None:
+        self._confirm_delete()
+
+    def _confirm_delete(self) -> None:
+        region = self.region
+        x = region.x + region.width // 2
+        y = region.y + region.height // 2
+        items = [
+            MenuItem(f"{ICON_DELETE} Delete {self.title}?", disabled=True),
+            MenuSeparator(),
+            MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
+            MenuItem(f"{ICON_DELETE} Cancel", "cancel"),
+        ]
+        self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
+
+    def _on_delete_confirmed(self, item: MenuItem | None) -> None:
+        if item and item.item_id == "confirm":
+            self.post_message(self.DeleteRequested(self))
 
     def _move_to_column(self, col_name: str) -> None:
         """Request move to the named column."""

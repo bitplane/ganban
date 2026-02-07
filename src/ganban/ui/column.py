@@ -12,7 +12,15 @@ from ganban.model.writer import build_column_path, create_column
 from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
-from ganban.ui.constants import ICON_PALETTE
+from ganban.ui.constants import (
+    ICON_COLUMN,
+    ICON_CONFIRM,
+    ICON_DELETE,
+    ICON_EDIT,
+    ICON_MOVE_LEFT,
+    ICON_MOVE_RIGHT,
+    ICON_PALETTE,
+)
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
 from ganban.ui.edit.document import _rename_first_key
@@ -111,21 +119,28 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         """Show context menu on right-click."""
         if event.button == 3:
             event.stop()
-            col_index = self._get_column_index()
-            visible_count = sum(1 for c in self.board.columns if not c.hidden)
+            self.show_context_menu(event.screen_x, event.screen_y)
 
-            items = [
-                MenuItem("Edit", "edit"),
-                MenuItem(f"{ICON_PALETTE} Color", "color", submenu=build_color_menu()),
-                MenuSeparator(),
-                MenuItem("Move Left", "move_left", disabled=(col_index == 0)),
-                MenuItem("Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
-                MenuSeparator(),
-                MenuItem("Delete", "delete"),
-            ]
-
-            menu = ContextMenu(items, event.screen_x, event.screen_y)
-            self.app.push_screen(menu, self._on_menu_closed)
+    def show_context_menu(self, x: int | None = None, y: int | None = None) -> None:
+        if x is None or y is None:
+            region = self.region
+            x = region.x + region.width // 2
+            y = region.y + region.height // 2
+        name = first_title(self.column.sections)
+        col_index = self._get_column_index()
+        visible_count = sum(1 for c in self.board.columns if not c.hidden)
+        items = [
+            MenuItem(f"{ICON_COLUMN} {name}", disabled=True),
+            MenuSeparator(),
+            MenuItem(f"{ICON_EDIT} Edit", "edit"),
+            MenuItem(f"{ICON_PALETTE} Color", "color", submenu=build_color_menu()),
+            MenuSeparator(),
+            MenuItem(f"{ICON_MOVE_LEFT} Move Left", "move_left", disabled=(col_index == 0)),
+            MenuItem(f"{ICON_MOVE_RIGHT} Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
+            MenuSeparator(),
+            MenuItem(f"{ICON_DELETE} Delete", "delete"),
+        ]
+        self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
     def on_key(self, event) -> None:
         """Arrow key navigation and shift+arrow card movement."""
@@ -286,7 +301,24 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             case "move_right":
                 self.post_message(self.MoveRequested(self, 1))
             case "delete":
-                self.post_message(self.DeleteRequested(self))
+                self._confirm_delete()
+
+    def _confirm_delete(self) -> None:
+        name = first_title(self.column.sections)
+        region = self.region
+        x = region.x + region.width // 2
+        y = region.y + region.height // 2
+        items = [
+            MenuItem(f"{ICON_DELETE} Delete {name}?", disabled=True),
+            MenuSeparator(),
+            MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
+            MenuItem(f"{ICON_DELETE} Cancel", "cancel"),
+        ]
+        self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
+
+    def _on_delete_confirmed(self, item: MenuItem | None) -> None:
+        if item and item.item_id == "confirm":
+            self.post_message(self.DeleteRequested(self))
 
     def _get_column_index(self) -> int:
         """Get the index of this column among visible columns."""

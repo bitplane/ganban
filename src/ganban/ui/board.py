@@ -10,12 +10,13 @@ from ganban.model.writer import build_column_path, save_board
 from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
+from ganban.ui.constants import ICON_BOARD, ICON_EDIT
 from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import DragStarted
 from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.edit.document import _rename_first_key
-from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.watcher import NodeWatcherMixin
 
 
@@ -25,6 +26,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
     BINDINGS = [
         ("escape", "cancel_drag", "Cancel drag"),
         ("ctrl+s", "save", "Save"),
+        ("ctrl+@", "context_menu", "Context menu"),
     ]
 
     DEFAULT_CSS = """
@@ -123,14 +125,40 @@ class BoardScreen(NodeWatcherMixin, Screen):
         header = self.query_one("#board-header", EditableText)
         if header.region.contains(event.screen_x, event.screen_y):
             event.stop()
-            items = [MenuItem("Edit", "edit")]
-            menu = ContextMenu(items, event.screen_x, event.screen_y)
-            self.app.push_screen(menu, self._on_header_menu_closed)
+            self.show_context_menu(event.screen_x, event.screen_y)
+
+    def show_context_menu(self, x: int | None = None, y: int | None = None) -> None:
+        if x is None or y is None:
+            region = self.query_one("#board-header", EditableText).region
+            x = region.x + region.width // 2
+            y = region.y + region.height // 2
+        title = first_title(self.board.sections)
+        items = [
+            MenuItem(f"{ICON_BOARD} {title}", disabled=True),
+            MenuSeparator(),
+            MenuItem(f"{ICON_EDIT} Edit", "edit"),
+        ]
+        self.app.push_screen(ContextMenu(items, x, y), self._on_header_menu_closed)
 
     def _on_header_menu_closed(self, item: MenuItem | None) -> None:
         """Handle board header context menu selection."""
         if item and item.item_id == "edit":
             self.app.push_screen(BoardDetailModal(self.board))
+
+    def action_context_menu(self) -> None:
+        """Show context menu for the focused widget."""
+        focused = self.focused
+        if focused is None:
+            return
+        region = focused.region
+        x = region.x + region.width // 2
+        y = region.y + region.height // 2
+        widget = focused
+        while widget is not None:
+            if hasattr(widget, "show_context_menu"):
+                widget.show_context_menu(x, y)
+                return
+            widget = widget.parent
 
     def action_save(self) -> None:
         """Save the board to git."""
