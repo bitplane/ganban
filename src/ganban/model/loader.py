@@ -65,11 +65,16 @@ def _parse_link_name(name: str) -> tuple[str | None, str]:
     return parts
 
 
-def _build_sections_list(text: str) -> tuple[ListNode, dict]:
-    """Parse markdown text into a ListNode of sections plus meta dict."""
+def _build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[ListNode, dict]:
+    """Parse markdown text into a ListNode of sections plus meta dict.
+
+    If the first section has no title, fallback_title is used.
+    """
     sections, meta = parse_sections(text)
     ln = ListNode()
-    for title, body in sections:
+    for i, (title, body) in enumerate(sections):
+        if not title and i == 0:
+            title = fallback_title
         ln[title] = body
     return ln, meta
 
@@ -90,7 +95,7 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
     index_blob = _tree_get(tree, "index.md")
     if index_blob is not None:
         text = index_blob.data_stream.read().decode("utf-8")
-        sections_ln, meta = _build_sections_list(text)
+        sections_ln, meta = _build_sections_list(text, fallback_title="ganban")
         board.sections = sections_ln
         board.meta = meta
     else:
@@ -111,7 +116,7 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
             card_id = item.name[:-3]
             card_ids.add(card_id)
             text = item.data_stream.read().decode("utf-8")
-            sections_ln, meta = _build_sections_list(text)
+            sections_ln, meta = _build_sections_list(text, fallback_title=card_id)
             card = Node(
                 sections=sections_ln,
                 meta=meta,
@@ -139,7 +144,7 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         index_blob = _tree_get(col_tree, "index.md")
         if index_blob is not None:
             text = index_blob.data_stream.read().decode("utf-8")
-            col_sections, col_meta = _build_sections_list(text)
+            col_sections, col_meta = _build_sections_list(text, fallback_title=name)
         else:
             col_sections = ListNode()
             col_sections[name] = ""

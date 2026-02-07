@@ -7,6 +7,7 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.model.writer import build_column_path, save_board
+from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 from ganban.ui.detail import BoardDetailModal
@@ -51,7 +52,7 @@ class BoardScreen(Screen):
         self._column_drag = ColumnDragManager(self)
 
     def compose(self) -> ComposeResult:
-        title = self.board.sections.keys()[0]
+        title = first_title(self.board.sections)
         yield EditableText(title, Static(title), TextEditor(), id="board-header")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
@@ -142,7 +143,7 @@ class BoardScreen(Screen):
         col_name = event.target_column
 
         source_col = card._find_column()
-        target_col = next((c for c in self.board.columns if c.sections.keys()[0] == col_name), None)
+        target_col = next((c for c in self.board.columns if first_title(c.sections) == col_name), None)
         if not target_col or target_col is source_col:
             return
 
@@ -216,7 +217,7 @@ class BoardScreen(Screen):
 
         for i, col in enumerate(all_cols):
             col.order = str(i + 1)
-            col.dir_path = build_column_path(col.order, col.sections.keys()[0], col.hidden)
+            col.dir_path = build_column_path(col.order, first_title(col.sections), col.hidden)
             self.board.columns[col.order] = col
 
         # Sync UI to match model

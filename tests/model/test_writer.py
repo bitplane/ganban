@@ -655,13 +655,13 @@ def test_create_card_basic(repo_with_ganban):
     card_id, card = create_card(board, "New card", "Description here")
 
     assert card is not None
-    assert card_id == "2"  # next_id after "001" is "2"
+    assert card_id == "002"  # next_id after "001" is "002"
     assert "New card" in card.sections.keys()
     assert len(board.cards) == original_count + 1
 
     # Should be added to first column's links
     backlog = board.columns["1"]
-    assert backlog.links[-1] == "2"
+    assert backlog.links[-1] == "002"
 
 
 def test_create_card_empty_board(empty_repo):

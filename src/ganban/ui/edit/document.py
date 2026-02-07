@@ -8,6 +8,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import ListNode
+from ganban.parser import first_title
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor
@@ -55,7 +56,7 @@ class DocHeader(Container):
         self.sections = sections
 
     def compose(self) -> ComposeResult:
-        title = self.sections.keys()[0]
+        title = first_title(self.sections)
         yield EditableText(
             title,
             Static(title),
@@ -67,6 +68,38 @@ class DocHeader(Container):
         event.stop()
         _rename_first_key(self.sections, event.new_value)
         self.post_message(self.TitleChanged(event.new_value))
+
+
+class AddSection(Static):
+    """Widget to add a new subsection."""
+
+    class SectionCreated(Message):
+        """Posted when a new section is created."""
+
+        def __init__(self, heading: str) -> None:
+            super().__init__()
+            self.heading = heading
+
+    DEFAULT_CSS = """
+    AddSection {
+        width: 100%;
+        height: auto;
+        border: dashed $surface-lighten-2;
+    }
+    AddSection > EditableText > ContentSwitcher > Static {
+        text-align: center;
+        color: $text-muted;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+        event.stop()
+        if event.new_value:
+            self.post_message(self.SectionCreated(event.new_value))
+        self.query_one(EditableText).value = ""
 
 
 class MarkdownDocEditor(Container):
@@ -118,6 +151,7 @@ class MarkdownDocEditor(Container):
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
                     yield SectionEditor(heading, content, classes="subsection")
+                yield AddSection()
 
     def on_doc_header_title_changed(self, event: DocHeader.TitleChanged) -> None:
         event.stop()
@@ -138,7 +172,15 @@ class MarkdownDocEditor(Container):
         event.stop()
         editor = event.control
         if editor.id == "main-section":
-            self.sections[self.sections.keys()[0]] = event.new_value
+            self.sections[first_title(self.sections)] = event.new_value
         else:
             self.sections[editor.heading] = event.new_value
+        self.post_message(self.Changed())
+
+    def on_add_section_section_created(self, event: AddSection.SectionCreated) -> None:
+        """Add a new subsection."""
+        event.stop()
+        self.sections[event.heading] = ""
+        editor = SectionEditor(event.heading, "", classes="subsection")
+        self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
         self.post_message(self.Changed())

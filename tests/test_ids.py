@@ -61,7 +61,7 @@ def test_next_id_none():
 
 def test_next_id_numeric():
     """Numeric IDs increment."""
-    assert next_id("001") == "2"
+    assert next_id("001") == "002"
     assert next_id("99") == "100"
     assert next_id("999") == "1000"
 
@@ -75,5 +75,5 @@ def test_next_id_alpha():
 
 def test_next_id_padded_numeric():
     """Padded numeric IDs still parse as int."""
-    assert next_id("007") == "8"
-    assert next_id("0099") == "100"
+    assert next_id("007") == "008"
+    assert next_id("0099") == "0100"

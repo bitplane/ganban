@@ -40,6 +40,7 @@ def next_id(current_max: str | None) -> str:
         return "001"
 
     try:
-        return str(int(current_max) + 1)
+        next_val = int(current_max) + 1
+        return str(next_val).zfill(len(current_max))
     except ValueError:
         return "1" + "0" * len(current_max)

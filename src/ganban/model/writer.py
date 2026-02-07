@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ganban.ids import max_id, next_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
-from ganban.parser import serialize_sections
+from ganban.parser import first_title, serialize_sections
 
 
 # --- Helpers for converting Node tree back to serializable form ---
@@ -26,11 +26,6 @@ def _sections_to_text(sections: ListNode, meta) -> str:
     """Serialize a sections ListNode + meta back to markdown text."""
     meta_dict = _meta_to_dict(meta)
     return serialize_sections(sections.items(), meta_dict or None)
-
-
-def _first_section_title(sections: ListNode) -> str:
-    """Get the title of the first section."""
-    return sections.keys()[0]
 
 
 # --- Git plumbing (copied verbatim from writer.py) ---
@@ -176,7 +171,7 @@ def _build_column_tree(repo_path: Path, col: Node, board: Node) -> str:
     # Add symlinks for card links
     for i, card_id in enumerate(col.links):
         card = board.cards[card_id]
-        title = _first_section_title(card.sections) if card else ""
+        title = first_title(card.sections) if card else ""
         slug = slugify(title)
         position = f"{i + 1:02d}"
         target = f"../.all/{card_id}.md"

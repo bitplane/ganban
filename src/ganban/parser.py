@@ -82,6 +82,21 @@ def serialize_sections(sections: list[tuple[str, str]], meta: dict | None = None
     return "\n".join(parts).rstrip() + "\n"
 
 
+def first_title(sections) -> str:
+    """Get the title (first key) of a sections ListNode, or empty string."""
+    keys = sections.keys()
+    return keys[0] if keys else ""
+
+
+def first_body(sections) -> str:
+    """Get the body (first value) of a sections ListNode, or empty string."""
+    keys = sections.keys()
+    if not keys:
+        return ""
+    value = sections[keys[0]]
+    return value if isinstance(value, str) else ""
+
+
 def _extract_front_matter(text: str) -> tuple[str, dict]:
     """Extract YAML front-matter from text. Returns (remaining_text, meta)."""
     if not text.startswith("---"):

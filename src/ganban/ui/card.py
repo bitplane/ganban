@@ -7,6 +7,7 @@ from textual.widgets import Rule, Static
 
 from ganban.model.node import Node
 from ganban.model.writer import create_card
+from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
@@ -17,7 +18,10 @@ from ganban.ui.static import PlainStatic
 
 def _card_title(board: Node, card_id: str) -> str:
     """Get the display title for a card."""
-    return board.cards[card_id].sections.keys()[0]
+    card = board.cards[card_id]
+    if not card or not card.sections:
+        return card_id
+    return first_title(card.sections) or card_id
 
 
 class CardWidget(DraggableMixin, Static):
@@ -118,7 +122,7 @@ class CardWidget(DraggableMixin, Static):
 
             # Build move submenu from visible columns (current disabled)
             move_items = [
-                MenuItem(col.sections.keys()[0], f"move:{col.sections.keys()[0]}", disabled=(col is current_col))
+                MenuItem(first_title(col.sections), f"move:{first_title(col.sections)}", disabled=(col is current_col))
                 for col in self.board.columns
                 if not col.hidden
             ]

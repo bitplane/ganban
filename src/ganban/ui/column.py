@@ -9,6 +9,7 @@ from textual.widgets import Rule, Static
 
 from ganban.model.node import Node
 from ganban.model.writer import build_column_path, create_column
+from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
 from ganban.ui.detail import ColumnDetailModal
@@ -86,7 +87,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        name = self.column.sections.keys()[0]
+        name = first_title(self.column.sections)
         yield EditableText(name, Static(name), TextEditor(), id="column-title")
         yield Rule()
         with VerticalScroll(classes="column-body"):

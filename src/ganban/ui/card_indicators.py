@@ -5,6 +5,7 @@ from datetime import date
 from rich.text import Text
 
 from ganban.model.node import ListNode, Node
+from ganban.parser import first_body
 from ganban.ui.cal import date_diff
 
 
@@ -17,9 +18,8 @@ def build_footer_text(sections: ListNode, meta: Node) -> Text:
     parts: list[Text] = []
 
     # Body indicator
-    first_key = sections.keys()[0]
-    body = sections[first_key]
-    if isinstance(body, str) and body.strip():
+    body = first_body(sections)
+    if body.strip():
         parts.append(Text("📝", style="dim"))
 
     # Due date indicator
