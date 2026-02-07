@@ -149,27 +149,14 @@ class BoardScreen(NodeWatcherMixin, Screen):
         if not target_col or target_col is source_col:
             return
 
-        # Update model - remove from source
         if source_col:
             links = list(source_col.links)
-            if card.card_id in links:
-                links.remove(card.card_id)
-                source_col.links = links
+            links.remove(card.card_id)
+            source_col.links = links
 
-        # Add to target
         links = list(target_col.links)
         links.append(card.card_id)
         target_col.links = links
-
-        # Update UI - find target column widget and mount new card
-        for col_widget in self.query(ColumnWidget):
-            if col_widget.column is target_col:
-                add_widget = col_widget.query_one(AddCard)
-                new_card = CardWidget(card.card_id, self.board)
-                col_widget.mount(new_card, before=add_widget)
-                break
-
-        card.remove()
 
     def on_card_widget_delete_requested(self, event: CardWidget.DeleteRequested) -> None:
         """Handle card delete request."""
@@ -178,20 +165,12 @@ class BoardScreen(NodeWatcherMixin, Screen):
         col = card._find_column()
         if col:
             links = list(col.links)
-            if card.card_id in links:
-                links.remove(card.card_id)
-                col.links = links
-                card.remove()
+            links.remove(card.card_id)
+            col.links = links
 
     def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
-        """Handle new card creation."""
+        """Handle new card creation — model already updated by create_card."""
         event.stop()
-        for col_widget in self.query(ColumnWidget):
-            if col_widget.column is event.column:
-                add_widget = col_widget.query_one(AddCard)
-                card_widget = CardWidget(event.card_id, self.board)
-                col_widget.mount(card_widget, before=add_widget)
-                break
 
     def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
         """Handle new column creation."""

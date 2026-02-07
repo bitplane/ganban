@@ -128,8 +128,17 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             self.app.push_screen(menu, self._on_menu_closed)
 
     def on_key(self, event) -> None:
-        """Arrow key navigation between focusable children and adjacent siblings."""
-        if event.key not in ("up", "down", "left", "right"):
+        """Arrow key navigation and shift+arrow card movement."""
+        if event.key not in (
+            "up",
+            "down",
+            "left",
+            "right",
+            "shift+up",
+            "shift+down",
+            "shift+left",
+            "shift+right",
+        ):
             return
 
         focused = self.screen.focused
@@ -153,9 +162,45 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
                 target_focusable = [c for c in target.children if c.can_focus]
                 if target_focusable:
                     target_focusable[min(idx, len(target_focusable) - 1)].focus()
+        elif event.key.startswith("shift+") and isinstance(focused, CardWidget):
+            self._move_card(focused, event.key)
 
         event.prevent_default()
         event.stop()
+
+    def _move_card(self, card: CardWidget, key: str) -> None:
+        """Move a card via shift+arrow by updating the model."""
+        links = list(self.column.links)
+        card_idx = links.index(card.card_id)
+        card_id = card.card_id
+
+        if key in ("shift+up", "shift+down"):
+            swap_idx = card_idx + (-1 if key == "shift+up" else 1)
+            if 0 <= swap_idx < len(links):
+                links[card_idx], links[swap_idx] = links[swap_idx], links[card_idx]
+                self.column.links = links
+                self.call_after_refresh(lambda: self._refocus_card(self, card_id))
+        elif key in ("shift+left", "shift+right"):
+            direction = -1 if key == "shift+left" else 1
+            siblings = list(self.parent.children)
+            my_idx = siblings.index(self)
+            new_idx = my_idx + direction
+            if 0 <= new_idx < len(siblings) and hasattr(siblings[new_idx], "column"):
+                target = siblings[new_idx]
+                links.remove(card_id)
+                self.column.links = links
+                target_links = list(target.column.links)
+                target_links.insert(min(card_idx, len(target_links)), card_id)
+                target.column.links = target_links
+                self.call_after_refresh(lambda: self._refocus_card(target, card_id))
+
+    @staticmethod
+    def _refocus_card(column: "ColumnWidget", card_id: str) -> None:
+        """Focus a card by id within a specific column."""
+        for card in column.query(CardWidget):
+            if card.card_id == card_id:
+                card.focus()
+                return
 
     def on_mouse_move(self, event) -> None:
         """Focus the child widget under the mouse cursor."""
@@ -169,6 +214,31 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         self._apply_color()
         self.node_watch(self.column, "sections", self._on_sections_changed)
         self.node_watch(self.column, "meta", self._on_meta_changed)
+        self.node_watch(self.column, "links", self._on_links_changed)
+
+    def _on_links_changed(self, node, key, old, new) -> None:
+        """Sync card children to match column.links."""
+        new_links = list(self.column.links) if self.column.links else []
+        existing = {c.card_id: c for c in self.query(CardWidget)}
+        new_ids = set(new_links)
+
+        # Remove cards no longer in links
+        for card_id, widget in existing.items():
+            if card_id not in new_ids:
+                widget.remove()
+
+        # Add missing cards and reorder
+        add_card = self.query_one(AddCard)
+        for card_id in new_links:
+            if card_id not in existing:
+                widget = CardWidget(card_id, self.board)
+                self.mount(widget, before=add_card)
+                existing[card_id] = widget
+
+        # Reorder to match links
+        for card_id in reversed(new_links):
+            self.move_child(existing[card_id], before=add_card)
+            add_card = existing[card_id]
 
     def _on_meta_changed(self, node, key, old, new) -> None:
         """Re-apply color when meta changes."""

@@ -28,6 +28,14 @@ def _card_title(board: Node, card_id: str) -> str:
 class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     """A single card in a column."""
 
+    BINDINGS = [
+        ("space", "open_card"),
+        ("enter", "open_card"),
+    ]
+
+    def action_open_card(self) -> None:
+        self.draggable_clicked()
+
     class MoveRequested(Message):
         """Posted when card should be moved to another column."""
 

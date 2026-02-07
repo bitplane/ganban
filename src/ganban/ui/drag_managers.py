@@ -173,39 +173,31 @@ class CardDragManager:
 
         self.screen.release_mouse()
 
-        from ganban.ui.card import CardWidget
-
         card = self.dragging
         target_col_widget = self.target_column
-        insert_before = self.insert_before
         target_column = target_col_widget.column
 
         source_column = card._find_column()
         if source_column:
             links = list(source_column.links)
-            if card.card_id in links:
-                links.remove(card.card_id)
-                source_column.links = links
+            links.remove(card.card_id)
+            source_column.links = links
 
-        actual_pos = self._calculate_model_position(target_col_widget, insert_before, card)
+        actual_pos = self._calculate_model_position(target_col_widget)
         links = list(target_column.links)
         links.insert(actual_pos, card.card_id)
         target_column.links = links
 
-        new_card = CardWidget(card.card_id, self.screen.board)
-        target_col_widget.mount(new_card, before=insert_before)
-        card.remove()
-
         self._cleanup()
 
-    def _calculate_model_position(self, column: ColumnWidget, insert_before: Static, card: CardWidget) -> int:
+    def _calculate_model_position(self, column: ColumnWidget) -> int:
         from ganban.ui.card import CardWidget
 
         pos = 0
         for c in column.children:
-            if c is insert_before:
+            if c is self.insert_before:
                 break
-            if isinstance(c, CardWidget) and c is not card:
+            if isinstance(c, CardWidget) and c is not self.dragging:
                 pos += 1
         return pos
 
