@@ -14,9 +14,9 @@ from ganban.parser import first_title, serialize_sections
 
 
 def _meta_to_dict(meta) -> dict:
-    """Convert a meta value (Node or dict) back to a plain dict."""
+    """Convert a meta value (Node or dict) back to a plain dict, recursively."""
     if isinstance(meta, Node):
-        return dict(meta.items())
+        return {k: _meta_to_dict(v) if isinstance(v, Node) else v for k, v in meta.items()}
     if isinstance(meta, dict):
         return meta
     return {}

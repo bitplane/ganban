@@ -9,7 +9,7 @@ from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 class ConfirmButton(Static):
     """A button that shows a confirm/cancel menu on click.
 
-    Shows a single icon (default: 🗑️). When clicked, opens a context menu
+    Shows a single icon (default: ❌). When clicked, opens a context menu
     with ❌ (cancel) and ✅ (confirm). Emits Confirmed message on confirm.
     """
 
@@ -30,7 +30,7 @@ class ConfirmButton(Static):
     }
     """
 
-    def __init__(self, icon: str = "🗑️", **kwargs) -> None:
+    def __init__(self, icon: str = "❌", **kwargs) -> None:
         super().__init__(icon, **kwargs)
 
     def on_click(self, event) -> None:
@@ -39,7 +39,7 @@ class ConfirmButton(Static):
             [
                 MenuRow(
                     MenuItem("🔙", item_id="cancel"),
-                    MenuItem("🗑️", item_id="confirm"),
+                    MenuItem("❌", item_id="confirm"),
                 ),
             ],
             event.screen_x,

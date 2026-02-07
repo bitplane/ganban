@@ -134,8 +134,8 @@ class MarkdownDocEditor(Container):
     class Changed(Message):
         """Emitted when the document content changes."""
 
-    def __init__(self, sections: ListNode, include_header: bool = True) -> None:
-        super().__init__()
+    def __init__(self, sections: ListNode, include_header: bool = True, **kwargs) -> None:
+        super().__init__(**kwargs)
         self.sections = sections
         self._include_header = include_header
 

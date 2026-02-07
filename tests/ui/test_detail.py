@@ -175,9 +175,9 @@ async def test_editing_section_updates_sections(card):
         text_area = body.query_one("#edit")
         text_area.text = "Updated notes"
 
-        # Blur to save (click elsewhere)
-        main_section = app.screen.query_one("#main-section")
-        await pilot.click(main_section)
+        # Blur to save (focus title to trigger blur-save on editor)
+        title = app.screen.query_one("#doc-title", EditableText)
+        title.focus()
         await pilot.pause()
 
         assert card.sections["Notes"] == "Updated notes"

@@ -743,6 +743,44 @@ def test_create_column_saves(repo_with_ganban):
 # --- slugify tests ---
 
 
+def test_meta_to_dict_recursive():
+    """Nested Node children are serialized to plain dicts."""
+    from ganban.model.writer import _meta_to_dict
+
+    meta = Node(
+        simple="value",
+        nested={"inner_key": "inner_value", "deep": {"level3": 42}},
+        number=99,
+    )
+    result = _meta_to_dict(meta)
+    assert result == {
+        "simple": "value",
+        "nested": {"inner_key": "inner_value", "deep": {"level3": 42}},
+        "number": 99,
+    }
+    # Verify nested values are plain dicts, not Nodes
+    assert type(result["nested"]) is dict
+    assert type(result["nested"]["deep"]) is dict
+
+
+def test_meta_to_dict_preserves_flat():
+    """Non-nested meta round-trips correctly."""
+    from ganban.model.writer import _meta_to_dict
+
+    meta = Node(tags=["a", "b"], priority=1)
+    result = _meta_to_dict(meta)
+    assert result == {"tags": ["a", "b"], "priority": 1}
+
+
+def test_meta_to_dict_empty():
+    """Empty Node returns empty dict."""
+    from ganban.model.writer import _meta_to_dict
+
+    assert _meta_to_dict(Node()) == {}
+    assert _meta_to_dict({}) == {}
+    assert _meta_to_dict(None) == {}
+
+
 def test_slugify_basic():
     assert slugify("Hello World") == "hello-world"
 

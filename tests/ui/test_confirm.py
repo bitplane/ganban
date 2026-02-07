@@ -33,7 +33,7 @@ async def test_displays_icon(app):
     """Button displays the trash icon by default."""
     async with app.run_test():
         btn = app.query_one(ConfirmButton)
-        assert btn.content == "🗑️"
+        assert btn.content == "❌"
 
 
 @pytest.mark.asyncio
