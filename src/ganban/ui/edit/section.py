@@ -74,10 +74,11 @@ class SectionEditor(Container):
         def control(self) -> SectionEditor:
             return self._sender
 
-    def __init__(self, heading: str | None, body: str = "", **kwargs) -> None:
+    def __init__(self, heading: str | None, body: str = "", parser_factory=None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._heading = heading
         self._body = body
+        self._parser_factory = parser_factory
 
     @property
     def heading(self) -> str | None:
@@ -97,7 +98,7 @@ class SectionEditor(Container):
             )
         yield EditableText(
             self._body,
-            MarkdownViewer(self._body),
+            MarkdownViewer(self._body, parser_factory=self._parser_factory),
             MarkdownEditor(),
             classes="section-body",
             clean=False,

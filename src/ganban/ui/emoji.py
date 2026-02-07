@@ -128,13 +128,35 @@ def find_user_by_email(email: str, meta: Node | None) -> tuple[str, Node] | None
     return None
 
 
-def resolve_email_emoji(email: str, meta: Node) -> str:
-    """Look up the emoji for an email from meta.users, falling back to hash."""
+def resolve_email_display(
+    email: str,
+    meta: Node | None = None,
+    committers: list[str] | None = None,
+) -> tuple[str, str] | None:
+    """Resolve an email to (emoji, display_name).
+
+    Checks meta.users first (custom emoji + user name), then
+    git committers (hash emoji + committer name). Returns None
+    if the email isn't found in either source.
+    """
     result = find_user_by_email(email, meta)
     if result:
-        _, user_node = result
-        if user_node.emoji is not None:
-            return user_node.emoji
+        name, user_node = result
+        emoji = user_node.emoji or emoji_for_email(email)
+        return emoji, name
+    if committers:
+        for committer_str in committers:
+            _, cname, cemail = parse_committer(committer_str)
+            if cemail == email:
+                return emoji_for_email(email), cname
+    return None
+
+
+def resolve_email_emoji(email: str, meta: Node) -> str:
+    """Look up the emoji for an email from meta.users, falling back to hash."""
+    result = resolve_email_display(email, meta)
+    if result:
+        return result[0]
     return emoji_for_email(email)
 
 

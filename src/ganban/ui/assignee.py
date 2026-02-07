@@ -12,7 +12,7 @@ from textual.widgets import Static
 from ganban.model.node import Node
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.constants import ICON_PERSON
-from ganban.ui.emoji import emoji_for_email, find_user_by_email, parse_committer
+from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_display
 from ganban.ui.menu import ContextMenu, MenuItem
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -21,17 +21,15 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
     """Parse an assigned string and resolve against board users.
 
     Returns (emoji, display_name, email). Board users override the
-    name and emoji from the stored string.
+    name and emoji from the parsed committer string.
     """
-    _, name, email = parse_committer(assigned)
-    result = find_user_by_email(email, board.meta)
+    _, parsed_name, email = parse_committer(assigned)
+    committers = board.git.committers if board.git else None
+    committers = committers if isinstance(committers, list) else None
+    result = resolve_email_display(email, board.meta, committers)
     if result:
-        user_name, user_node = result
-        name = user_name
-        emoji = user_node.emoji if user_node.emoji else emoji_for_email(email)
-    else:
-        emoji = emoji_for_email(email)
-    return emoji, name, email
+        return result[0], result[1], email
+    return emoji_for_email(email), parsed_name, email
 
 
 def build_assignee_menu(board: Node) -> list[MenuItem]:

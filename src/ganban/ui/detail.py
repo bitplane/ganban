@@ -13,7 +13,17 @@ from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_META, ICON_TAB_RAW, ICON_TAB_USERS
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
+from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.users import UsersEditor
+
+
+def _board_context(board: Node | None) -> tuple[Node | None, list[str] | None]:
+    """Extract meta and committers from a board node."""
+    if not board:
+        return None, None
+    meta = board.meta
+    committers = board.git.committers if board.git else None
+    return meta, committers if isinstance(committers, list) else None
 
 
 class TabButton(Static):
@@ -117,6 +127,8 @@ class CardDetailModal(DetailModal):
         self.board = board
 
     def compose(self) -> ComposeResult:
+        meta, committers = _board_context(self.board)
+        pf = ganban_parser_factory(meta, committers)
         with Vertical(id="detail-container"):
             yield DocHeader(self.card.sections)
             with Horizontal(id="detail-bar"):
@@ -128,7 +140,9 @@ class CardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
-                yield MarkdownDocEditor(self.card.sections, include_header=False, id="tab-doc")
+                yield MarkdownDocEditor(
+                    self.card.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
+                )
                 yield MetaEditor(self.card.meta, id="tab-meta")
                 yield Static("Coming soon", id="tab-raw")
 
@@ -136,11 +150,14 @@ class CardDetailModal(DetailModal):
 class ColumnDetailModal(DetailModal):
     """Modal screen showing full column details."""
 
-    def __init__(self, column: Node) -> None:
+    def __init__(self, column: Node, board: Node | None = None) -> None:
         super().__init__()
         self.column = column
+        self.board = board
 
     def compose(self) -> ComposeResult:
+        meta, committers = _board_context(self.board)
+        pf = ganban_parser_factory(meta, committers)
         color = self.column.meta.color
         with Vertical(id="detail-container"):
             yield DocHeader(self.column.sections)
@@ -151,7 +168,9 @@ class ColumnDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
-                yield MarkdownDocEditor(self.column.sections, include_header=False, id="tab-doc")
+                yield MarkdownDocEditor(
+                    self.column.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
+                )
                 yield MetaEditor(self.column.meta, id="tab-meta")
                 yield Static("Coming soon", id="tab-raw")
 
@@ -168,6 +187,8 @@ class BoardDetailModal(DetailModal):
         self.board = board
 
     def compose(self) -> ComposeResult:
+        meta, committers = _board_context(self.board)
+        pf = ganban_parser_factory(meta, committers)
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-bar"):
                 with Horizontal(id="detail-tabs"):
@@ -176,7 +197,7 @@ class BoardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_USERS, "tab-users")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
-                yield MarkdownDocEditor(self.board.sections, id="tab-doc")
+                yield MarkdownDocEditor(self.board.sections, meta=meta, parser_factory=pf, id="tab-doc")
                 yield MetaEditor(self.board.meta, id="tab-meta")
                 yield UsersEditor(self.board.meta, id="tab-users")
                 yield Static("Coming soon", id="tab-raw")

@@ -7,11 +7,13 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.model.node import ListNode
+from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor
+from ganban.ui.edit.viewers import MarkdownViewer
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 def _rename_first_key(sections: ListNode, new_title: str) -> None:
@@ -102,7 +104,7 @@ class AddSection(Static):
         self.query_one(EditableText).value = ""
 
 
-class MarkdownDocEditor(Container):
+class MarkdownDocEditor(NodeWatcherMixin, Container):
     """Two-panel editor for markdown sections content."""
 
     DEFAULT_CSS = """
@@ -134,10 +136,20 @@ class MarkdownDocEditor(Container):
     class Changed(Message):
         """Emitted when the document content changes."""
 
-    def __init__(self, sections: ListNode, include_header: bool = True, **kwargs) -> None:
+    def __init__(
+        self,
+        sections: ListNode,
+        include_header: bool = True,
+        meta: Node | None = None,
+        parser_factory=None,
+        **kwargs,
+    ) -> None:
+        self._init_watcher()
         super().__init__(**kwargs)
         self.sections = sections
         self._include_header = include_header
+        self._meta = meta
+        self._parser_factory = parser_factory
 
     def compose(self) -> ComposeResult:
         if self._include_header:
@@ -145,13 +157,22 @@ class MarkdownDocEditor(Container):
         items = self.sections.items()
         body = items[0][1]
         subsections = items[1:]
+        pf = self._parser_factory
         with Horizontal(id="doc-editor-container"):
             with VerticalScroll(id="doc-editor-left"):
-                yield SectionEditor(None, body, id="main-section")
+                yield SectionEditor(None, body, parser_factory=pf, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
-                    yield SectionEditor(heading, content, classes="subsection")
+                    yield SectionEditor(heading, content, parser_factory=pf, classes="subsection")
                 yield AddSection()
+
+    def on_mount(self) -> None:
+        if self._meta:
+            self.node_watch(self._meta, "users", self._on_users_changed)
+
+    def _on_users_changed(self, source_node, key, old, new) -> None:
+        for viewer in self.query(MarkdownViewer):
+            viewer.refresh_content()
 
     def on_doc_header_title_changed(self, event: DocHeader.TitleChanged) -> None:
         event.stop()
@@ -181,6 +202,6 @@ class MarkdownDocEditor(Container):
         """Add a new subsection."""
         event.stop()
         self.sections[event.heading] = ""
-        editor = SectionEditor(event.heading, "", classes="subsection")
+        editor = SectionEditor(event.heading, "", parser_factory=self._parser_factory, classes="subsection")
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
         self.post_message(self.Changed())

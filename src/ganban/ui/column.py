@@ -175,7 +175,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             return
         match item.item_id:
             case "edit":
-                self.app.push_screen(ColumnDetailModal(self.column))
+                self.app.push_screen(ColumnDetailModal(self.column, self.board))
             case "move_left":
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":
