@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from ganban.model.node import ListNode, Node
 from ganban.ui.card_indicators import build_footer_text
+from ganban.ui.emoji import emoji_for_email
 
 
 def _make_card(body="", due=None):
@@ -79,3 +80,29 @@ def test_footer_combined():
     result = build_footer_text(sections, meta)
     assert "📝" in result.plain
     assert "📅2d" in result.plain
+
+
+def test_footer_assigned_with_custom_emoji():
+    """Assigned card shows custom emoji from board meta users."""
+    sections, meta = _make_card()
+    meta.assigned = "alice@example.com"
+    board_meta = Node(users={"Alice": {"emoji": "🤖", "emails": ["alice@example.com"]}})
+    result = build_footer_text(sections, meta, board_meta)
+    assert "🤖" in result.plain
+
+
+def test_footer_assigned_hash_fallback():
+    """Assigned card shows hash-based emoji when no custom set."""
+    sections, meta = _make_card()
+    meta.assigned = "alice@example.com"
+    board_meta = Node()
+    result = build_footer_text(sections, meta, board_meta)
+    assert emoji_for_email("alice@example.com") in result.plain
+
+
+def test_footer_assigned_no_board_meta():
+    """No assignee indicator when board_meta not provided."""
+    sections, meta = _make_card()
+    meta.assigned = "alice@example.com"
+    result = build_footer_text(sections, meta)
+    assert result.plain == ""

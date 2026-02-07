@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
+from typing import Any
 
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.model.node import Node
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 EMOJIS: list[list[str]] = [
@@ -111,3 +114,44 @@ class EmojiButton(Static):
         self._emoji = emoji
         self.update(emoji or self._default_emoji)
         self.post_message(self.EmojiSelected(emoji))
+
+
+def resolve_email_emoji(email: str, meta: Node) -> str:
+    """Look up the emoji for an email from meta.users, falling back to hash."""
+    users = meta.users
+    if users is not None:
+        for _, user_node in users.items():
+            emails = user_node.emails
+            if isinstance(emails, list) and email in emails:
+                if user_node.emoji is not None:
+                    return user_node.emoji
+                break
+    return emoji_for_email(email)
+
+
+class EmailEmoji(Static):
+    """Display-only emoji resolved from an email address.
+
+    Watches meta.users so it updates when custom emojis change.
+    """
+
+    DEFAULT_CSS = """
+    EmailEmoji { width: 2; height: 1; }
+    """
+
+    def __init__(self, email: str, meta: Node, **kwargs) -> None:
+        self._email = email
+        self._meta = meta
+        self._unwatch: Callable | None = None
+        super().__init__(resolve_email_emoji(email, meta), **kwargs)
+
+    def on_mount(self) -> None:
+        self._unwatch = self._meta.watch("users", self._on_users_changed)
+
+    def on_unmount(self) -> None:
+        if self._unwatch is not None:
+            self._unwatch()
+            self._unwatch = None
+
+    def _on_users_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
+        self.update(resolve_email_emoji(self._email, self._meta))

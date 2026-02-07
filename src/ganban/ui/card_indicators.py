@@ -7,15 +7,22 @@ from rich.text import Text
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
 from ganban.ui.cal import date_diff
+from ganban.ui.emoji import resolve_email_emoji
 
 
-def build_footer_text(sections: ListNode, meta: Node) -> Text:
+def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = None) -> Text:
     """Build footer indicators from card sections and meta.
 
+    Shows assignee emoji if meta.assigned is set.
     Shows 📝 (dim) if first section has body content.
     Shows 📅Xd if meta.due is set, red if overdue.
     """
     parts: list[Text] = []
+
+    # Assignee indicator
+    assigned = meta.assigned if meta else None
+    if assigned and board_meta:
+        parts.append(Text(resolve_email_emoji(assigned, board_meta)))
 
     # Body indicator
     body = first_body(sections)

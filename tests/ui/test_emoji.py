@@ -3,12 +3,15 @@
 import pytest
 from textual.app import App, ComposeResult
 
+from ganban.model.node import Node
 from ganban.ui.emoji import (
     DEFAULT_EMOJIS,
+    EmailEmoji,
     EmojiButton,
     build_emoji_menu,
     emoji_for_email,
     parse_committer,
+    resolve_email_emoji,
 )
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
@@ -197,3 +200,73 @@ async def test_escape_dismisses():
         await pilot.press("escape")
         assert not isinstance(app.screen, ContextMenu)
         assert app.selected_emoji is ...
+
+
+# --- resolve_email_emoji tests ---
+
+
+def test_resolve_email_emoji_custom():
+    """Returns custom emoji when user has one set."""
+    meta = Node(users={"Alice": {"emoji": "🤖", "emails": ["alice@example.com"]}})
+    assert resolve_email_emoji("alice@example.com", meta) == "🤖"
+
+
+def test_resolve_email_emoji_no_custom():
+    """Falls back to hash when user exists but has no custom emoji."""
+    meta = Node(users={"Alice": {"emails": ["alice@example.com"]}})
+    assert resolve_email_emoji("alice@example.com", meta) == emoji_for_email("alice@example.com")
+
+
+def test_resolve_email_emoji_unknown():
+    """Falls back to hash for unknown emails."""
+    meta = Node(users={"Alice": {"emoji": "🤖", "emails": ["alice@example.com"]}})
+    assert resolve_email_emoji("bob@example.com", meta) == emoji_for_email("bob@example.com")
+
+
+def test_resolve_email_emoji_no_users():
+    """Falls back to hash when meta has no users."""
+    meta = Node()
+    assert resolve_email_emoji("alice@example.com", meta) == emoji_for_email("alice@example.com")
+
+
+# --- EmailEmoji widget tests ---
+
+
+class EmailEmojiApp(App):
+    def __init__(self, email, meta):
+        super().__init__()
+        self._email = email
+        self.meta = meta
+
+    def compose(self) -> ComposeResult:
+        yield EmailEmoji(self._email, self.meta)
+
+
+@pytest.mark.asyncio
+async def test_email_emoji_shows_custom():
+    meta = Node(users={"Alice": {"emoji": "🤖", "emails": ["alice@example.com"]}})
+    app = EmailEmojiApp("alice@example.com", meta)
+    async with app.run_test():
+        assert app.query_one(EmailEmoji).content == "🤖"
+
+
+@pytest.mark.asyncio
+async def test_email_emoji_shows_hash_default():
+    meta = Node()
+    app = EmailEmojiApp("alice@example.com", meta)
+    async with app.run_test():
+        assert app.query_one(EmailEmoji).content == emoji_for_email("alice@example.com")
+
+
+@pytest.mark.asyncio
+async def test_email_emoji_updates_on_user_change():
+    meta = Node(users={"Alice": {"emails": ["alice@example.com"]}})
+    app = EmailEmojiApp("alice@example.com", meta)
+    async with app.run_test() as pilot:
+        widget = app.query_one(EmailEmoji)
+        assert widget.content == emoji_for_email("alice@example.com")
+
+        meta.users.Alice.emoji = "😈"
+        await pilot.pause()
+
+        assert widget.content == "😈"
