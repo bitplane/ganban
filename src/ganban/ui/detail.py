@@ -1,7 +1,5 @@
 """Detail modals for viewing and editing markdown content."""
 
-from datetime import date
-
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.events import Click
@@ -33,7 +31,8 @@ class TabButton(Static):
         background: $primary-darken-2;
     }
     TabButton.-active {
-        text-style: bold underline;
+        background: $primary-darken-2;
+        text-style: bold;
     }
     """
 
@@ -114,11 +113,10 @@ class CardDetailModal(DetailModal):
         self.card = card
 
     def compose(self) -> ComposeResult:
-        due = self._get_due_date()
         with Vertical(id="detail-container"):
             yield DocHeader(self.card.sections)
             with Horizontal(id="detail-bar"):
-                yield DueDateWidget(due=due)
+                yield DueDateWidget(self.card.meta)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
                     yield TabButton("\U0001f527", "tab-meta")
@@ -127,16 +125,6 @@ class CardDetailModal(DetailModal):
                 yield MarkdownDocEditor(self.card.sections, include_header=False, id="tab-doc")
                 yield MetaEditor(self.card.meta, id="tab-meta")
                 yield Static("Coming soon", id="tab-raw")
-
-    def _get_due_date(self) -> date | None:
-        due_str = self.card.meta.due
-        if due_str:
-            return date.fromisoformat(due_str)
-        return None
-
-    def on_due_date_widget_changed(self, event: DueDateWidget.Changed) -> None:
-        event.stop()
-        self.card.meta.due = event.due.isoformat() if event.due else None
 
 
 class ColumnDetailModal(DetailModal):

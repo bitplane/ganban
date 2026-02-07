@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import pytest
 from textual.app import App, ComposeResult
 
+from ganban.model.node import Node
 from ganban.ui.cal import Calendar, CalendarDay
 from ganban.ui.due import DueDateLabel, DueDateWidget
 from ganban.ui.menu import ContextMenu, MenuItem
@@ -15,16 +16,10 @@ class DueDateApp(App):
 
     def __init__(self, due: date | None = None):
         super().__init__()
-        self._due = due
-        self.due_changed: date | None = ...  # sentinel to distinguish None from not-set
-        self.changed_control = None
+        self.meta = Node(due=due.isoformat() if due else None)
 
     def compose(self) -> ComposeResult:
-        yield DueDateWidget(due=self._due)
-
-    def on_due_date_widget_changed(self, event: DueDateWidget.Changed) -> None:
-        self.due_changed = event.due
-        self.changed_control = event.control
+        yield DueDateWidget(self.meta)
 
 
 @pytest.mark.asyncio
@@ -102,7 +97,7 @@ async def test_delete_clears_due():
         await pilot.pause()
 
         assert widget.due is None
-        assert app.due_changed is None
+        assert app.meta.due is None
         assert label.content == ""
 
 
@@ -162,7 +157,7 @@ async def test_calendar_sets_due():
 
         # Due should be set
         assert widget.due == target_day.date
-        assert app.due_changed == target_day.date
+        assert app.meta.due == target_day.date.isoformat()
 
 
 @pytest.mark.asyncio
@@ -250,7 +245,7 @@ async def test_click_label_confirm_clears_due():
 
         await pilot.click(confirm_item)
         assert widget.due is None
-        assert app.due_changed is None
+        assert app.meta.due is None
 
 
 @pytest.mark.asyncio
@@ -271,7 +266,7 @@ async def test_click_label_cancel_keeps_due():
 
         await pilot.click(cancel_item)
         assert widget.due == due
-        assert app.due_changed is ...
+        assert app.meta.due == due.isoformat()
 
 
 @pytest.mark.asyncio
@@ -285,21 +280,18 @@ async def test_click_label_not_hovering_noop():
 
 
 @pytest.mark.asyncio
-async def test_changed_event_control_is_widget():
-    """Changed event's control property returns the DueDateWidget."""
+async def test_external_node_change_updates_widget():
+    """Changing meta.due externally updates the widget label."""
     app = DueDateApp()
     async with app.run_test() as pilot:
         widget = app.query_one(DueDateWidget)
-        picker = widget.query_one("#due-picker")
+        label = widget.query_one("#due-label", DueDateLabel)
+        assert widget.due is None
 
-        await pilot.click(picker)
+        # External change (e.g. meta editor)
+        target = date.today() + timedelta(days=7)
+        app.meta.due = target.isoformat()
+        await pilot.pause()
 
-        cal = app.screen.query_one(Calendar)
-        target_day = None
-        for day in cal.query(CalendarDay):
-            if day.date.month == date.today().month:
-                target_day = day
-                break
-
-        await pilot.click(target_day)
-        assert app.changed_control is widget
+        assert widget.due == target
+        assert label.content == "7d"

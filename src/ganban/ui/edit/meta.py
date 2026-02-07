@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.events import Click, Show
+from textual.events import Click
 from textual.message import Message
 from textual.widgets import Static
 
@@ -219,34 +220,55 @@ class ListItemRow(Vertical):
         self.post_message(self.DeleteRequested(self.index))
 
 
-class AddListItemRow(Container):
-    """Row to add a new item to a list."""
+class AddListItemRow(Static):
+    """Clickable '+' that opens a type picker to add a new list item."""
 
     class ItemAdded(Message):
-        def __init__(self, value: str) -> None:
+        def __init__(self, value: Any) -> None:
             super().__init__()
             self.value = value
+
+    TYPE_DEFAULTS: dict[str, Any] = {
+        "text": "",
+        "number": 0,
+        "bool": False,
+        "dict": {},
+        "list": [],
+    }
 
     DEFAULT_CSS = """
     AddListItemRow {
         width: 100%;
-        height: auto;
-        border: dashed $surface-lighten-2;
-    }
-    AddListItemRow > EditableText > ContentSwitcher > Static {
+        height: 1;
         text-align: center;
         color: $text-muted;
+        border: dashed $surface-lighten-2;
+    }
+    AddListItemRow:hover {
+        background: $primary-darken-2;
     }
     """
 
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+    def __init__(self, **kwargs) -> None:
+        super().__init__("+", **kwargs)
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+    def on_click(self, event: Click) -> None:
         event.stop()
-        if event.new_value:
-            self.post_message(self.ItemAdded(event.new_value))
-            self.query_one(EditableText).value = ""
+        items = [
+            MenuItem("Text", item_id="text"),
+            MenuItem("Number", item_id="number"),
+            MenuItem("True/False", item_id="bool"),
+            MenuItem("Dict", item_id="dict"),
+            MenuItem("List", item_id="list"),
+        ]
+        region = self.region
+        menu = ContextMenu(items, region.x, region.y + region.height)
+        self.app.push_screen(menu, self._on_type_selected)
+
+    def _on_type_selected(self, item: MenuItem | None) -> None:
+        if item:
+            default = self.TYPE_DEFAULTS.get(item.item_id, "")
+            self.post_message(self.ItemAdded(default))
 
 
 class ListEditor(Vertical):
@@ -281,10 +303,14 @@ class ListEditor(Vertical):
         for i, row in enumerate(self.query(ListItemRow)):
             row.index = i
 
+    def _emit_changed(self) -> None:
+        """Post a Changed message with a snapshot of the current items."""
+        self.post_message(self.Changed(list(self.items)))
+
     def on_list_item_row_value_changed(self, event: ListItemRow.ValueChanged) -> None:
         event.stop()
         self.items[event.index] = event.value
-        self.post_message(self.Changed(self.items))
+        self._emit_changed()
 
     def on_list_item_row_delete_requested(self, event: ListItemRow.DeleteRequested) -> None:
         event.stop()
@@ -292,14 +318,14 @@ class ListEditor(Vertical):
         rows = list(self.query(ListItemRow))
         rows[event.index].remove()
         self._reindex()
-        self.post_message(self.Changed(self.items))
+        self._emit_changed()
 
     def on_add_list_item_row_item_added(self, event: AddListItemRow.ItemAdded) -> None:
         event.stop()
         self.items.append(event.value)
         row = ListItemRow(len(self.items) - 1, event.value)
         self.mount(row, before=self.query_one(AddListItemRow))
-        self.post_message(self.Changed(self.items))
+        self._emit_changed()
 
 
 # --- Key-value row ---
@@ -494,37 +520,71 @@ class DictEditor(Vertical):
     def __init__(self, node: Node, **kwargs) -> None:
         super().__init__(**kwargs)
         self.node = node
-        self._last_version: int = node._version
+        self._unwatch: Callable | None = None
+        self._suppressing: bool = False
 
     def compose(self) -> ComposeResult:
-        self._last_version = self.node._version
         for key, value in self.node.items():
             yield KeyValueRow(key, value)
         yield AddKeyRow()
 
-    def on_show(self, event: Show) -> None:
-        """Recompose if the node changed externally (e.g. due date widget)."""
-        if self.node._version != self._last_version:
-            self._last_version = self.node._version
-            self.query("KeyValueRow").remove()
-            add_row = self.query_one(AddKeyRow)
-            for key, value in self.node.items():
-                self.mount(KeyValueRow(key, value), before=add_row)
+    def on_mount(self) -> None:
+        if self.node._parent is not None and self.node._key is not None:
+            self._unwatch = self.node._parent.watch(self.node._key, self._on_node_changed)
+
+    def on_unmount(self) -> None:
+        if self._unwatch is not None:
+            self._unwatch()
+            self._unwatch = None
+
+    def _on_node_changed(self, source_node, key, old, new) -> None:
+        """React to model changes that bubbled up through our node."""
+        if self._suppressing or source_node is not self.node:
+            return
+        self.call_later(self._sync_row, key, new)
+
+    def _sync_row(self, key: str, new_value: Any) -> None:
+        """Add, remove, or replace a single row to match the node."""
+        existing = None
+        for row in self.query(KeyValueRow):
+            if row.key == key:
+                existing = row
+                break
+
+        if new_value is None:
+            if existing:
+                existing.remove()
+            return
+
+        if existing:
+            rows = list(self.query(KeyValueRow))
+            idx = rows.index(existing)
+            insert_before = rows[idx + 1] if idx + 1 < len(rows) else self.query_one(AddKeyRow)
+            existing.remove()
+        else:
+            insert_before = self.query_one(AddKeyRow)
+
+        self.mount(KeyValueRow(key, new_value), before=insert_before)
+
+    def _set_node(self, key: str, value: Any) -> None:
+        """Set a value on the node with change suppression."""
+        self._suppressing = True
+        setattr(self.node, key, value)
+        self._suppressing = False
 
     def on_key_value_row_value_changed(self, event: KeyValueRow.ValueChanged) -> None:
         event.stop()
-        setattr(self.node, event.key, event.value)
-        self._last_version = self.node._version
+        self._set_node(event.key, event.value)
 
     def on_key_value_row_key_renamed(self, event: KeyValueRow.KeyRenamed) -> None:
         event.stop()
+        self._suppressing = True
         _rename_node_key(self.node, event.old_key, event.new_key)
-        self._last_version = self.node._version
+        self._suppressing = False
 
     def on_key_value_row_delete_requested(self, event: KeyValueRow.DeleteRequested) -> None:
         event.stop()
-        setattr(self.node, event.key, None)
-        self._last_version = self.node._version
+        self._set_node(event.key, None)
         for row in self.query(KeyValueRow):
             if row.key == event.key:
                 row.remove()
@@ -532,8 +592,7 @@ class DictEditor(Vertical):
 
     def on_add_key_row_key_added(self, event: AddKeyRow.KeyAdded) -> None:
         event.stop()
-        setattr(self.node, event.key, event.value)
-        self._last_version = self.node._version
+        self._set_node(event.key, event.value)
         row = KeyValueRow(event.key, event.value)
         self.mount(row, before=self.query_one(AddKeyRow))
 

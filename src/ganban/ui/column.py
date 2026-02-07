@@ -156,7 +156,10 @@ class ColumnWidget(DraggableMixin, Vertical):
     def _apply_color(self) -> None:
         color_hex = self.column.meta.color
         if color_hex:
-            self.styles.background = Color.parse(color_hex)
+            try:
+                self.styles.background = Color.parse(color_hex)
+            except Exception:
+                self.styles.clear_rule("background")
         else:
             self.styles.clear_rule("background")
 

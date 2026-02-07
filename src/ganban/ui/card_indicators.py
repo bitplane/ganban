@@ -25,11 +25,15 @@ def build_footer_text(sections: ListNode, meta: Node) -> Text:
     # Due date indicator
     due_str = meta.due if meta else None
     if due_str:
-        due = date.fromisoformat(due_str)
-        today = date.today()
-        diff = date_diff(due, today)
-        style = "red" if due <= today else ""
-        parts.append(Text(f"📅{diff}", style=style))
+        try:
+            due = date.fromisoformat(due_str)
+        except (ValueError, TypeError):
+            due = None
+        if due:
+            today = date.today()
+            diff = date_diff(due, today)
+            style = "red" if due <= today else ""
+            parts.append(Text(f"\U0001f4c5{diff}", style=style))
 
     if not parts:
         return Text()

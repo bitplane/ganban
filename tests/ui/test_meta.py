@@ -2,7 +2,7 @@
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.events import Show
+
 from textual.widgets import Button
 
 from ganban.model.node import Node
@@ -35,11 +35,16 @@ class MetaEditorApp(App):
 
 
 class DictEditorApp(App):
-    """Test app wrapping a DictEditor."""
+    """Test app wrapping a DictEditor.
+
+    Wraps the node in a parent so that DictEditor's watcher can
+    observe external changes via the parent chain.
+    """
 
     def __init__(self, node: Node):
         super().__init__()
-        self.node = node
+        self.root_node = Node(child=node)
+        self.node = self.root_node.child
 
     def compose(self) -> ComposeResult:
         yield Button("focus target", id="focus-target")
@@ -377,8 +382,8 @@ async def test_list_of_dicts_renders_nested():
 
 
 @pytest.mark.asyncio
-async def test_dict_editor_refreshes_on_show():
-    """DictEditor recomposes when node changed externally and tab is shown."""
+async def test_dict_editor_reacts_to_external_change():
+    """DictEditor adds a row when an external change adds a key to the node."""
     node = Node(color="red")
     app = DictEditorApp(node)
     async with app.run_test() as pilot:
@@ -386,11 +391,7 @@ async def test_dict_editor_refreshes_on_show():
         assert len(rows) == 1
 
         # External change (simulates due date widget etc.)
-        node.due = "2026-01-15"
-        assert node._version != app.query_one(DictEditor)._last_version
-
-        # Trigger show event (simulates tab switch)
-        app.query_one(DictEditor).post_message(Show())
+        app.node.due = "2026-01-15"
         await pilot.pause()
 
         rows = app.query(KeyValueRow)
