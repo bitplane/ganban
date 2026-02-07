@@ -63,13 +63,23 @@ def test_node_version_no_change():
     node = Node()
     node.name = "Backlog"
     v = node._version
-    node.name = node.name  # same object
+    node.name = "Backlog"  # equal value, different object
     assert node._version == v
 
 
 def test_node_keys():
     node = Node(a="1", b="2")
     assert set(node.keys()) == {"a", "b"}
+
+
+def test_node_no_event_on_equal_list():
+    """Setting a list property to an equal list should not emit."""
+    events = []
+    node = Node()
+    node.links = ["a", "b", "c"]
+    node.watch("links", lambda n, k, old, new: events.append(1))
+    node.links = ["a", "b", "c"]
+    assert len(events) == 0
 
 
 def test_node_contains():
@@ -147,7 +157,7 @@ def test_watcher_not_called_on_no_change():
     node = Node()
     node.name = "Backlog"
     node.watch("name", lambda n, k, old, new: events.append(1))
-    node.name = node.name  # same object identity
+    node.name = "Backlog"  # equal value, different object
     assert len(events) == 0
 
 
@@ -268,6 +278,24 @@ def test_list_node_replace_with_duplicate_values():
     lst["b"] = "updated"
     assert lst.keys() == ["a", "b", "c"]
     assert list(lst) == ["same", "updated", "other"]
+
+
+def test_list_node_no_event_on_equal_value():
+    """Setting a key to an equal value should not emit."""
+    events = []
+    lst = ListNode()
+    lst["a"] = "hello"
+    lst.watch("a", lambda n, k, old, new: events.append(1))
+    lst["a"] = "hello"
+    assert len(events) == 0
+
+
+def test_list_node_no_version_bump_on_equal_value():
+    lst = ListNode()
+    lst["a"] = "hello"
+    v = lst._version
+    lst["a"] = "hello"
+    assert lst._version == v
 
 
 def test_list_node_auto_wrap():

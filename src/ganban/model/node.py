@@ -70,7 +70,7 @@ class Node:
         else:
             value = _wrap(value, parent=self, key=name)
             self._children[name] = value
-        if old is not value:
+        if old != value:
             self._version += 1
             _emit(self, name, old, value)
 
@@ -177,8 +177,9 @@ class ListNode:
             else:
                 self._items.append(value)
             self._by_id[key] = value
-            self._version += 1
-            _emit(self, key, old, value)
+            if old != value:
+                self._version += 1
+                _emit(self, key, old, value)
 
     def __iter__(self):
         return iter(self._items)
