@@ -25,11 +25,18 @@ def test_build_emoji_menu_structure():
         assert len(row._items) == 5
 
 
-def test_build_emoji_menu_clear_item():
-    """First item in first row is the clear button with id 'none'."""
+def test_build_emoji_menu_clear_item_default():
+    """First item shows 🙂 when no email provided."""
     rows = build_emoji_menu()
     assert rows[0]._items[0].item_id == "none"
-    assert rows[0]._items[0].label == "🧑"
+    assert rows[0]._items[0].label == "🙂"
+
+
+def test_build_emoji_menu_clear_item_with_email():
+    """First item shows hash-based emoji when email provided."""
+    rows = build_emoji_menu("alice@example.com")
+    assert rows[0]._items[0].item_id == "none"
+    assert rows[0]._items[0].label == emoji_for_email("alice@example.com")
 
 
 def test_build_emoji_menu_has_29_emojis():
@@ -121,7 +128,7 @@ async def test_emoji_button_displays_default():
     app = EmojiButtonApp()
     async with app.run_test():
         btn = app.query_one(EmojiButton)
-        assert btn.content == "🧑"
+        assert btn.content == "🙂"
 
 
 @pytest.mark.asyncio
@@ -151,7 +158,7 @@ async def test_selecting_emoji_emits_message():
         btn = app.query_one(EmojiButton)
         await pilot.click(btn)
 
-        # Pick the second item in the first row (🤵)
+        # Pick the first non-default item
         items = list(app.screen.query(MenuItem))
         target = [i for i in items if i.item_id != "none"][0]
         await pilot.click(target)

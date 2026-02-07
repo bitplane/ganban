@@ -18,7 +18,7 @@ from ganban.ui.edit.meta import (
     ListItemRow,
     MetaEditor,
     _parse_number,
-    _rename_node_key,
+    rename_node_key,
 )
 
 
@@ -78,7 +78,7 @@ def test_parse_number_float():
 
 def test_rename_node_key():
     node = Node(alpha="a", beta="b", gamma="c")
-    _rename_node_key(node, "beta", "bravo")
+    rename_node_key(node, "beta", "bravo")
     assert list(node.keys()) == ["alpha", "bravo", "gamma"]
     assert node.bravo == "b"
     assert node.beta is None

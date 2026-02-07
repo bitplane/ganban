@@ -53,7 +53,7 @@ class BoolToggle(Static):
         self.post_message(self.Changed(self._value))
 
 
-def _rename_node_key(node: Node, old_key: str, new_key: str) -> None:
+def rename_node_key(node: Node, old_key: str, new_key: str) -> None:
     """Rename a key in a Node's _children, preserving insertion order."""
     items = list(node.items())
     for key, _ in items:
@@ -579,7 +579,7 @@ class DictEditor(Vertical):
     def on_key_value_row_key_renamed(self, event: KeyValueRow.KeyRenamed) -> None:
         event.stop()
         self._suppressing = True
-        _rename_node_key(self.node, event.old_key, event.new_key)
+        rename_node_key(self.node, event.old_key, event.new_key)
         self._suppressing = False
 
     def on_key_value_row_delete_requested(self, event: KeyValueRow.DeleteRequested) -> None:

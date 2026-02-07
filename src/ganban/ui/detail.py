@@ -11,6 +11,7 @@ from ganban.model.node import Node
 from ganban.ui.color import ColorButton
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
+from ganban.ui.users import UsersEditor
 
 
 class TabButton(Static):
@@ -167,8 +168,10 @@ class BoardDetailModal(DetailModal):
                 with Horizontal(id="detail-tabs"):
                     yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
                     yield TabButton("\U0001f527", "tab-meta")
+                    yield TabButton("😃", "tab-users")
                     yield TabButton("\U0001f440", "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(self.board.sections, id="tab-doc")
                 yield MetaEditor(self.board.meta, id="tab-meta")
+                yield UsersEditor(self.board.meta, id="tab-users")
                 yield Static("Coming soon", id="tab-raw")
