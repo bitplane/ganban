@@ -304,20 +304,17 @@ class UsersEditor(Container):
         yield AddUserRow()
 
     def on_mount(self) -> None:
-        if self.meta._parent is not None and self.meta._key is not None:
-            self._unwatch = self.meta._parent.watch(self.meta._key, self._on_meta_changed)
+        self._unwatch = self.meta.watch("users", self._on_users_changed)
 
     def on_unmount(self) -> None:
         if self._unwatch is not None:
             self._unwatch()
             self._unwatch = None
 
-    def _on_meta_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
+    def _on_users_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
         if self._suppressing:
             return
-
-    def _set_suppressing(self, value: bool) -> None:
-        self._suppressing = value
+        self.call_later(self.recompose)
 
     def on_user_row_name_renamed(self, event: UserRow.NameRenamed) -> None:
         event.stop()
