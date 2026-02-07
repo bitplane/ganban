@@ -4,7 +4,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Button, Static
 
-from ganban.ui.edit import EditableText, TextEditor
+from ganban.ui.edit import EditableText, NumberEditor, TextEditor
 
 
 class EditableTextApp(App):
@@ -432,3 +432,106 @@ async def test_click_escape_click_edits_again(app):
         await pilot.pause()
 
         assert editable.value == "xyz"
+
+
+# --- NumberEditor ---
+
+
+class NumberEditorApp(App):
+    """Test app with a NumberEditor in EditableText."""
+
+    def __init__(self, initial_value: str = "42"):
+        super().__init__()
+        self.initial_value = initial_value
+        self.changes: list[tuple[str, str]] = []
+
+    def compose(self) -> ComposeResult:
+        yield Button("focus target", id="focus-target")
+        yield EditableText(
+            self.initial_value,
+            Static(self.initial_value),
+            NumberEditor(),
+            id="editable",
+        )
+
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+        self.changes.append((event.old_value, event.new_value))
+
+
+@pytest.mark.asyncio
+async def test_number_editor_accepts_integer():
+    app = NumberEditorApp("42")
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+        editor = editable.query_one("#edit", NumberEditor)
+        editor.select_all()
+        await pilot.press("1", "0", "0")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert editable.value == "100"
+        assert app.changes == [("42", "100")]
+
+
+@pytest.mark.asyncio
+async def test_number_editor_accepts_float():
+    app = NumberEditorApp("42")
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+        editor = editable.query_one("#edit", NumberEditor)
+        editor.select_all()
+        await pilot.press("3", ".", "1", "4")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert editable.value == "3.14"
+        assert app.changes == [("42", "3.14")]
+
+
+@pytest.mark.asyncio
+async def test_number_editor_accepts_negative():
+    app = NumberEditorApp("42")
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+        editor = editable.query_one("#edit", NumberEditor)
+        editor.select_all()
+        await pilot.press("-", "5")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert editable.value == "-5"
+
+
+@pytest.mark.asyncio
+async def test_number_editor_rejects_non_numeric():
+    app = NumberEditorApp("42")
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+        editor = editable.query_one("#edit", NumberEditor)
+        editor.select_all()
+        await pilot.press("a", "b", "c")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert editable.value == "42"
+        assert app.changes == []
+
+
+@pytest.mark.asyncio
+async def test_number_editor_accepts_empty():
+    """Empty string is accepted (allows clearing the value)."""
+    app = NumberEditorApp("42")
+    async with app.run_test() as pilot:
+        editable = app.query_one("#editable", EditableText)
+        editable.focus()
+        await pilot.pause()
+        editor = editable.query_one("#edit", NumberEditor)
+        editor.select_all()
+        await pilot.press("backspace")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert editable.value == ""

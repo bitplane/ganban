@@ -71,6 +71,18 @@ class TextEditor(BaseEditor):
         super().__init__(**kwargs)
 
 
+class NumberEditor(TextEditor):
+    """Single-line numeric editor. Validates input is a number on save."""
+
+    def _finish(self, save: bool) -> None:
+        if save and self.text.strip():
+            try:
+                float(self.text)
+            except ValueError:
+                save = False
+        super()._finish(save)
+
+
 class MarkdownEditor(BaseEditor):
     """Multi-line editor. Enter inserts newline."""
 
