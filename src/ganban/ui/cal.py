@@ -8,6 +8,8 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.ui.menu import ContextMenu
+
 
 def date_diff(target: date, reference: date) -> str:
     """Return compact string showing difference between dates.
@@ -251,8 +253,6 @@ class DateButton(Static):
 
     def on_click(self, event) -> None:
         event.stop()
-        from ganban.ui.menu import ContextMenu
-
         # Position at button, not mouse (for keyboard accessibility)
         x = self.region.x
         y = self.region.y + 1  # Below the button

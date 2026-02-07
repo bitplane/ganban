@@ -10,6 +10,7 @@ from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
 from ganban.model.writer import (
     MergeRequired,
+    _meta_to_dict,
     build_column_path,
     check_for_merge,
     check_remote_for_merge,
@@ -745,7 +746,6 @@ def test_create_column_saves(repo_with_ganban):
 
 def test_meta_to_dict_recursive():
     """Nested Node children are serialized to plain dicts."""
-    from ganban.model.writer import _meta_to_dict
 
     meta = Node(
         simple="value",
@@ -765,7 +765,6 @@ def test_meta_to_dict_recursive():
 
 def test_meta_to_dict_preserves_flat():
     """Non-nested meta round-trips correctly."""
-    from ganban.model.writer import _meta_to_dict
 
     meta = Node(tags=["a", "b"], priority=1)
     result = _meta_to_dict(meta)
@@ -774,7 +773,6 @@ def test_meta_to_dict_preserves_flat():
 
 def test_meta_to_dict_empty():
     """Empty Node returns empty dict."""
-    from ganban.model.writer import _meta_to_dict
 
     assert _meta_to_dict(Node()) == {}
     assert _meta_to_dict({}) == {}
