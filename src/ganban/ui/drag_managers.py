@@ -47,6 +47,11 @@ class DragGhost(Static):
 
         yield CardWidget(self._card.card_id, self._card.board)
 
+    def on_mount(self) -> None:
+        from ganban.ui.card import CardWidget
+
+        self.query_one(CardWidget).focus()
+
 
 class ColumnPlaceholder(Static):
     """Placeholder showing where a dragged column will drop."""
@@ -81,6 +86,7 @@ class CardDragManager:
 
     def start(self, card: CardWidget, mouse_offset: Offset) -> None:
         self.dragging = card
+        self.screen.set_focus(None)
         card.add_class("dragging")
 
         card_region = card.region
@@ -176,19 +182,29 @@ class CardDragManager:
         card = self.dragging
         target_col_widget = self.target_column
         target_column = target_col_widget.column
-
         source_column = card._find_column()
-        if source_column:
-            links = list(source_column.links)
-            links.remove(card.card_id)
-            source_column.links = links
-
         actual_pos = self._calculate_model_position(target_col_widget)
-        links = list(target_column.links)
-        links.insert(actual_pos, card.card_id)
-        target_column.links = links
+
+        card_id = card.card_id
+
+        if source_column is target_column:
+            # Same column: single atomic update to avoid the watcher
+            # removing the card widget between remove and re-insert.
+            links = list(source_column.links)
+            links.remove(card_id)
+            links.insert(actual_pos, card_id)
+            source_column.links = links
+        else:
+            if source_column:
+                links = list(source_column.links)
+                links.remove(card_id)
+                source_column.links = links
+            links = list(target_column.links)
+            links.insert(actual_pos, card_id)
+            target_column.links = links
 
         self._cleanup()
+        target_col_widget.call_after_refresh(target_col_widget._refocus_card, target_col_widget, card_id)
 
     def _calculate_model_position(self, column: ColumnWidget) -> int:
         from ganban.ui.card import CardWidget
