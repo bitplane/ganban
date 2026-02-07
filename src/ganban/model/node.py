@@ -134,19 +134,27 @@ class ListNode:
     def __getitem__(self, key: str) -> Any:
         return self._by_id.get(str(key))
 
+    def _key_index(self, key: str) -> int:
+        """Find the index of a key in insertion order."""
+        for i, k in enumerate(self._by_id):
+            if k == key:
+                return i
+        raise KeyError(key)
+
     def __setitem__(self, key: str, value: Any) -> None:
         key = str(key)
         old = self._by_id.get(key)
         if value is None:
             if old is not None:
-                self._items.remove(old)
+                idx = self._key_index(key)
+                del self._items[idx]
                 del self._by_id[key]
             self._version += 1
             _emit(self, key, old, None)
         else:
             value = _wrap(value, parent=self, key=key)
             if old is not None:
-                idx = self._items.index(old)
+                idx = self._key_index(key)
                 self._items[idx] = value
             else:
                 self._items.append(value)
