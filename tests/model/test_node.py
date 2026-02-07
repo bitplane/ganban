@@ -248,6 +248,28 @@ def test_list_node_replace_keeps_position():
     assert names == ["Backlog", "In Progress", "Done"]
 
 
+def test_list_node_delete_with_duplicate_values():
+    """Deleting a key works correctly when multiple keys have the same value."""
+    lst = ListNode()
+    lst["a"] = "same"
+    lst["b"] = "same"
+    lst["c"] = "different"
+    lst["a"] = None
+    assert lst.keys() == ["b", "c"]
+    assert list(lst) == ["same", "different"]
+
+
+def test_list_node_replace_with_duplicate_values():
+    """Replacing a key works correctly when multiple keys have the same value."""
+    lst = ListNode()
+    lst["a"] = "same"
+    lst["b"] = "same"
+    lst["c"] = "other"
+    lst["b"] = "updated"
+    assert lst.keys() == ["a", "b", "c"]
+    assert list(lst) == ["same", "updated", "other"]
+
+
 def test_list_node_auto_wrap():
     lst = ListNode()
     lst["1"] = {"name": "Backlog"}
@@ -371,3 +393,166 @@ def test_board_like_tree():
     assert len(card_events) == 1
     assert card_events[0] == ("title", "Fixed bug")
     assert len(column_events) == 1  # unchanged
+
+
+# --- Node.update ---
+
+
+def test_node_update_adds_keys():
+    node = Node(a="1")
+    other = Node(a="1", b="2")
+    node.update(other)
+    assert node.b == "2"
+
+
+def test_node_update_deletes_keys():
+    node = Node(a="1", b="2")
+    other = Node(a="1")
+    node.update(other)
+    assert node.b is None
+    assert "b" not in node
+
+
+def test_node_update_changes_values():
+    node = Node(a="1")
+    other = Node(a="2")
+    node.update(other)
+    assert node.a == "2"
+
+
+def test_node_update_skips_equal_values():
+    events = []
+    node = Node(a="1")
+    node.watch("a", lambda n, k, old, new: events.append(1))
+    other = Node(a="1")
+    node.update(other)
+    assert len(events) == 0
+
+
+def test_node_update_recurses_into_child_nodes():
+    node = Node()
+    node.meta = {"color": "red"}
+    original_meta = node.meta
+    other = Node()
+    other.meta = {"color": "blue"}
+    node.update(other)
+    assert node.meta is original_meta
+    assert node.meta.color == "blue"
+
+
+def test_node_update_preserves_watchers_on_children():
+    events = []
+    node = Node()
+    node.meta = {"color": "red"}
+    node.meta.watch("color", lambda n, k, old, new: events.append((old, new)))
+    other = Node()
+    other.meta = {"color": "blue"}
+    node.update(other)
+    assert events == [("red", "blue")]
+
+
+def test_node_update_replaces_type_mismatch():
+    """When old is a Node but new is a scalar (or vice versa), replace."""
+    node = Node()
+    node.meta = {"color": "red"}
+    other = Node(meta="raw string")
+    node.update(other)
+    assert node.meta == "raw string"
+
+
+def test_node_update_fires_watchers_for_changes():
+    events = []
+    node = Node(a="1", b="2")
+    node.watch("a", lambda n, k, old, new: events.append(("a", old, new)))
+    node.watch("b", lambda n, k, old, new: events.append(("b", old, new)))
+    other = Node(a="1", b="3")
+    node.update(other)
+    assert events == [("b", "2", "3")]
+
+
+# --- ListNode.update ---
+
+
+def test_list_node_update_adds_keys():
+    lst = ListNode()
+    lst["a"] = "one"
+    other = ListNode()
+    other["a"] = "one"
+    other["b"] = "two"
+    lst.update(other)
+    assert lst.keys() == ["a", "b"]
+    assert list(lst) == ["one", "two"]
+
+
+def test_list_node_update_deletes_keys():
+    lst = ListNode()
+    lst["a"] = "one"
+    lst["b"] = "two"
+    other = ListNode()
+    other["a"] = "one"
+    lst.update(other)
+    assert lst.keys() == ["a"]
+    assert list(lst) == ["one"]
+
+
+def test_list_node_update_reorders():
+    lst = ListNode()
+    lst["a"] = "one"
+    lst["b"] = "two"
+    lst["c"] = "three"
+    other = ListNode()
+    other["c"] = "three"
+    other["a"] = "one"
+    other["b"] = "two"
+    lst.update(other)
+    assert lst.keys() == ["c", "a", "b"]
+    assert list(lst) == ["three", "one", "two"]
+
+
+def test_list_node_update_recurses_into_child_nodes():
+    lst = ListNode()
+    lst["a"] = {"name": "Backlog"}
+    original = lst["a"]
+    other = ListNode()
+    other["a"] = {"name": "Archive"}
+    lst.update(other)
+    assert lst["a"] is original
+    assert lst["a"].name == "Archive"
+
+
+def test_list_node_update_preserves_watchers():
+    events = []
+    lst = ListNode()
+    lst["a"] = {"name": "Backlog"}
+    lst["a"].watch("name", lambda n, k, old, new: events.append((old, new)))
+    other = ListNode()
+    other["a"] = {"name": "Archive"}
+    lst.update(other)
+    assert events == [("Backlog", "Archive")]
+
+
+def test_list_node_update_skips_equal_values():
+    events = []
+    lst = ListNode()
+    lst["a"] = "one"
+    lst.watch("a", lambda n, k, old, new: events.append(1))
+    other = ListNode()
+    other["a"] = "one"
+    lst.update(other)
+    assert len(events) == 0
+
+
+def test_list_node_update_emits_on_reorder():
+    events = []
+    root = Node()
+    root.things = ListNode(_parent=root, _key="things")
+    root.things["a"] = "one"
+    root.things["b"] = "two"
+    root.watch("things", lambda n, k, old, new: events.append(k))
+    other = ListNode()
+    other["b"] = "two"
+    other["a"] = "one"
+    root.things.update(other)
+    assert root.things.keys() == ["b", "a"]
+    assert len(events) == 1
+    assert events[0] == "*"

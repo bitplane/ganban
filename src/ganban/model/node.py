@@ -104,6 +104,24 @@ class Node:
             current = current._parent
         return ".".join(reversed(parts))
 
+    def update(self, other: Node) -> None:
+        """Update this node in-place to match other, preserving watchers."""
+        existing_keys = set(self.keys())
+        other_keys = set(other.keys())
+        for key in existing_keys - other_keys:
+            setattr(self, key, None)
+        for key in other_keys:
+            old_value = self._children.get(key)
+            new_value = other._children.get(key)
+            if isinstance(old_value, Node) and isinstance(new_value, Node):
+                old_value.update(new_value)
+            elif isinstance(old_value, ListNode) and isinstance(new_value, ListNode):
+                old_value.update(new_value)
+            elif old_value == new_value:
+                continue
+            else:
+                setattr(self, key, new_value)
+
     def __repr__(self) -> str:
         p = self.path
         keys = ", ".join(self._children.keys())
@@ -194,6 +212,38 @@ class ListNode:
     def items(self):
         """Return ordered (key, value) pairs."""
         return list(zip(self._by_id.keys(), self._items))
+
+    def update(self, other: ListNode) -> None:
+        """Update this list in-place to match other, preserving watchers."""
+        existing_keys = set(self._by_id.keys())
+        other_keys = set(other._by_id.keys())
+        # Delete removed keys
+        for key in existing_keys - other_keys:
+            self[key] = None
+        # Update matching keys, add new keys
+        for key in other._by_id:
+            old_value = self._by_id.get(key)
+            new_value = other._by_id.get(key)
+            if old_value is None:
+                self[key] = new_value
+            elif isinstance(old_value, Node) and isinstance(new_value, Node):
+                old_value.update(new_value)
+            elif isinstance(old_value, ListNode) and isinstance(new_value, ListNode):
+                old_value.update(new_value)
+            elif old_value == new_value:
+                continue
+            else:
+                self[key] = new_value
+        # Reorder to match other
+        old_keys = self.keys()
+        new_keys = list(other._by_id.keys())
+        if old_keys != new_keys:
+            new_by_id = {k: self._by_id[k] for k in new_keys}
+            new_items = [new_by_id[k] for k in new_keys]
+            object.__setattr__(self, "_by_id", new_by_id)
+            object.__setattr__(self, "_items", new_items)
+            self._version += 1
+            _emit(self, "*", old_keys, new_keys)
 
     def __repr__(self) -> str:
         p = self.path
