@@ -32,7 +32,10 @@ class _FocusableView(Container):
     def on_focus(self) -> None:
         parent = self._get_editable_parent()
         if parent and not parent._skip_next_focus:
-            parent._start_edit()
+            if parent.is_mounted:
+                parent._start_edit()
+            else:
+                parent.call_after_refresh(parent._start_edit)
         if parent:
             parent._skip_next_focus = False
 
