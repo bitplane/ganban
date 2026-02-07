@@ -7,6 +7,7 @@ from textual.app import App, ComposeResult
 
 from ganban.model.node import Node
 from ganban.ui.cal import Calendar, CalendarDay
+from ganban.ui.constants import ICON_DELETE
 from ganban.ui.due import DueDateLabel, DueDateWidget
 from ganban.ui.menu import ContextMenu, MenuItem
 
@@ -113,7 +114,7 @@ async def test_hover_shows_delete_icon():
         assert label.content == "5d"
 
         await pilot.hover(DueDateLabel)
-        assert label.content == "🚫"
+        assert label.content == ICON_DELETE
 
         # Move mouse away - label restores
         await pilot.hover(DueDateWidget, offset=(0, 0))
