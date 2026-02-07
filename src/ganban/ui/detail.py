@@ -8,6 +8,7 @@ from textual.screen import ModalScreen
 from textual.widgets import ContentSwitcher, Static
 
 from ganban.model.node import Node
+from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.color import ColorButton
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
@@ -109,15 +110,18 @@ class DetailModal(ModalScreen[None]):
 class CardDetailModal(DetailModal):
     """Modal screen showing full card details."""
 
-    def __init__(self, card: Node) -> None:
+    def __init__(self, card: Node, board: Node | None = None) -> None:
         super().__init__()
         self.card = card
+        self.board = board
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
             yield DocHeader(self.card.sections)
             with Horizontal(id="detail-bar"):
                 yield DueDateWidget(self.card.meta)
+                if self.board:
+                    yield AssigneeWidget(self.card.meta, self.board)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton("\U0001f4dd", "tab-doc", classes="-active")
                     yield TabButton("\U0001f527", "tab-meta")

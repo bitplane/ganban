@@ -108,7 +108,7 @@ class CardWidget(DraggableMixin, Static):
 
     def draggable_clicked(self, click_pos: Offset) -> None:
         card = self.board.cards[self.card_id]
-        self.app.push_screen(CardDetailModal(card))
+        self.app.push_screen(CardDetailModal(card, self.board))
 
     def _find_column(self) -> Node | None:
         """Find the column containing this card."""
@@ -145,7 +145,7 @@ class CardWidget(DraggableMixin, Static):
         match item.item_id:
             case "edit":
                 card = self.board.cards[self.card_id]
-                self.app.push_screen(CardDetailModal(card))
+                self.app.push_screen(CardDetailModal(card, self.board))
             case "delete":
                 self._delete_card()
             case s if s and s.startswith("move:"):

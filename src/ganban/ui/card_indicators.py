@@ -7,7 +7,7 @@ from rich.text import Text
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
 from ganban.ui.cal import date_diff
-from ganban.ui.emoji import resolve_email_emoji
+from ganban.ui.emoji import parse_committer, resolve_email_emoji
 
 
 def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = None) -> Text:
@@ -22,7 +22,8 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
     # Assignee indicator
     assigned = meta.assigned if meta else None
     if assigned and board_meta:
-        parts.append(Text(resolve_email_emoji(assigned, board_meta)))
+        _, _, email = parse_committer(assigned)
+        parts.append(Text(resolve_email_emoji(email, board_meta)))
 
     # Body indicator
     body = first_body(sections)
