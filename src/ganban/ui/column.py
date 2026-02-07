@@ -18,9 +18,10 @@ from ganban.ui.drag import DraggableMixin
 from ganban.ui.edit.document import _rename_first_key
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
+from ganban.ui.watcher import NodeWatcherMixin
 
 
-class ColumnWidget(DraggableMixin, Vertical):
+class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
     """A single column on the board."""
 
     DEFAULT_CSS = """
@@ -82,6 +83,7 @@ class ColumnWidget(DraggableMixin, Vertical):
             self.column_widget = column_widget
 
     def __init__(self, column: Node, board: Node):
+        self._init_watcher()
         Vertical.__init__(self)
         self._init_draggable()
         self.column = column
@@ -131,8 +133,8 @@ class ColumnWidget(DraggableMixin, Vertical):
 
     def on_mount(self) -> None:
         self._apply_color()
-        self._unwatch_sections = self.column.watch("sections", self._on_sections_changed)
-        self._unwatch_meta = self.column.watch("meta", self._on_meta_changed)
+        self.node_watch(self.column, "sections", self._on_sections_changed)
+        self.node_watch(self.column, "meta", self._on_meta_changed)
 
     def _on_meta_changed(self, node, key, old, new) -> None:
         """Re-apply color when meta changes."""

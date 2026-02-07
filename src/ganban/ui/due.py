@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import date
 
 from textual.app import ComposeResult
@@ -13,6 +12,7 @@ from ganban.model.node import Node
 from ganban.ui.cal import DateButton, date_diff
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.constants import ICON_CALENDAR
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 class DueDateLabel(Horizontal):
@@ -53,7 +53,7 @@ class DueDateLabel(Horizontal):
             text_widget.display = bool(text_widget.render())
 
 
-class DueDateWidget(Container):
+class DueDateWidget(NodeWatcherMixin, Container):
     """Inline due date display with calendar picker.
 
     Reads and writes ``meta.due`` on the given Node directly,
@@ -76,10 +76,9 @@ class DueDateWidget(Container):
     """
 
     def __init__(self, meta: Node, **kwargs) -> None:
+        self._init_watcher()
         super().__init__(**kwargs)
         self.meta = meta
-        self._unwatch: Callable | None = None
-        self._suppressing: bool = False
 
     @property
     def due(self) -> date | None:
@@ -97,17 +96,10 @@ class DueDateWidget(Container):
             yield DueDateLabel(id="due-label")
 
     def on_mount(self) -> None:
-        self._unwatch = self.meta.watch("due", self._on_due_changed)
+        self.node_watch(self.meta, "due", self._on_due_changed)
         self._update_label()
 
-    def on_unmount(self) -> None:
-        if self._unwatch is not None:
-            self._unwatch()
-            self._unwatch = None
-
     def _on_due_changed(self, node, key, old, new) -> None:
-        if self._suppressing:
-            return
         self.call_later(self._update_label)
 
     def _update_label(self) -> None:
@@ -124,9 +116,8 @@ class DueDateWidget(Container):
             self.set_class(False, "has-due")
 
     def _set_due(self, value: date | None) -> None:
-        self._suppressing = True
-        self.meta.due = value.isoformat() if value else None
-        self._suppressing = False
+        with self.suppressing():
+            self.meta.due = value.isoformat() if value else None
         self._update_label()
 
     def on_date_button_date_selected(self, event: DateButton.DateSelected) -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from textual.app import ComposeResult
@@ -18,6 +17,7 @@ from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.meta import rename_node_key
 from ganban.ui.edit.viewers import TextViewer
 from ganban.ui.emoji import EmojiButton
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 class EmailTag(Horizontal):
@@ -260,8 +260,8 @@ class AddUserRow(Static):
         self.post_message(self.UserAdded())
 
 
-class UsersEditor(Container):
-    """Editor for board.meta.users — a dict of display name → user info."""
+class UsersEditor(NodeWatcherMixin, Container):
+    """Editor for board.meta.users -- a dict of display name -> user info."""
 
     DEFAULT_CSS = """
     UsersEditor {
@@ -272,10 +272,9 @@ class UsersEditor(Container):
     """
 
     def __init__(self, meta: Node, **kwargs) -> None:
+        self._init_watcher()
         super().__init__(**kwargs)
         self.meta = meta
-        self._unwatch: Callable | None = None
-        self._suppressing: bool = False
 
     def _ensure_users(self) -> Node:
         """Create meta.users = {} if missing, return the users node."""
@@ -304,47 +303,36 @@ class UsersEditor(Container):
         yield AddUserRow()
 
     def on_mount(self) -> None:
-        self._unwatch = self.meta.watch("users", self._on_users_changed)
-
-    def on_unmount(self) -> None:
-        if self._unwatch is not None:
-            self._unwatch()
-            self._unwatch = None
+        self.node_watch(self.meta, "users", self._on_users_changed)
 
     def _on_users_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
-        if self._suppressing:
-            return
         self.call_later(self.recompose)
 
     def on_user_row_name_renamed(self, event: UserRow.NameRenamed) -> None:
         event.stop()
         users = self._ensure_users()
-        self._suppressing = True
-        rename_node_key(users, event.old, event.new)
-        self._suppressing = False
+        with self.suppressing():
+            rename_node_key(users, event.old, event.new)
 
     def on_user_row_emoji_changed(self, event: UserRow.EmojiChanged) -> None:
         event.stop()
         users = self._ensure_users()
         user = getattr(users, event.name)
-        self._suppressing = True
-        user.emoji = event.emoji
-        self._suppressing = False
+        with self.suppressing():
+            user.emoji = event.emoji
 
     def on_user_row_emails_changed(self, event: UserRow.EmailsChanged) -> None:
         event.stop()
         users = self._ensure_users()
         user = getattr(users, event.name)
-        self._suppressing = True
-        user.emails = event.emails
-        self._suppressing = False
+        with self.suppressing():
+            user.emails = event.emails
 
     def on_user_row_delete_requested(self, event: UserRow.DeleteRequested) -> None:
         event.stop()
         users = self._ensure_users()
-        self._suppressing = True
-        setattr(users, event.name, None)
-        self._suppressing = False
+        with self.suppressing():
+            setattr(users, event.name, None)
         for row in self.query(UserRow):
             if row.user_name == event.name:
                 row.remove()
@@ -354,9 +342,8 @@ class UsersEditor(Container):
         event.stop()
         users = self._ensure_users()
         name = self._unique_name()
-        self._suppressing = True
-        setattr(users, name, {"emails": []})
-        self._suppressing = False
+        with self.suppressing():
+            setattr(users, name, {"emails": []})
         user_node = getattr(users, name)
         row = UserRow(name, user_node)
         self.mount(row, before=self.query_one(AddUserRow))

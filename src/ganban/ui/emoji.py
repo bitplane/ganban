@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Callable
 from typing import Any
 
 from textual.message import Message
@@ -12,6 +11,7 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
+from ganban.ui.watcher import NodeWatcherMixin
 
 EMOJIS: list[list[str]] = [
     ["🙂", "🧑", "🤵", "👳", "👲"],
@@ -138,7 +138,7 @@ def resolve_email_emoji(email: str, meta: Node) -> str:
     return emoji_for_email(email)
 
 
-class EmailEmoji(Static):
+class EmailEmoji(NodeWatcherMixin, Static):
     """Display-only emoji resolved from an email address.
 
     Watches meta.users so it updates when custom emojis change.
@@ -151,16 +151,11 @@ class EmailEmoji(Static):
     def __init__(self, email: str, meta: Node, **kwargs) -> None:
         self._email = email
         self._meta = meta
-        self._unwatch: Callable | None = None
+        self._init_watcher()
         super().__init__(resolve_email_emoji(email, meta), **kwargs)
 
     def on_mount(self) -> None:
-        self._unwatch = self._meta.watch("users", self._on_users_changed)
-
-    def on_unmount(self) -> None:
-        if self._unwatch is not None:
-            self._unwatch()
-            self._unwatch = None
+        self.node_watch(self._meta, "users", self._on_users_changed)
 
     def _on_users_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
         self.update(resolve_email_emoji(self._email, self._meta))

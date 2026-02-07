@@ -16,9 +16,10 @@ from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.edit.document import _rename_first_key
 from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.watcher import NodeWatcherMixin
 
 
-class BoardScreen(Screen):
+class BoardScreen(NodeWatcherMixin, Screen):
     """Main board screen showing all columns."""
 
     BINDINGS = [
@@ -46,6 +47,7 @@ class BoardScreen(Screen):
     """
 
     def __init__(self, board: Node):
+        self._init_watcher()
         super().__init__()
         self.board = board
         self._card_drag = CardDragManager(self)
@@ -63,7 +65,7 @@ class BoardScreen(Screen):
             yield AddColumn(self.board)
 
     def on_mount(self) -> None:
-        self._unwatch_sections = self.board.watch("sections", self._on_board_sections_changed)
+        self.node_watch(self.board, "sections", self._on_board_sections_changed)
 
     def _on_board_sections_changed(self, node, key, old, new) -> None:
         """Update board header when title changes."""

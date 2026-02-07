@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from textual.app import ComposeResult
@@ -15,6 +14,7 @@ from ganban.ui.confirm import ConfirmButton
 from ganban.ui.constants import ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, find_user_by_email, parse_committer
 from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
@@ -120,7 +120,7 @@ class AssigneeButton(Static):
             self.post_message(self.AssigneeSelected(item.item_id))
 
 
-class AssigneeWidget(Container):
+class AssigneeWidget(NodeWatcherMixin, Container):
     """Inline assignee display with user picker.
 
     Reads and writes ``meta.assigned`` on the given card meta Node,
@@ -140,11 +140,10 @@ class AssigneeWidget(Container):
     """
 
     def __init__(self, meta: Node, board: Node, **kwargs) -> None:
+        self._init_watcher()
         super().__init__(**kwargs)
         self.meta = meta
         self.board = board
-        self._unwatch: Callable | None = None
-        self._suppressing: bool = False
 
     def compose(self) -> ComposeResult:
         assigned = self.meta.assigned
@@ -157,17 +156,10 @@ class AssigneeWidget(Container):
             yield AssigneeLabel(id="assignee-label")
 
     def on_mount(self) -> None:
-        self._unwatch = self.meta.watch("assigned", self._on_assigned_changed)
+        self.node_watch(self.meta, "assigned", self._on_assigned_changed)
         self._update_label()
 
-    def on_unmount(self) -> None:
-        if self._unwatch is not None:
-            self._unwatch()
-            self._unwatch = None
-
     def _on_assigned_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
-        if self._suppressing:
-            return
         self.call_later(self._update_label)
 
     def _update_label(self) -> None:
@@ -183,9 +175,8 @@ class AssigneeWidget(Container):
             label.set_label("")
 
     def _set_assigned(self, value: str | None) -> None:
-        self._suppressing = True
-        self.meta.assigned = value
-        self._suppressing = False
+        with self.suppressing():
+            self.meta.assigned = value
         self._update_label()
 
     def on_assignee_button_assignee_selected(self, event: AssigneeButton.AssigneeSelected) -> None:

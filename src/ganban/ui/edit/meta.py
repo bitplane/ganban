@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from textual.app import ComposeResult
@@ -18,6 +17,7 @@ from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import NumberEditor, TextEditor
 from ganban.ui.edit.viewers import TextViewer
 from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 class BoolToggle(Static):
@@ -514,7 +514,7 @@ class AddKeyRow(Container):
 # --- Dict editor ---
 
 
-class DictEditor(Vertical):
+class DictEditor(NodeWatcherMixin, Vertical):
     """Renders a Node's children as KeyValueRows + AddKeyRow."""
 
     DEFAULT_CSS = """
@@ -526,10 +526,9 @@ class DictEditor(Vertical):
     """
 
     def __init__(self, node: Node, **kwargs) -> None:
+        self._init_watcher()
         super().__init__(**kwargs)
         self.node = node
-        self._unwatch: Callable | None = None
-        self._suppressing: bool = False
 
     def compose(self) -> ComposeResult:
         for key, value in self.node.items():
@@ -538,16 +537,11 @@ class DictEditor(Vertical):
 
     def on_mount(self) -> None:
         if self.node._parent is not None and self.node._key is not None:
-            self._unwatch = self.node._parent.watch(self.node._key, self._on_node_changed)
-
-    def on_unmount(self) -> None:
-        if self._unwatch is not None:
-            self._unwatch()
-            self._unwatch = None
+            self.node_watch(self.node._parent, self.node._key, self._on_node_changed)
 
     def _on_node_changed(self, source_node, key, old, new) -> None:
         """React to model changes that bubbled up through our node."""
-        if self._suppressing or source_node is not self.node:
+        if source_node is not self.node:
             return
         self.call_later(self._sync_row, key, new)
 
@@ -576,9 +570,8 @@ class DictEditor(Vertical):
 
     def _set_node(self, key: str, value: Any) -> None:
         """Set a value on the node with change suppression."""
-        self._suppressing = True
-        setattr(self.node, key, value)
-        self._suppressing = False
+        with self.suppressing():
+            setattr(self.node, key, value)
 
     def on_key_value_row_value_changed(self, event: KeyValueRow.ValueChanged) -> None:
         event.stop()
@@ -586,9 +579,8 @@ class DictEditor(Vertical):
 
     def on_key_value_row_key_renamed(self, event: KeyValueRow.KeyRenamed) -> None:
         event.stop()
-        self._suppressing = True
-        rename_node_key(self.node, event.old_key, event.new_key)
-        self._suppressing = False
+        with self.suppressing():
+            rename_node_key(self.node, event.old_key, event.new_key)
 
     def on_key_value_row_delete_requested(self, event: KeyValueRow.DeleteRequested) -> None:
         event.stop()

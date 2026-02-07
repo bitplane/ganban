@@ -14,6 +14,7 @@ from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 def _card_title(board: Node, card_id: str) -> str:
@@ -24,7 +25,7 @@ def _card_title(board: Node, card_id: str) -> str:
     return first_title(card.sections) or card_id
 
 
-class CardWidget(DraggableMixin, Static):
+class CardWidget(NodeWatcherMixin, DraggableMixin, Static):
     """A single card in a column."""
 
     class MoveRequested(Message):
@@ -66,6 +67,7 @@ class CardWidget(DraggableMixin, Static):
     """
 
     def __init__(self, card_id: str, board: Node):
+        self._init_watcher()
         Static.__init__(self)
         self._init_draggable()
         self.card_id = card_id
@@ -79,16 +81,11 @@ class CardWidget(DraggableMixin, Static):
 
     def on_mount(self) -> None:
         card = self.board.cards[self.card_id]
-        self._unwatch_sections = card.watch("sections", self._on_card_changed)
-        self._unwatch_meta = card.watch("meta", self._on_card_changed)
-        self._unwatch_users = self.board.meta.watch("users", self._on_card_changed) if self.board.meta else None
+        self.node_watch(card, "sections", self._on_card_changed)
+        self.node_watch(card, "meta", self._on_card_changed)
+        if self.board.meta:
+            self.node_watch(self.board.meta, "users", self._on_card_changed)
         self._refresh_indicators()
-
-    def on_unmount(self) -> None:
-        self._unwatch_sections()
-        self._unwatch_meta()
-        if self._unwatch_users:
-            self._unwatch_users()
 
     def _on_card_changed(self, node, key, old, new) -> None:
         """Update card display when sections or meta change."""
