@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal
 from textual.geometry import Offset
 from textual.widgets import Static
 
@@ -72,7 +72,7 @@ class CardDragManager:
         self.overlay: DragGhost | None = None
         self.placeholder: CardPlaceholder | None = None
         self.drag_offset: Offset = Offset(0, 0)
-        self.target_scroll: VerticalScroll | None = None
+        self.target_column: ColumnWidget | None = None
         self.insert_before: Static | None = None
 
     @property
@@ -117,13 +117,12 @@ class CardDragManager:
         if not column_widget:
             return
 
-        scroll = column_widget.query_one(VerticalScroll)
-        insert_before = self._calculate_insert_position(scroll, screen_y)
+        insert_before = self._calculate_insert_position(column_widget, screen_y)
 
-        self.target_scroll = scroll
+        self.target_column = column_widget
         self.insert_before = insert_before
 
-        self._move_placeholder(scroll, insert_before)
+        self._move_placeholder(column_widget, insert_before)
 
     def _find_nearest_column(self, screen_x: int) -> ColumnWidget | None:
         from ganban.ui.column import ColumnWidget
@@ -142,11 +141,11 @@ class CardDragManager:
 
         return min(columns, key=column_distance)
 
-    def _calculate_insert_position(self, scroll: VerticalScroll, screen_y: int) -> Static:
+    def _calculate_insert_position(self, column: ColumnWidget, screen_y: int) -> Static:
         from ganban.ui.card import AddCard, CardWidget
 
-        add_widget = scroll.query_one(AddCard)
-        visible_cards = [c for c in scroll.children if isinstance(c, CardWidget) and c is not self.dragging]
+        add_widget = column.query_one(AddCard)
+        visible_cards = [c for c in column.children if isinstance(c, CardWidget) and c is not self.dragging]
 
         for card in visible_cards:
             card_mid_y = card.region.y + card.region.height // 2
@@ -154,21 +153,21 @@ class CardDragManager:
                 return card
         return add_widget
 
-    def _move_placeholder(self, scroll: VerticalScroll, insert_before: Static) -> None:
-        if self.placeholder.parent is scroll:
-            children = list(scroll.children)
+    def _move_placeholder(self, column: ColumnWidget, insert_before: Static) -> None:
+        if self.placeholder.parent is column:
+            children = list(column.children)
             placeholder_idx = children.index(self.placeholder)
             insert_idx = children.index(insert_before)
             if placeholder_idx + 1 == insert_idx:
                 return
-            scroll.move_child(self.placeholder, before=insert_before)
+            column.move_child(self.placeholder, before=insert_before)
         else:
             if self.placeholder.parent is not None:
                 self.placeholder.remove()
-            scroll.mount(self.placeholder, before=insert_before)
+            column.mount(self.placeholder, before=insert_before)
 
     def finish(self) -> None:
-        if not self.dragging or not self.target_scroll:
+        if not self.dragging or not self.target_column:
             self.cancel()
             return
 
@@ -177,9 +176,9 @@ class CardDragManager:
         from ganban.ui.card import CardWidget
 
         card = self.dragging
-        target_scroll = self.target_scroll
+        target_col_widget = self.target_column
         insert_before = self.insert_before
-        target_column = target_scroll.parent.column
+        target_column = target_col_widget.column
 
         source_column = card._find_column()
         if source_column:
@@ -188,22 +187,22 @@ class CardDragManager:
                 links.remove(card.card_id)
                 source_column.links = links
 
-        actual_pos = self._calculate_model_position(target_scroll, insert_before, card)
+        actual_pos = self._calculate_model_position(target_col_widget, insert_before, card)
         links = list(target_column.links)
         links.insert(actual_pos, card.card_id)
         target_column.links = links
 
         new_card = CardWidget(card.card_id, self.screen.board)
-        target_scroll.mount(new_card, before=insert_before)
+        target_col_widget.mount(new_card, before=insert_before)
         card.remove()
 
         self._cleanup()
 
-    def _calculate_model_position(self, scroll: VerticalScroll, insert_before: Static, card: CardWidget) -> int:
+    def _calculate_model_position(self, column: ColumnWidget, insert_before: Static, card: CardWidget) -> int:
         from ganban.ui.card import CardWidget
 
         pos = 0
-        for c in scroll.children:
+        for c in column.children:
             if c is insert_before:
                 break
             if isinstance(c, CardWidget) and c is not card:
@@ -227,7 +226,7 @@ class CardDragManager:
         self.dragging = None
         self.placeholder = None
         self.overlay = None
-        self.target_scroll = None
+        self.target_column = None
         self.insert_before = None
 
 

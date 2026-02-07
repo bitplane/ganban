@@ -1,7 +1,7 @@
 """Column widgets for ganban UI."""
 
 from textual.app import ComposeResult
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Vertical
 from textual.geometry import Offset
 from textual.message import Message
 from textual.color import Color, ColorParseError
@@ -27,7 +27,8 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
     DEFAULT_CSS = """
     ColumnWidget {
         width: 1fr;
-        height: 100%;
+        height: auto;
+        min-height: 100%;
         min-width: 25;
         max-width: 25;
         padding: 0 1;
@@ -45,10 +46,6 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
     }
     ColumnWidget > Rule.-horizontal {
         margin: 0;
-    }
-    .column-body {
-        width: 100%;
-        height: 1fr;
     }
     """
 
@@ -93,10 +90,9 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         name = first_title(self.column.sections)
         yield EditableText(name, Static(name), TextEditor(), id="column-title")
         yield Rule()
-        with VerticalScroll(classes="column-body", can_focus=False):
-            for card_id in self.column.links:
-                yield CardWidget(card_id, self.board)
-            yield AddCard(self.column, self.board)
+        for card_id in self.column.links:
+            yield CardWidget(card_id, self.board)
+        yield AddCard(self.column, self.board)
 
     def draggable_drag_started(self, mouse_pos: Offset) -> None:
         self.post_message(self.DragStarted(self, mouse_pos))
@@ -130,6 +126,14 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
 
             menu = ContextMenu(items, event.screen_x, event.screen_y)
             self.app.push_screen(menu, self._on_menu_closed)
+
+    def on_mouse_move(self, event) -> None:
+        """Focus the child widget under the mouse cursor."""
+        for child in self.children:
+            if child.can_focus and child.region.contains(event.screen_x, event.screen_y):
+                if child is not self.screen.focused:
+                    child.focus()
+                return
 
     def on_mount(self) -> None:
         self._apply_color()

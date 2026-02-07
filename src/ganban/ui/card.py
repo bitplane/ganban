@@ -82,9 +82,6 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         yield PlainStatic(self.title or self.card_id, id="card-title")
         yield PlainStatic(id="card-footer")
 
-    def on_enter(self) -> None:
-        self.focus()
-
     def on_mount(self) -> None:
         card = self.board.cards[self.card_id]
         self.node_watch(card, "sections", self._on_card_changed)
@@ -201,9 +198,6 @@ class AddCard(Static, can_focus=True):
 
     def compose(self) -> ComposeResult:
         yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
-    def on_enter(self) -> None:
-        self.focus()
 
     def on_click(self, event) -> None:
         if event.button == 3:

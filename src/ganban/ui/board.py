@@ -1,7 +1,7 @@
 """Board screen showing kanban columns and cards."""
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Static
 
@@ -42,7 +42,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
     #columns {
         width: 100%;
         height: 1fr;
-        overflow-x: auto;
+        overflow: auto;
     }
     """
 
@@ -164,10 +164,9 @@ class BoardScreen(NodeWatcherMixin, Screen):
         # Update UI - find target column widget and mount new card
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is target_col:
-                scroll = col_widget.query_one(VerticalScroll)
-                add_widget = scroll.query_one(AddCard)
+                add_widget = col_widget.query_one(AddCard)
                 new_card = CardWidget(card.card_id, self.board)
-                scroll.mount(new_card, before=add_widget)
+                col_widget.mount(new_card, before=add_widget)
                 break
 
         card.remove()
@@ -189,10 +188,9 @@ class BoardScreen(NodeWatcherMixin, Screen):
         event.stop()
         for col_widget in self.query(ColumnWidget):
             if col_widget.column is event.column:
-                scroll = col_widget.query_one(VerticalScroll)
-                add_widget = scroll.query_one(AddCard)
+                add_widget = col_widget.query_one(AddCard)
                 card_widget = CardWidget(event.card_id, self.board)
-                scroll.mount(card_widget, before=add_widget)
+                col_widget.mount(card_widget, before=add_widget)
                 break
 
     def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
