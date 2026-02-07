@@ -11,9 +11,10 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import Node
-from ganban.ui.constants import ICON_BACK, ICON_DELETE, ICON_PERSON
+from ganban.ui.confirm import ConfirmButton
+from ganban.ui.constants import ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, find_user_by_email, parse_committer
-from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
+from ganban.ui.menu import ContextMenu, MenuItem
 
 
 def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
@@ -33,7 +34,7 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
     return emoji, name, email
 
 
-def build_assignee_menu(board: Node) -> list[MenuItem | MenuRow]:
+def build_assignee_menu(board: Node) -> list[MenuItem]:
     """Build a menu of assignable users from board.meta.users and git committers."""
     items: list[MenuItem] = []
     seen: set[str] = set()
@@ -62,10 +63,7 @@ def build_assignee_menu(board: Node) -> list[MenuItem | MenuRow]:
 
 
 class AssigneeLabel(Horizontal):
-    """Shows assignee name with an overlay delete icon on hover."""
-
-    class Confirmed(Message):
-        """Emitted when delete is confirmed."""
+    """Shows assignee name with a delete confirmation button."""
 
     DEFAULT_CSS = """
     AssigneeLabel {
@@ -76,45 +74,20 @@ class AssigneeLabel(Horizontal):
         width: auto;
         height: 1;
     }
-    AssigneeLabel .assignee-clear {
-        width: 2;
-        height: 1;
-    }
-    AssigneeLabel .assignee-clear:hover {
-        background: $primary-darken-2;
-    }
     """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._has_label = False
 
     def compose(self) -> ComposeResult:
         yield Static("", classes="assignee-name")
-        clear = Static(ICON_DELETE, classes="assignee-clear")
-        clear.display = False
-        yield clear
+        btn = ConfirmButton(classes="assignee-clear")
+        btn.display = False
+        yield btn
 
     def set_label(self, text: str) -> None:
-        self._has_label = bool(text)
         self.query_one(".assignee-name", Static).update(text)
-        self.query_one(".assignee-clear", Static).display = self._has_label
-
-    def on_click(self, event) -> None:
-        widget, _ = self.app.get_widget_at(event.screen_x, event.screen_y)
-        if not (isinstance(widget, Static) and "assignee-clear" in widget.classes):
-            return
-        event.stop()
-        menu = ContextMenu(
-            [MenuRow(MenuItem(ICON_BACK, item_id="cancel"), MenuItem(ICON_DELETE, item_id="confirm"))],
-            event.screen_x,
-            event.screen_y,
-        )
-        self.app.push_screen(menu, self._on_menu_closed)
-
-    def _on_menu_closed(self, item: MenuItem | None) -> None:
-        if item and item.item_id == "confirm":
-            self.post_message(self.Confirmed())
+        self.query_one(".assignee-clear", ConfirmButton).display = bool(text)
 
 
 class AssigneeButton(Static):
@@ -219,6 +192,6 @@ class AssigneeWidget(Container):
         event.stop()
         self._set_assigned(event.assigned)
 
-    def on_assignee_label_confirmed(self, event: AssigneeLabel.Confirmed) -> None:
+    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
         event.stop()
         self._set_assigned(None)

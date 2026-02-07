@@ -2,7 +2,6 @@
 
 ICON_BACK = "🔙"
 ICON_DELETE = "🚫"
-ICON_CONFIRM = "❌"
 ICON_CALENDAR = "📅"
 ICON_PALETTE = "🎨"
 ICON_BODY = "📝"

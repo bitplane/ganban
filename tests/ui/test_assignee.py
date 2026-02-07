@@ -8,11 +8,11 @@ from ganban.model.node import Node
 from ganban.ui.constants import ICON_PERSON
 from ganban.ui.assignee import (
     AssigneeButton,
-    AssigneeLabel,
     AssigneeWidget,
     build_assignee_menu,
     resolve_assignee,
 )
+from ganban.ui.confirm import ConfirmButton
 from ganban.ui.emoji import emoji_for_email
 
 
@@ -153,7 +153,7 @@ async def test_clear_assignee():
     app = AssigneeApp(assigned="Alice <alice@example.com>")
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
-        widget.on_assignee_label_confirmed(AssigneeLabel.Confirmed())
+        widget.on_confirm_button_confirmed(ConfirmButton.Confirmed())
         await pilot.pause()
 
         assert app.card_meta.assigned is None

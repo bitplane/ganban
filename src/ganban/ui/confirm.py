@@ -3,7 +3,7 @@
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.ui.constants import ICON_BACK, ICON_CONFIRM
+from ganban.ui.constants import ICON_BACK, ICON_DELETE
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
@@ -31,7 +31,7 @@ class ConfirmButton(Static):
     }
     """
 
-    def __init__(self, icon: str = ICON_CONFIRM, **kwargs) -> None:
+    def __init__(self, icon: str = ICON_DELETE, **kwargs) -> None:
         super().__init__(icon, **kwargs)
 
     def on_click(self, event) -> None:
@@ -40,7 +40,7 @@ class ConfirmButton(Static):
             [
                 MenuRow(
                     MenuItem(ICON_BACK, item_id="cancel"),
-                    MenuItem(ICON_CONFIRM, item_id="confirm"),
+                    MenuItem(ICON_DELETE, item_id="confirm"),
                 ),
             ],
             event.screen_x,

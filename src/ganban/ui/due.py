@@ -7,61 +7,50 @@ from datetime import date
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.cal import DateButton, date_diff
-from ganban.ui.constants import ICON_BACK, ICON_CALENDAR, ICON_DELETE
-from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
+from ganban.ui.confirm import ConfirmButton
+from ganban.ui.constants import ICON_CALENDAR
 
 
-class DueDateLabel(Static):
-    """Shows due date text, swaps to delete icon on hover."""
-
-    class Confirmed(Message):
-        """Emitted when delete is confirmed."""
+class DueDateLabel(Horizontal):
+    """Shows due date text, swaps to delete confirmation on hover."""
 
     DEFAULT_CSS = """
     DueDateLabel { width: auto; height: 1; }
-    DueDateLabel:hover { background: $primary-darken-2; }
-    DueDateLabel.overdue { color: $error; }
+    DueDateLabel .due-text { width: auto; height: 1; }
+    DueDateLabel .due-text:hover { background: $primary-darken-2; }
+    DueDateLabel.overdue .due-text { color: $error; }
     """
 
-    def __init__(self, text: str = "", **kwargs):
-        super().__init__(text, **kwargs)
-        self._label_text = text
-        self._hovering = False
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def compose(self) -> ComposeResult:
+        yield Static("", classes="due-text")
+        btn = ConfirmButton(classes="due-clear")
+        btn.display = False
+        yield btn
 
     def set_label(self, text: str) -> None:
-        self._label_text = text
-        if not self._hovering:
-            self.update(text)
+        self.query_one(".due-text", Static).update(text)
+        self.query_one(".due-text", Static).display = bool(text)
+        self.query_one(".due-clear", ConfirmButton).display = False
 
     def on_enter(self, event) -> None:
-        if event.node is self and self._label_text:
-            self._hovering = True
-            self.update(ICON_DELETE)
+        text_widget = self.query_one(".due-text", Static)
+        if text_widget.display:
+            text_widget.display = False
+            self.query_one(".due-clear", ConfirmButton).display = True
 
     def on_leave(self, event) -> None:
-        if event.node is self:
-            self._hovering = False
-            self.update(self._label_text)
-
-    def on_click(self, event) -> None:
-        if not self._hovering:
-            return
-        event.stop()
-        menu = ContextMenu(
-            [MenuRow(MenuItem(ICON_BACK, item_id="cancel"), MenuItem(ICON_DELETE, item_id="confirm"))],
-            event.screen_x,
-            event.screen_y,
-        )
-        self.app.push_screen(menu, self._on_menu_closed)
-
-    def _on_menu_closed(self, item: MenuItem | None) -> None:
-        if item and item.item_id == "confirm":
-            self.post_message(self.Confirmed())
+        text_widget = self.query_one(".due-text", Static)
+        clear_widget = self.query_one(".due-clear", ConfirmButton)
+        if clear_widget.display:
+            clear_widget.display = False
+            text_widget.display = bool(text_widget.render())
 
 
 class DueDateWidget(Container):
@@ -105,7 +94,7 @@ class DueDateWidget(Container):
     def compose(self) -> ComposeResult:
         with Horizontal():
             yield DateButton(selected=self.due, icon=ICON_CALENDAR, id="due-picker")
-            yield DueDateLabel("", id="due-label")
+            yield DueDateLabel(id="due-label")
 
     def on_mount(self) -> None:
         self._unwatch = self.meta.watch("due", self._on_due_changed)
@@ -144,6 +133,6 @@ class DueDateWidget(Container):
         event.stop()
         self._set_due(event.date)
 
-    def on_due_date_label_confirmed(self, event: DueDateLabel.Confirmed) -> None:
+    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
         event.stop()
         self._set_due(None)

@@ -4,10 +4,11 @@ from datetime import date, timedelta
 
 import pytest
 from textual.app import App, ComposeResult
+from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.cal import Calendar, CalendarDay
-from ganban.ui.constants import ICON_DELETE
+from ganban.ui.confirm import ConfirmButton
 from ganban.ui.due import DueDateLabel, DueDateWidget
 from ganban.ui.menu import ContextMenu, MenuItem
 
@@ -23,15 +24,19 @@ class DueDateApp(App):
         yield DueDateWidget(self.meta)
 
 
+def _label_text(app):
+    """Get the due label text content."""
+    return app.query_one("#due-label .due-text", Static).content
+
+
 @pytest.mark.asyncio
 async def test_no_due_shows_only_calendar():
     """Widget with no due date shows only calendar button, label empty, delete hidden."""
     app = DueDateApp()
     async with app.run_test():
         widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
 
-        assert label.content == ""
+        assert _label_text(app) == ""
         assert "has-due" not in widget.classes
 
 
@@ -41,10 +46,7 @@ async def test_due_shows_label():
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test():
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
-
-        assert label.content == "5d"
+        assert _label_text(app) == "5d"
 
 
 @pytest.mark.asyncio
@@ -53,10 +55,9 @@ async def test_overdue_is_red():
     due = date.today() - timedelta(days=3)
     app = DueDateApp(due=due)
     async with app.run_test():
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        label = app.query_one("#due-label", DueDateLabel)
 
-        assert label.content == "-3d"
+        assert _label_text(app) == "-3d"
         assert "overdue" in label.classes
 
 
@@ -66,10 +67,9 @@ async def test_due_today_is_overdue():
     due = date.today()
     app = DueDateApp(due=due)
     async with app.run_test():
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        label = app.query_one("#due-label", DueDateLabel)
 
-        assert label.content == "0d"
+        assert _label_text(app) == "0d"
         assert "overdue" in label.classes
 
 
@@ -79,8 +79,7 @@ async def test_future_not_overdue():
     due = date.today() + timedelta(days=1)
     app = DueDateApp(due=due)
     async with app.run_test():
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        label = app.query_one("#due-label", DueDateLabel)
 
         assert "overdue" not in label.classes
 
@@ -92,45 +91,44 @@ async def test_delete_clears_due():
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
         widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        btn = widget.query_one(".due-clear", ConfirmButton)
 
-        label.post_message(DueDateLabel.Confirmed())
+        btn.post_message(ConfirmButton.Confirmed())
         await pilot.pause()
 
         assert widget.due is None
         assert app.meta.due is None
-        assert label.content == ""
+        assert _label_text(app) == ""
 
 
 @pytest.mark.asyncio
-async def test_hover_shows_delete_icon():
-    """Hovering over the due label swaps text for delete icon."""
+async def test_hover_shows_delete_button():
+    """Hovering over the due label shows confirm button."""
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        btn = app.query_one(".due-clear", ConfirmButton)
 
-        assert label.content == "5d"
+        assert _label_text(app) == "5d"
+        assert btn.display is False
 
         await pilot.hover(DueDateLabel)
-        assert label.content == ICON_DELETE
+        assert btn.display is True
 
         # Move mouse away - label restores
         await pilot.hover(DueDateWidget, offset=(0, 0))
-        assert label.content == "5d"
+        assert btn.display is False
 
 
 @pytest.mark.asyncio
-async def test_hover_no_due_no_icon():
-    """Hovering when no due date doesn't show delete icon."""
+async def test_hover_no_due_no_button():
+    """Hovering when no due date doesn't show delete button."""
     app = DueDateApp()
     async with app.run_test() as pilot:
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
+        btn = app.query_one(".due-clear", ConfirmButton)
 
         await pilot.hover(DueDateLabel)
-        assert label.content == ""
+        assert btn.display is False
 
 
 @pytest.mark.asyncio
@@ -167,10 +165,9 @@ async def test_changing_due_updates_label():
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
-        widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
-        assert label.content == "5d"
+        assert _label_text(app) == "5d"
 
+        widget = app.query_one(DueDateWidget)
         picker = widget.query_one("#due-picker")
         await pilot.click(picker)
 
@@ -185,7 +182,7 @@ async def test_changing_due_updates_label():
 
         if target_day:
             await pilot.click(target_day)
-            assert label.content == "10d"
+            assert _label_text(app) == "10d"
 
 
 @pytest.mark.asyncio
@@ -218,25 +215,27 @@ async def test_has_due_class_when_due():
 
 
 @pytest.mark.asyncio
-async def test_click_hovering_label_opens_menu():
-    """Clicking the due label while hovering opens context menu."""
+async def test_click_delete_button_opens_menu():
+    """Clicking the delete button opens context menu."""
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
         await pilot.hover(DueDateLabel)
-        await pilot.click(DueDateLabel)
+        btn = app.query_one(".due-clear", ConfirmButton)
+        await pilot.click(btn)
         assert isinstance(app.screen, ContextMenu)
 
 
 @pytest.mark.asyncio
-async def test_click_label_confirm_clears_due():
-    """Clicking label then confirming clears due date."""
+async def test_click_delete_confirm_clears_due():
+    """Clicking delete button then confirming clears due date."""
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
         widget = app.query_one(DueDateWidget)
         await pilot.hover(DueDateLabel)
-        await pilot.click(DueDateLabel)
+        btn = app.query_one(".due-clear", ConfirmButton)
+        await pilot.click(btn)
 
         confirm_item = None
         for item in app.screen.query(MenuItem):
@@ -250,14 +249,15 @@ async def test_click_label_confirm_clears_due():
 
 
 @pytest.mark.asyncio
-async def test_click_label_cancel_keeps_due():
-    """Clicking label then cancelling keeps due date."""
+async def test_click_delete_cancel_keeps_due():
+    """Clicking delete button then cancelling keeps due date."""
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
     async with app.run_test() as pilot:
         widget = app.query_one(DueDateWidget)
         await pilot.hover(DueDateLabel)
-        await pilot.click(DueDateLabel)
+        btn = app.query_one(".due-clear", ConfirmButton)
+        await pilot.click(btn)
 
         cancel_item = None
         for item in app.screen.query(MenuItem):
@@ -271,13 +271,13 @@ async def test_click_label_cancel_keeps_due():
 
 
 @pytest.mark.asyncio
-async def test_click_label_not_hovering_noop():
-    """Clicking label without hovering does nothing."""
+async def test_delete_hidden_by_default():
+    """Delete button is hidden when not hovering."""
     due = date.today() + timedelta(days=5)
     app = DueDateApp(due=due)
-    async with app.run_test() as pilot:
-        await pilot.click(DueDateLabel)
-        assert not isinstance(app.screen, ContextMenu)
+    async with app.run_test():
+        btn = app.query_one(".due-clear", ConfirmButton)
+        assert btn.display is False
 
 
 @pytest.mark.asyncio
@@ -286,7 +286,6 @@ async def test_external_node_change_updates_widget():
     app = DueDateApp()
     async with app.run_test() as pilot:
         widget = app.query_one(DueDateWidget)
-        label = widget.query_one("#due-label", DueDateLabel)
         assert widget.due is None
 
         # External change (e.g. meta editor)
@@ -295,4 +294,4 @@ async def test_external_node_change_updates_widget():
         await pilot.pause()
 
         assert widget.due == target
-        assert label.content == "7d"
+        assert _label_text(app) == "7d"

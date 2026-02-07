@@ -4,7 +4,7 @@ import pytest
 from textual.app import App, ComposeResult
 
 from ganban.ui.confirm import ConfirmButton
-from ganban.ui.constants import ICON_CONFIRM
+from ganban.ui.constants import ICON_DELETE
 from ganban.ui.menu import ContextMenu, MenuItem
 
 
@@ -34,7 +34,7 @@ async def test_displays_icon(app):
     """Button displays the trash icon by default."""
     async with app.run_test():
         btn = app.query_one(ConfirmButton)
-        assert btn.content == ICON_CONFIRM
+        assert btn.content == ICON_DELETE
 
 
 @pytest.mark.asyncio
