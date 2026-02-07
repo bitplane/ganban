@@ -8,8 +8,19 @@ _H1_OR_H2 = re.compile(r"^(#{1,2}) ", re.MULTILINE)
 
 
 def _demote_headings(text: str) -> str:
-    """Convert # and ## at start of lines to ### to prevent structural conflicts."""
-    return _H1_OR_H2.sub("### ", text)
+    """Convert # and ## at start of lines to ### to prevent structural conflicts.
+
+    Skips lines inside fenced code blocks.
+    """
+    result = []
+    in_fence = False
+    for line in text.split("\n"):
+        if line.startswith("```"):
+            in_fence = not in_fence
+        if not in_fence:
+            line = _H1_OR_H2.sub("### ", line)
+        result.append(line)
+    return "\n".join(result)
 
 
 def parse_sections(text: str) -> tuple[list[tuple[str, str]], dict]:
@@ -29,9 +40,12 @@ def parse_sections(text: str) -> tuple[list[tuple[str, str]], dict]:
     current_lines: list[str] = []
     preamble_lines: list[str] = []
     in_heading = False
+    in_code_fence = False
 
     for line in lines:
-        if line.startswith("# ") or line.startswith("## "):
+        if line.startswith("```"):
+            in_code_fence = not in_code_fence
+        if not in_code_fence and (line.startswith("# ") or line.startswith("## ")):
             if in_heading:
                 sections.append((current_title or "", "\n".join(current_lines).strip()))
             is_h1 = line.startswith("# ") and not line.startswith("## ")

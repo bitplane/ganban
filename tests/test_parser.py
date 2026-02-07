@@ -84,6 +84,24 @@ def test_serialize_sections_empty_title():
     assert "Just body" in text
 
 
+def test_parse_code_block_ignores_headings():
+    """Headings inside fenced code blocks are not treated as sections."""
+    text = "# title\n```\n## not a section\n```\n## section\n"
+    sections, meta = parse_sections(text)
+    assert len(sections) == 2
+    assert sections[0] == ("title", "```\n## not a section\n```")
+    assert sections[1] == ("section", "")
+
+
+def test_code_block_roundtrip():
+    """Code blocks with headings survive a round-trip."""
+    text = "# title\n\n```\n## not a section\n```\n\n## section\n"
+    sections, meta = parse_sections(text)
+    result = serialize_sections(sections, meta)
+    sections2, _ = parse_sections(result)
+    assert sections == sections2
+
+
 def test_sections_roundtrip():
     original = "---\ntags:\n- a\n- b\n---\n# Board\n\nDesc\n\n## Notes\n\nStuff\n"
     sections, meta = parse_sections(original)
