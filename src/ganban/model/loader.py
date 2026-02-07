@@ -10,6 +10,8 @@ from ganban.ids import compare_ids
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
 
+MAX_COMMITS = 100
+
 
 def _tree_get(tree: Tree, name: str) -> Blob | Tree | None:
     """Get an item from a tree by name, returning None if not found."""
@@ -77,6 +79,17 @@ def _build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[L
             title = fallback_title
         ln[title] = body
     return ln, meta
+
+
+def _get_committers(repo: Repo, max_count: int = MAX_COMMITS) -> list[str]:
+    """Extract unique committers from recent git history.
+
+    Returns a sorted list of "Name <email>" strings.
+    """
+    seen: set[str] = set()
+    for commit in repo.iter_commits(max_count=max_count, all=True):
+        seen.add(f"{commit.author.name} <{commit.author.email}>")
+    return sorted(seen)
 
 
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
@@ -184,4 +197,5 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         columns_ln[order] = col
 
     board.columns = columns_ln
+    board.git = Node(committers=_get_committers(repo))
     return board

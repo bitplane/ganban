@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from git import Repo
 
-from ganban.model.loader import load_board
+from git.util import Actor
+
+from ganban.model.loader import _get_committers, load_board
 from ganban.model.node import ListNode, Node
 
 
@@ -153,6 +155,47 @@ def test_load_board_commit(sample_board):
 
     repo = Repo(sample_board)
     assert board.commit == repo.commit("ganban").hexsha
+
+
+def test_load_board_has_git_node(sample_board):
+    board = load_board(str(sample_board))
+    assert isinstance(board.git, Node)
+    assert isinstance(board.git.committers, list)
+
+
+def test_load_board_git_committers_populated(sample_board):
+    """Committers list contains the author from the fixture's commits."""
+    board = load_board(str(sample_board))
+    assert len(board.git.committers) > 0
+    # Each entry should be "Name <email>" format
+    for entry in board.git.committers:
+        assert "<" in entry and ">" in entry
+
+
+def test_get_committers_deduplicates(tmp_path):
+    """Multiple commits by same author produce one entry."""
+    repo = Repo.init(tmp_path)
+    (tmp_path / "a.txt").write_text("a")
+    repo.index.add(["a.txt"])
+    repo.index.commit("first", author=Actor("Alice", "alice@example.com"))
+    (tmp_path / "b.txt").write_text("b")
+    repo.index.add(["b.txt"])
+    repo.index.commit("second", author=Actor("Alice", "alice@example.com"))
+    result = _get_committers(repo)
+    assert result.count("Alice <alice@example.com>") == 1
+
+
+def test_get_committers_multiple_authors(tmp_path):
+    """Different authors produce separate entries, sorted."""
+    repo = Repo.init(tmp_path)
+    (tmp_path / "a.txt").write_text("a")
+    repo.index.add(["a.txt"])
+    repo.index.commit("first", author=Actor("Bob", "bob@example.com"))
+    (tmp_path / "b.txt").write_text("b")
+    repo.index.add(["b.txt"])
+    repo.index.commit("second", author=Actor("Alice", "alice@example.com"))
+    result = _get_committers(repo)
+    assert result == ["Alice <alice@example.com>", "Bob <bob@example.com>"]
 
 
 def test_load_board_missing_branch(tmp_path):
