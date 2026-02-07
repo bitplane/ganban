@@ -4,7 +4,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.geometry import Offset
 from textual.message import Message
-from textual.color import Color
+from textual.color import Color, ColorParseError
 from textual.widgets import Rule, Static
 
 from ganban.model.node import Node
@@ -159,7 +159,7 @@ class ColumnWidget(DraggableMixin, Vertical):
         if color_hex:
             try:
                 self.styles.background = Color.parse(color_hex)
-            except ValueError:
+            except ColorParseError:
                 self.styles.clear_rule("background")
         else:
             self.styles.clear_rule("background")
