@@ -65,7 +65,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
         self._card_drag = CardDragManager(self)
         self._column_drag = ColumnDragManager(self)
         self._sync_task: asyncio.Task | None = None
-        self._last_sync: float = 0.0
+        self._last_sync: float = time.monotonic()
 
         # Initialize sync state (transient, not persisted to git)
         if not board.git:

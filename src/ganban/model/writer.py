@@ -303,6 +303,12 @@ def try_auto_merge(
 
     our_tree = _build_board_tree(repo_path, board)
 
+    # Fast-forward: our tree matches the merge base, so we're just behind
+    base_tree = _git(repo_path, ["rev-parse", f"{merge_info.base}^{{tree}}"])
+    if our_tree == base_tree:
+        _git(repo_path, ["update-ref", f"refs/heads/{branch}", merge_info.theirs])
+        return merge_info.theirs
+
     merged_tree, has_conflicts = _merge_trees(repo_path, merge_info.base, our_tree, merge_info.theirs)
 
     if has_conflicts:
