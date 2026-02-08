@@ -5,8 +5,10 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Static
 
+from ganban.model.card import archive_card, move_card
+from ganban.model.column import archive_column, move_column
 from ganban.model.node import Node
-from ganban.model.writer import build_column_path, save_board
+from ganban.model.writer import save_board
 from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
@@ -15,7 +17,6 @@ from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import DragStarted
 from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
 from ganban.ui.edit import EditableText, TextEditor
-from ganban.ui.edit.document import _rename_first_key
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -82,7 +83,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
         """Update board header when title changes."""
         keys = self.board.sections.keys()
         if not keys:
-            return  # transient empty state during _rename_first_key rebuild
+            return  # transient empty state during rename_first_key rebuild
         new_title = keys[0]
         header = self.query_one("#board-header", EditableText)
         if header.value != new_title:
@@ -125,7 +126,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
         header = self.query_one("#board-header", EditableText)
         if event.control is header:
             event.stop()
-            _rename_first_key(self.board.sections, event.new_value)
+            self.board.sections.rename_first_key(event.new_value)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click on board header."""
@@ -181,29 +182,16 @@ class BoardScreen(NodeWatcherMixin, Screen):
         card = event.card
         col_name = event.target_column
 
-        source_col = card._find_column()
         target_col = next((c for c in self.board.columns if first_title(c.sections) == col_name), None)
-        if not target_col or target_col is source_col:
+        if not target_col:
             return
 
-        if source_col:
-            links = list(source_col.links)
-            links.remove(card.card_id)
-            source_col.links = links
+        move_card(self.board, card.card_id, target_col)
 
-        links = list(target_col.links)
-        links.append(card.card_id)
-        target_col.links = links
-
-    def on_card_widget_delete_requested(self, event: CardWidget.DeleteRequested) -> None:
-        """Handle card delete request."""
+    def on_card_widget_archive_requested(self, event: CardWidget.ArchiveRequested) -> None:
+        """Handle card archive request."""
         event.stop()
-        card = event.card
-        col = card._find_column()
-        if col:
-            links = list(col.links)
-            links.remove(card.card_id)
-            col.links = links
+        archive_card(self.board, event.card.card_id)
 
     def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
         """Handle new card creation — model already updated by create_card."""
@@ -219,24 +207,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
 
     def _move_column_to_index(self, col_widget: ColumnWidget, new_index: int) -> None:
         """Move column to new position in both model and UI."""
-        column = col_widget.column
-
-        # Rebuild columns ListNode with new order
-        all_cols = list(self.board.columns)
-        all_cols.remove(column)
-        all_cols.insert(new_index, column)
-
-        # Clear and rebuild the columns ListNode
-        old_keys = self.board.columns.keys()
-        for key in old_keys:
-            self.board.columns[key] = None
-
-        for i, col in enumerate(all_cols):
-            col.order = str(i + 1)
-            col.dir_path = build_column_path(col.order, first_title(col.sections), col.hidden)
-            self.board.columns[col.order] = col
-
-        # Sync UI to match model
+        move_column(self.board, col_widget.column, new_index)
         self._sync_column_order()
 
     def _sync_column_order(self) -> None:
@@ -268,15 +239,9 @@ class BoardScreen(NodeWatcherMixin, Screen):
 
         self._move_column_to_index(col_widget, new_index)
 
-    def on_column_widget_delete_requested(self, event: ColumnWidget.DeleteRequested) -> None:
-        """Handle column delete request."""
+    def on_column_widget_archive_requested(self, event: ColumnWidget.ArchiveRequested) -> None:
+        """Handle column archive request."""
         event.stop()
         col_widget = event.column_widget
-
-        # Remove from model
-        order = col_widget.column.order
-        if order in self.board.columns:
-            self.board.columns[order] = None
-
-        # Remove from UI
+        archive_column(self.board, col_widget.column.order)
         col_widget.remove()

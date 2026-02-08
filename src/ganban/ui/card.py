@@ -5,8 +5,8 @@ from textual.geometry import Offset
 from textual.message import Message
 from textual.widgets import Rule, Static
 
+from ganban.model.card import create_card, find_card_column
 from ganban.model.node import Node
-from ganban.model.writer import create_card
 from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text
 from ganban.ui.constants import ICON_BACK, ICON_CARD, ICON_CONFIRM, ICON_DELETE, ICON_EDIT, ICON_MOVE_TO
@@ -32,7 +32,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     BINDINGS = [
         ("space", "open_card"),
         ("enter", "open_card"),
-        ("delete", "confirm_delete"),
+        ("delete", "confirm_archive"),
     ]
 
     def action_open_card(self) -> None:
@@ -46,8 +46,8 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             self.card = card
             self.target_column = target_column
 
-    class DeleteRequested(Message):
-        """Posted when card should be deleted."""
+    class ArchiveRequested(Message):
+        """Posted when card should be archived."""
 
         def __init__(self, card: "CardWidget"):
             super().__init__()
@@ -123,10 +123,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
 
     def _find_column(self) -> Node | None:
         """Find the column containing this card."""
-        for col in self.board.columns:
-            if self.card_id in col.links:
-                return col
-        return None
+        return find_card_column(self.board, self.card_id)
 
     def on_click(self, event) -> None:
         if event.button == 3:  # Right click
@@ -150,7 +147,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),
             MenuSeparator(),
-            MenuItem(f"{ICON_DELETE} Delete", "delete"),
+            MenuItem(f"{ICON_DELETE} Archive", "archive"),
         ]
         self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
@@ -161,30 +158,30 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             case "edit":
                 card = self.board.cards[self.card_id]
                 self.app.push_screen(CardDetailModal(card, self.board))
-            case "delete":
-                self._confirm_delete()
+            case "archive":
+                self._confirm_archive()
             case s if s and s.startswith("move:"):
                 col_name = s[5:]
                 self._move_to_column(col_name)
 
-    def action_confirm_delete(self) -> None:
-        self._confirm_delete()
+    def action_confirm_archive(self) -> None:
+        self._confirm_archive()
 
-    def _confirm_delete(self) -> None:
+    def _confirm_archive(self) -> None:
         region = self.region
         x = region.x + region.width // 2
         y = region.y + region.height // 2
         items = [
-            MenuItem(f"{ICON_DELETE} Delete {self.title}?", disabled=True),
+            MenuItem(f"{ICON_DELETE} Archive {self.title}?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
             MenuItem(f"{ICON_BACK} Cancel", "cancel"),
         ]
-        self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
+        self.app.push_screen(ContextMenu(items, x, y), self._on_archive_confirmed)
 
-    def _on_delete_confirmed(self, item: MenuItem | None) -> None:
+    def _on_archive_confirmed(self, item: MenuItem | None) -> None:
         if item and item.item_id == "confirm":
-            self.post_message(self.DeleteRequested(self))
+            self.post_message(self.ArchiveRequested(self))
 
     def _move_to_column(self, col_name: str) -> None:
         """Request move to the named column."""

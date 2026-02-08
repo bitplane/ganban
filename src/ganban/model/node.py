@@ -122,6 +122,23 @@ class Node:
             else:
                 setattr(self, key, new_value)
 
+    def rename_key(self, old_key: str, new_key: str) -> None:
+        """Rename a key in _children, preserving insertion order."""
+        value = self._children.get(old_key)
+        if value is None:
+            return
+        items = list(self.items())
+        for key, _ in items:
+            self._children.pop(key, None)
+        for key, val in items:
+            k = new_key if key == old_key else key
+            self._children[k] = val
+        if hasattr(value, "_key"):
+            object.__setattr__(value, "_key", new_key)
+        self._version += 1
+        _emit(self, old_key, value, None)
+        _emit(self, new_key, None, value)
+
     def __repr__(self) -> str:
         p = self.path
         keys = ", ".join(self._children.keys())
@@ -245,6 +262,16 @@ class ListNode:
             object.__setattr__(self, "_items", new_items)
             self._version += 1
             _emit(self, "*", old_keys, new_keys)
+
+    def rename_first_key(self, new_title: str) -> None:
+        """Rename the first key by rebuilding the list."""
+        items = self.items()
+        for key, _ in items:
+            self[key] = None
+        if items:
+            items[0] = (new_title, items[0][1])
+        for key, val in items:
+            self[key] = val
 
     def __repr__(self) -> str:
         p = self.path

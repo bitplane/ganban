@@ -16,17 +16,6 @@ from ganban.ui.edit.viewers import MarkdownViewer
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-def _rename_first_key(sections: ListNode, new_title: str) -> None:
-    """Rename the first key in a sections ListNode by rebuilding it."""
-    items = sections.items()
-    for key, _ in items:
-        sections[key] = None
-    if items:
-        items[0] = (new_title, items[0][1])
-    for key, val in items:
-        sections[key] = val
-
-
 class DocHeader(Container):
     """Editable document title with rule underneath."""
 
@@ -67,7 +56,7 @@ class DocHeader(Container):
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        _rename_first_key(self.sections, event.new_value)
+        self.sections.rename_first_key(event.new_value)
         self.post_message(self.TitleChanged(event.new_value))
 
 

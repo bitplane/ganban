@@ -10,7 +10,7 @@ from textual.events import Click
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.model.node import Node, _emit
+from ganban.model.node import Node
 from ganban.model.writer import _meta_to_dict
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
@@ -51,24 +51,6 @@ class BoolToggle(Static):
         self._value = not self._value
         self.update(str(self._value).lower())
         self.post_message(self.Changed(self._value))
-
-
-def rename_node_key(node: Node, old_key: str, new_key: str) -> None:
-    """Rename a key in a Node's _children, preserving insertion order."""
-    value = node._children.get(old_key)
-    if value is None:
-        return
-    items = list(node.items())
-    for key, _ in items:
-        node._children.pop(key, None)
-    for key, val in items:
-        k = new_key if key == old_key else key
-        node._children[k] = val
-    if hasattr(value, "_key"):
-        object.__setattr__(value, "_key", new_key)
-    node._version += 1
-    _emit(node, old_key, value, None)
-    _emit(node, new_key, None, value)
 
 
 def _parse_number(text: str) -> int | float:
@@ -580,7 +562,7 @@ class DictEditor(NodeWatcherMixin, Vertical):
     def on_key_value_row_key_renamed(self, event: KeyValueRow.KeyRenamed) -> None:
         event.stop()
         with self.suppressing():
-            rename_node_key(self.node, event.old_key, event.new_key)
+            self.node.rename_key(event.old_key, event.new_key)
 
     def on_key_value_row_delete_requested(self, event: KeyValueRow.DeleteRequested) -> None:
         event.stop()

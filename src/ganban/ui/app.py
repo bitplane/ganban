@@ -10,7 +10,8 @@ from textual.widgets import Button, Static
 from ganban.git import has_branch, init_repo, is_git_repo
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
-from ganban.model.writer import create_column, save_board
+from ganban.model.column import create_column
+from ganban.model.writer import save_board
 from ganban.ui.board import BoardScreen
 
 

@@ -14,7 +14,6 @@ from ganban.model.node import Node
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.meta import rename_node_key
 from ganban.ui.edit.viewers import TextViewer
 from ganban.ui.emoji import EmojiButton
 from ganban.ui.watcher import NodeWatcherMixin
@@ -312,7 +311,7 @@ class UsersEditor(NodeWatcherMixin, Container):
         event.stop()
         users = self._ensure_users()
         with self.suppressing():
-            rename_node_key(users, event.old, event.new)
+            users.rename_key(event.old, event.new)
 
     def on_user_row_emoji_changed(self, event: UserRow.EmojiChanged) -> None:
         event.stop()

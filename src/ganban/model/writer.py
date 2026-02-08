@@ -1,11 +1,10 @@
 """Save a ganban board (Node tree) to git without touching the working tree."""
 
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from ganban.ids import max_id, next_id
+from ganban.model.column import slugify
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import first_title, serialize_sections
 
@@ -318,90 +317,3 @@ def try_auto_merge(
     _git(repo_path, ["update-ref", f"refs/heads/{branch}", new_commit])
 
     return new_commit
-
-
-# --- Board manipulation helpers ---
-
-
-def create_card(
-    board: Node,
-    title: str,
-    body: str = "",
-    column: Node | None = None,
-    position: int | None = None,
-) -> tuple[str, Node]:
-    """Create a new card and add it to the board.
-
-    Returns (card_id, card_node).
-    """
-    card_id = next_id(max_id(board.cards.keys()))
-
-    sections = ListNode()
-    sections[title] = body
-
-    card = Node(
-        sections=sections,
-        meta={},
-        file_path=f".all/{card_id}.md",
-    )
-    board.cards[card_id] = card
-
-    # Add to column
-    target_column = column
-    if target_column is None:
-        for col in board.columns:
-            target_column = col
-            break
-
-    if target_column is not None:
-        links = list(target_column.links)
-        if position is not None:
-            links.insert(position, card_id)
-        else:
-            links.append(card_id)
-        target_column.links = links
-
-    return card_id, card
-
-
-def create_column(
-    board: Node,
-    name: str,
-    order: str | None = None,
-    hidden: bool = False,
-) -> Node:
-    """Create a new column and add it to the board.
-
-    Returns the created column Node.
-    """
-    if order is None:
-        existing_orders = board.columns.keys()
-        order = next_id(max_id(existing_orders)) if existing_orders else "1"
-
-    sections = ListNode()
-    sections[name] = ""
-    col = Node(
-        order=order,
-        dir_path=build_column_path(order, name, hidden),
-        hidden=hidden,
-        sections=sections,
-        meta={},
-        links=[],
-    )
-    board.columns[order] = col
-
-    return col
-
-
-def slugify(text: str) -> str:
-    """Convert text to a URL-friendly slug."""
-    slug = text.lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    slug = slug.strip("-")
-    return slug or "untitled"
-
-
-def build_column_path(order: str, name: str, hidden: bool = False) -> str:
-    """Build column directory path from components."""
-    prefix = "." if hidden else ""
-    return f"{prefix}{order}.{slugify(name)}"

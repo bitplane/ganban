@@ -7,8 +7,9 @@ from textual.message import Message
 from textual.color import Color, ColorParseError
 from textual.widgets import Rule, Static
 
+from ganban.model.card import move_card
+from ganban.model.column import create_column, rename_column
 from ganban.model.node import Node
-from ganban.model.writer import build_column_path, create_column
 from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
@@ -24,7 +25,6 @@ from ganban.ui.constants import (
 )
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import DraggableMixin
-from ganban.ui.edit.document import _rename_first_key
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.watcher import NodeWatcherMixin
@@ -81,8 +81,8 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             self.column_widget = column_widget
             self.direction = direction  # -1 for left, +1 for right
 
-    class DeleteRequested(Message):
-        """Posted when column should be deleted."""
+    class ArchiveRequested(Message):
+        """Posted when column should be archived."""
 
         def __init__(self, column_widget: "ColumnWidget") -> None:
             super().__init__()
@@ -113,8 +113,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         """Update column name when header is edited."""
         event.stop()
         if event.new_value:
-            _rename_first_key(self.column.sections, event.new_value)
-            self.column.dir_path = build_column_path(self.column.order, event.new_value, self.column.hidden)
+            rename_column(self.board, self.column, event.new_value)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click."""
@@ -139,7 +138,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             MenuItem(f"{ICON_MOVE_LEFT} Move Left", "move_left", disabled=(col_index == 0)),
             MenuItem(f"{ICON_MOVE_RIGHT} Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
             MenuSeparator(),
-            MenuItem(f"{ICON_DELETE} Delete", "delete"),
+            MenuItem(f"{ICON_DELETE} Archive", "archive"),
         ]
         self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
@@ -193,8 +192,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         if key in ("shift+up", "shift+down"):
             swap_idx = card_idx + (-1 if key == "shift+up" else 1)
             if 0 <= swap_idx < len(links):
-                links[card_idx], links[swap_idx] = links[swap_idx], links[card_idx]
-                self.column.links = links
+                move_card(self.board, card_id, self.column, position=swap_idx)
                 self.call_after_refresh(lambda: self._refocus_card(self, card_id))
         elif key in ("shift+left", "shift+right"):
             direction = -1 if key == "shift+left" else 1
@@ -203,11 +201,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             new_idx = my_idx + direction
             if 0 <= new_idx < len(siblings) and hasattr(siblings[new_idx], "column"):
                 target = siblings[new_idx]
-                links.remove(card_id)
-                self.column.links = links
-                target_links = list(target.column.links)
-                target_links.insert(min(card_idx, len(target_links)), card_id)
-                target.column.links = target_links
+                move_card(self.board, card_id, target.column, position=min(card_idx, len(target.column.links)))
                 self.call_after_refresh(lambda: self._refocus_card(target, card_id))
 
     @staticmethod
@@ -262,12 +256,11 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         self._apply_color()
 
     def _on_sections_changed(self, node, key, old, new) -> None:
-        """Sync column dir_path and UI when sections title changes."""
+        """Sync UI when sections title changes."""
         keys = self.column.sections.keys()
         if not keys:
-            return  # transient empty state during _rename_first_key rebuild
+            return  # transient empty state during rename_first_key rebuild
         new_name = keys[0]
-        self.column.dir_path = build_column_path(self.column.order, new_name, self.column.hidden)
         title_widget = self.query_one("#column-title", EditableText)
         if title_widget.value != new_name:
             title_widget.value = new_name
@@ -301,25 +294,25 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":
                 self.post_message(self.MoveRequested(self, 1))
-            case "delete":
-                self._confirm_delete()
+            case "archive":
+                self._confirm_archive()
 
-    def _confirm_delete(self) -> None:
+    def _confirm_archive(self) -> None:
         name = first_title(self.column.sections)
         region = self.region
         x = region.x + region.width // 2
         y = region.y + region.height // 2
         items = [
-            MenuItem(f"{ICON_DELETE} Delete {name}?", disabled=True),
+            MenuItem(f"{ICON_DELETE} Archive {name}?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
             MenuItem(f"{ICON_BACK} Cancel", "cancel"),
         ]
-        self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
+        self.app.push_screen(ContextMenu(items, x, y), self._on_archive_confirmed)
 
-    def _on_delete_confirmed(self, item: MenuItem | None) -> None:
+    def _on_archive_confirmed(self, item: MenuItem | None) -> None:
         if item and item.item_id == "confirm":
-            self.post_message(self.DeleteRequested(self))
+            self.post_message(self.ArchiveRequested(self))
 
     def _get_column_index(self) -> int:
         """Get the index of this column among visible columns."""

@@ -570,6 +570,75 @@ def test_list_node_update_skips_equal_values():
     assert len(events) == 0
 
 
+# --- Node.rename_key ---
+
+
+def test_node_rename_key():
+    node = Node(a="1", b="2", c="3")
+    node.rename_key("b", "beta")
+    assert list(node.keys()) == ["a", "beta", "c"]
+    assert node.beta == "2"
+    assert node.b is None
+
+
+def test_node_rename_key_preserves_order():
+    node = Node(x="first", y="second", z="third")
+    node.rename_key("x", "alpha")
+    assert list(node.keys()) == ["alpha", "y", "z"]
+
+
+def test_node_rename_key_fires_events():
+    events = []
+    node = Node(a="1", b="2")
+    node.watch("a", lambda n, k, old, new: events.append(("a", old, new)))
+    node.watch("beta", lambda n, k, old, new: events.append(("beta", old, new)))
+    node.rename_key("a", "beta")
+    assert ("a", "1", None) in events
+    assert ("beta", None, "1") in events
+
+
+def test_node_rename_key_missing():
+    node = Node(a="1")
+    node.rename_key("nonexistent", "whatever")
+    assert list(node.keys()) == ["a"]
+
+
+def test_node_rename_key_updates_child_key():
+    node = Node()
+    node.child = {"nested": "value"}
+    node.rename_key("child", "renamed")
+    assert node.renamed._key == "renamed"
+
+
+# --- ListNode.rename_first_key ---
+
+
+def test_list_node_rename_first_key():
+    lst = ListNode()
+    lst["Title"] = "body"
+    lst["Section"] = "content"
+    lst.rename_first_key("New Title")
+    assert lst.keys() == ["New Title", "Section"]
+    assert lst["New Title"] == "body"
+    assert lst["Title"] is None
+
+
+def test_list_node_rename_first_key_preserves_values():
+    lst = ListNode()
+    lst["A"] = "one"
+    lst["B"] = "two"
+    lst["C"] = "three"
+    lst.rename_first_key("Alpha")
+    assert lst.keys() == ["Alpha", "B", "C"]
+    assert list(lst) == ["one", "two", "three"]
+
+
+def test_list_node_rename_first_key_empty():
+    lst = ListNode()
+    lst.rename_first_key("Whatever")
+    assert lst.keys() == []
+
+
 def test_list_node_update_emits_on_reorder():
     events = []
     root = Node()
