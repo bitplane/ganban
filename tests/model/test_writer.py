@@ -231,6 +231,21 @@ def test_save_custom_branch(empty_repo):
     assert loaded.cards["001"] is not None
 
 
+def test_save_custom_message(empty_repo):
+    """save_board with a custom message produces that commit message."""
+    board = _make_board(
+        empty_repo,
+        cards={"001": _make_card("Test")},
+        columns=[_make_column("1", "Backlog")],
+    )
+
+    commit_sha = save_board(board, message="Add card: Test")
+
+    repo = Repo(empty_repo)
+    commit = repo.commit(commit_sha)
+    assert commit.message.strip() == "Add card: Test"
+
+
 def test_save_noop_skips_commit(repo_with_ganban):
     """Saving an unchanged board returns the same commit, no new history."""
     # First save to normalize the tree (adds index.md etc.)

@@ -229,8 +229,11 @@ class BoardScreen(NodeWatcherMixin, Screen):
         archive_card(self.board, event.card.card_id)
 
     def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
-        """Handle new card creation — model already updated by create_card."""
+        """Handle new card creation — commit immediately for timestamp."""
         event.stop()
+        new_commit = save_board(self.board, message=f"Add card: {event.title}")
+        self.board.commit = new_commit
+        self._last_sync = time.monotonic()
 
     def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
         """Handle new column creation."""

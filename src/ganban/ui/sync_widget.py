@@ -83,10 +83,7 @@ class SyncWidget(NodeWatcherMixin, Container):
         sync = self.board.git.sync
         icon = _current_icon(sync)
         icon_widget.update(icon)
-        status = sync.status or "idle"
-        local_str = "on" if sync.local else "off"
-        remote_str = "on" if sync.remote else "off"
-        icon_widget.tooltip = f"Sync: {status} (local={local_str}, remote={remote_str})"
+        icon_widget.tooltip = sync.status or "idle"
 
     def on_click(self, event) -> None:
         event.stop()

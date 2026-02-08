@@ -61,6 +61,13 @@ class ConfirmInitScreen(ModalScreen[bool]):
 class GanbanApp(App):
     """Git-based kanban board TUI."""
 
+    CSS = """
+    Tooltip {
+        padding: 0 1;
+        margin: 0;
+    }
+    """
+
     TITLE = "ganban"
     BINDINGS = [("ctrl+q", "quit", "Quit")]
 
