@@ -104,6 +104,16 @@ class DetailModal(ModalScreen[None]):
         ("ctrl+q", "quit", "Quit"),
     ]
 
+    def on_mount(self) -> None:
+        self.call_after_refresh(self._focus_content)
+
+    def _focus_content(self) -> None:
+        content = self.query_one("#detail-content", ContentSwitcher)
+        for widget in content.query("*"):
+            if widget.can_focus:
+                widget.focus()
+                return
+
     def on_click(self, event: Click) -> None:
         """Dismiss modal when clicking outside the detail container."""
         container = self.query_one("#detail-container")

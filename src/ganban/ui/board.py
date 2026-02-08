@@ -68,6 +68,15 @@ class BoardScreen(NodeWatcherMixin, Screen):
 
     def on_mount(self) -> None:
         self.node_watch(self.board, "sections", self._on_board_sections_changed)
+        self.call_after_refresh(self._focus_first_card)
+
+    def _focus_first_card(self) -> None:
+        columns = list(self.query(ColumnWidget))
+        for col in columns:
+            focusable = [c for c in col.children if c.can_focus]
+            if focusable:
+                focusable[0].focus()
+                return
 
     def _on_board_sections_changed(self, node, key, old, new) -> None:
         """Update board header when title changes."""
