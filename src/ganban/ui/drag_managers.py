@@ -189,6 +189,7 @@ class CardDragManager:
 
         move_card(card.board, card_id, target_column, position=actual_pos)
 
+        card.remove_class("dragging")
         self._cleanup()
         target_col_widget.call_after_refresh(target_col_widget._refocus_card, target_col_widget, card_id)
 
