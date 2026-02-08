@@ -7,7 +7,7 @@ from rich.text import Text
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
 from ganban.ui.cal import date_diff
-from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
+from ganban.ui.constants import ICON_BODY, ICON_CALENDAR, ICON_CHECKED
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
 
 
@@ -43,6 +43,11 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
             diff = date_diff(due, today)
             style = "red" if due <= today else ""
             parts.append(Text(f"{ICON_CALENDAR}{diff}", style=style))
+
+    # Done indicator
+    done = meta.done if meta else None
+    if done:
+        parts.append(Text(ICON_CHECKED, style="dim"))
 
     if not parts:
         return Text()

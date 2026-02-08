@@ -100,7 +100,10 @@ class GanbanApp(App):
         self.push_screen(BoardScreen(self.board))
 
     def action_quit(self) -> None:
-        """Save and quit."""
+        """Cancel sync, save and quit."""
+        screen = self.screen
+        if hasattr(screen, "_sync_task") and screen._sync_task is not None:
+            screen._sync_task.cancel()
         if self.board:
             save_board(self.board)
         self.exit()

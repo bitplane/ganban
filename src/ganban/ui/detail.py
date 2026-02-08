@@ -11,6 +11,7 @@ from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_META, ICON_TAB_RAW, ICON_TAB_USERS
+from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
 from ganban.ui.markdown import ganban_parser_factory
@@ -154,6 +155,7 @@ class CardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
+                yield DoneWidget(self.card.meta)
                 yield DueDateWidget(self.card.meta)
                 if self.board:
                     yield AssigneeWidget(self.card.meta, self.board)

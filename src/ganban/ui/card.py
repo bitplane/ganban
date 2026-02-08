@@ -1,5 +1,7 @@
 """Card widgets for ganban UI."""
 
+from datetime import date
+
 from textual.app import ComposeResult
 from textual.geometry import Offset
 from textual.message import Message
@@ -9,7 +11,16 @@ from ganban.model.card import create_card, find_card_column
 from ganban.model.node import Node
 from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text
-from ganban.ui.constants import ICON_BACK, ICON_CARD, ICON_CONFIRM, ICON_DELETE, ICON_EDIT, ICON_MOVE_TO
+from ganban.ui.constants import (
+    ICON_BACK,
+    ICON_CARD,
+    ICON_CHECKED,
+    ICON_CONFIRM,
+    ICON_DELETE,
+    ICON_EDIT,
+    ICON_MOVE_TO,
+    ICON_UNCHECKED,
+)
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
@@ -141,11 +152,14 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             for col in self.board.columns
             if not col.hidden
         ]
+        card = self.board.cards[self.card_id]
+        done_label = f"{ICON_CHECKED} Done" if card.meta.done else f"{ICON_UNCHECKED} Done"
         items = [
             MenuItem(f"{ICON_CARD} {self.title}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),
+            MenuItem(done_label, "toggle-done"),
             MenuSeparator(),
             MenuItem(f"{ICON_DELETE} Archive", "archive"),
         ]
@@ -160,6 +174,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
                 self.app.push_screen(CardDetailModal(card, self.board))
             case "archive":
                 self._confirm_archive()
+            case "toggle-done":
+                card = self.board.cards[self.card_id]
+                card.meta.done = None if card.meta.done else date.today().isoformat()
             case s if s and s.startswith("move:"):
                 col_name = s[5:]
                 self._move_to_column(col_name)
