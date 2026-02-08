@@ -249,9 +249,12 @@ class ColumnDragManager:
             mouse_offset.y - col_region.y,
         )
 
-        column_widget.styles.offset = (col_region.x, col_region.y)
-
         columns_container = self.screen.query_one("#columns", Horizontal)
+        container_region = columns_container.region
+        content_x = col_region.x - container_region.x + columns_container.scroll_x
+        content_y = col_region.y - container_region.y + columns_container.scroll_y
+        column_widget.styles.offset = (content_x, content_y)
+
         self.placeholder = ColumnPlaceholder()
         columns_container.mount(self.placeholder, after=column_widget)
 
@@ -261,8 +264,10 @@ class ColumnDragManager:
         if not self.dragging:
             return
 
-        new_x = screen_x - self.drag_offset.x
-        new_y = screen_y - self.drag_offset.y
+        columns_container = self.screen.query_one("#columns", Horizontal)
+        container_region = columns_container.region
+        new_x = (screen_x - self.drag_offset.x) - container_region.x + columns_container.scroll_x
+        new_y = (screen_y - self.drag_offset.y) - container_region.y + columns_container.scroll_y
         self.dragging.styles.offset = (new_x, new_y)
 
         self._update_placeholder_position(screen_x)
