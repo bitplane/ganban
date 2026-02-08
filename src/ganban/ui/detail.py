@@ -71,13 +71,19 @@ class DetailModal(ModalScreen[None]):
         width: 90%;
         height: 90%;
         background: $surface;
-        border: solid $primary;
+    }
+
+    #detail-title-bar {
+        width: 100%;
+        height: auto;
+        background: $primary;
         padding: 0 1;
     }
 
     #detail-bar {
         width: 100%;
         height: 1;
+        padding: 0 1;
     }
 
     #detail-tabs {
@@ -89,6 +95,7 @@ class DetailModal(ModalScreen[None]):
     #detail-content {
         width: 100%;
         height: 1fr;
+        padding: 1 1 0 1;
     }
     """
 
@@ -130,15 +137,16 @@ class CardDetailModal(DetailModal):
         meta, committers = _board_context(self.board)
         pf = ganban_parser_factory(meta, committers)
         with Vertical(id="detail-container"):
-            yield DocHeader(self.card.sections)
-            with Horizontal(id="detail-bar"):
-                yield DueDateWidget(self.card.meta)
-                if self.board:
-                    yield AssigneeWidget(self.card.meta, self.board)
+            with Horizontal(id="detail-title-bar"):
+                yield DocHeader(self.card.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
+            with Horizontal(id="detail-bar"):
+                yield DueDateWidget(self.card.meta)
+                if self.board:
+                    yield AssigneeWidget(self.card.meta, self.board)
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.card.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
@@ -160,13 +168,14 @@ class ColumnDetailModal(DetailModal):
         pf = ganban_parser_factory(meta, committers)
         color = self.column.meta.color
         with Vertical(id="detail-container"):
-            yield DocHeader(self.column.sections)
-            with Horizontal(id="detail-bar"):
-                yield ColorButton(color=color)
+            with Horizontal(id="detail-title-bar"):
+                yield DocHeader(self.column.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
+            with Horizontal(id="detail-bar"):
+                yield ColorButton(color=color)
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.column.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
@@ -190,14 +199,17 @@ class BoardDetailModal(DetailModal):
         meta, committers = _board_context(self.board)
         pf = ganban_parser_factory(meta, committers)
         with Vertical(id="detail-container"):
-            with Horizontal(id="detail-bar"):
+            with Horizontal(id="detail-title-bar"):
+                yield DocHeader(self.board.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_TAB_META, "tab-meta")
                     yield TabButton(ICON_TAB_USERS, "tab-users")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
-                yield MarkdownDocEditor(self.board.sections, meta=meta, parser_factory=pf, id="tab-doc")
+                yield MarkdownDocEditor(
+                    self.board.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
+                )
                 yield MetaEditor(self.board.meta, id="tab-meta")
                 yield UsersEditor(self.board.meta, id="tab-users")
                 yield Static("Coming soon", id="tab-raw")

@@ -32,14 +32,13 @@ class DocHeader(Container):
 
     DEFAULT_CSS = """
     DocHeader {
-        width: 100%;
+        width: 1fr;
         height: auto;
     }
     DocHeader #doc-title {
         width: 100%;
         height: auto;
         text-style: bold;
-        border-bottom: solid $primary;
     }
     DocHeader #doc-title > ContentSwitcher > Static {
         text-style: bold;

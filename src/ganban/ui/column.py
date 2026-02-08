@@ -13,6 +13,7 @@ from ganban.parser import first_title
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.color import build_color_menu
 from ganban.ui.constants import (
+    ICON_BACK,
     ICON_COLUMN,
     ICON_CONFIRM,
     ICON_DELETE,
@@ -312,7 +313,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             MenuItem(f"{ICON_DELETE} Delete {name}?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
-            MenuItem(f"{ICON_DELETE} Cancel", "cancel"),
+            MenuItem(f"{ICON_BACK} Cancel", "cancel"),
         ]
         self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
 

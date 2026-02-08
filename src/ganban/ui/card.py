@@ -9,7 +9,7 @@ from ganban.model.node import Node
 from ganban.model.writer import create_card
 from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text
-from ganban.ui.constants import ICON_CARD, ICON_CONFIRM, ICON_DELETE, ICON_EDIT, ICON_MOVE_TO
+from ganban.ui.constants import ICON_BACK, ICON_CARD, ICON_CONFIRM, ICON_DELETE, ICON_EDIT, ICON_MOVE_TO
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragStarted
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
@@ -178,7 +178,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             MenuItem(f"{ICON_DELETE} Delete {self.title}?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
-            MenuItem(f"{ICON_DELETE} Cancel", "cancel"),
+            MenuItem(f"{ICON_BACK} Cancel", "cancel"),
         ]
         self.app.push_screen(ContextMenu(items, x, y), self._on_delete_confirmed)
 
