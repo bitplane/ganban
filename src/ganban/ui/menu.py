@@ -96,7 +96,6 @@ class MenuRow(Horizontal):
     def __init__(self, *items: MenuItem) -> None:
         super().__init__()
         self._items = list(items)
-        self._active_index: int = 0
 
     def compose(self) -> ComposeResult:
         for item in self._items:
@@ -104,35 +103,20 @@ class MenuRow(Horizontal):
             item.styles.padding = (0, 0)
             yield item
 
-    @property
-    def active_item(self) -> MenuItem | None:
-        """The currently active (last-focused) item in this row."""
-        enabled = self.get_focusable_items()
-        if not enabled:
-            return None
-        self._active_index = min(self._active_index, len(enabled) - 1)
-        return enabled[self._active_index]
-
     def get_focusable_items(self) -> list[MenuItem]:
         """Return enabled items in this row."""
         return [item for item in self._items if not item.disabled]
 
     def navigate(self, direction: int) -> MenuItem | None:
-        """Move active index by direction (+1/-1). Return new item, or None at edge."""
+        """Move focus by direction (+1/-1). Return new item, or None at edge."""
         enabled = self.get_focusable_items()
         if not enabled:
             return None
-        new_index = self._active_index + direction
+        focused = next((i for i, item in enumerate(enabled) if item.has_focus), 0)
+        new_index = focused + direction
         if new_index < 0 or new_index >= len(enabled):
             return None
-        self._active_index = new_index
-        return enabled[self._active_index]
-
-    def activate(self, item: MenuItem) -> None:
-        """Set the given item as the active one."""
-        enabled = self.get_focusable_items()
-        if item in enabled:
-            self._active_index = enabled.index(item)
+        return enabled[new_index]
 
 
 class MenuList(VerticalScroll):
@@ -212,19 +196,23 @@ class MenuList(VerticalScroll):
                 item.focus()
                 break
 
-    def get_focusable_items(self) -> list[MenuItem]:
-        """Return list of items for vertical navigation.
+    def get_navigable_items(self) -> list[tuple[Static, list[MenuItem]]]:
+        """Return (top_level_child, focusable_descendants) for vertical nav.
 
-        Each MenuRow is collapsed to its active item.
+        A plain MenuItem has [itself]. A container has its focusable MenuItems.
+        Non-focusable items (separators) are skipped.
         """
-        result: list[MenuItem] = []
+        result: list[tuple[Static, list[MenuItem]]] = []
         for item in self._items:
-            if isinstance(item, MenuRow):
-                active = item.active_item
-                if active is not None:
-                    result.append(active)
-            elif isinstance(item, MenuItem) and not item.disabled:
-                result.append(item)
+            if isinstance(item, MenuItem):
+                if not item.disabled:
+                    result.append((item, [item]))
+            elif isinstance(item, MenuSeparator):
+                continue
+            else:
+                focusable = [child for child in item.query(MenuItem) if not child.disabled]
+                if focusable:
+                    result.append((item, focusable))
         return result
 
 
@@ -368,30 +356,42 @@ class ContextMenu(ModalScreen[MenuItem | None]):
     def on_descendant_focus(self, event) -> None:
         """React to any focus change within the menu."""
         if isinstance(event.widget, MenuItem):
-            row = self._containing_row(event.widget)
-            if row:
-                row.activate(event.widget)
             self._on_item_focused(event.widget)
+
+    def _focus_vertical(self, direction: int) -> None:
+        """Move focus up (-1) or down (+1), preserving column position."""
+        focused = self._focused_item
+        if not focused:
+            return
+        menu = self._menu_for_item(focused)
+        nav = menu.get_navigable_items()
+        if not nav:
+            return
+
+        # Find which top-level entry contains the focused widget
+        current_idx = None
+        child_idx = 0
+        for i, (top_level, focusable) in enumerate(nav):
+            if focused in focusable:
+                current_idx = i
+                child_idx = focusable.index(focused)
+                break
+
+        if current_idx is None:
+            return
+
+        target_idx = (current_idx + direction) % len(nav)
+        target_focusable = nav[target_idx][1]
+        clamped = min(child_idx, len(target_focusable) - 1)
+        target_focusable[clamped].focus()
 
     def action_focus_prev(self) -> None:
         """Focus the previous enabled item in current menu (wraps around)."""
-        focused = self._focused_item
-        if not focused:
-            return
-        menu = self._menu_for_item(focused)
-        items = menu.get_focusable_items()
-        idx = items.index(focused)
-        items[(idx - 1) % len(items)].focus()
+        self._focus_vertical(-1)
 
     def action_focus_next(self) -> None:
         """Focus the next enabled item in current menu (wraps around)."""
-        focused = self._focused_item
-        if not focused:
-            return
-        menu = self._menu_for_item(focused)
-        items = menu.get_focusable_items()
-        idx = items.index(focused)
-        items[(idx + 1) % len(items)].focus()
+        self._focus_vertical(1)
 
     def action_select_item(self) -> None:
         """Select leaf item or enter submenu."""

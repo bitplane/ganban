@@ -521,19 +521,20 @@ async def test_left_at_row_start_does_close_submenu(menu_with_row):
 
 
 @pytest.mark.asyncio
-async def test_row_remembers_active_item(menu_with_row):
-    """Row remembers which item was last focused."""
+async def test_vertical_nav_preserves_column(menu_with_row):
+    """Up/down preserves column position, not row memory."""
     app = MenuTestApp(menu_with_row)
     async with app.run_test() as pilot:
         await pilot.press("down")  # -> "a"
         await pilot.press("right")  # -> "b"
         assert app.focused.item_id == "b"
 
-        await pilot.press("down")  # -> "below"
+        await pilot.press("down")  # -> "below" (single item, index 0)
         assert app.focused.item_id == "below"
 
-        await pilot.press("up")  # -> back to row, should be "b"
-        assert app.focused.item_id == "b"
+        # "below" is index 0, so up lands on index 0 of the row = "a"
+        await pilot.press("up")
+        assert app.focused.item_id == "a"
 
 
 @pytest.mark.asyncio
@@ -582,3 +583,52 @@ async def test_row_wrapping_down_from_bottom(menu_with_row):
 
         await pilot.press("down")
         assert app.focused.item_id == "normal"
+
+
+@pytest.mark.asyncio
+async def test_column_preserved_across_rows(menu_with_rows):
+    """Down from row1[2] lands on row2[2], preserving column."""
+    app = MenuTestApp(menu_with_rows)
+    async with app.run_test() as pilot:
+        # First item focused is "a" (row1, index 0)
+        assert app.focused.item_id == "a"
+
+        await pilot.press("right")  # -> "b"
+        await pilot.press("right")  # -> "c" (index 2)
+        assert app.focused.item_id == "c"
+
+        await pilot.press("down")  # -> row2, index 2 = "f"
+        assert app.focused.item_id == "f"
+
+        await pilot.press("up")  # -> row1, index 2 = "c"
+        assert app.focused.item_id == "c"
+
+
+@pytest.mark.asyncio
+async def test_column_clamped_when_target_shorter(menu_with_rows):
+    """Column index is clamped when target row has fewer items."""
+    # Use menu_with_row fixture indirectly - create inline
+    from ganban.ui.menu import MenuRow
+
+    items = [
+        MenuRow(
+            MenuItem("A", item_id="a"),
+            MenuItem("B", item_id="b"),
+            MenuItem("C", item_id="c"),
+        ),
+        MenuRow(
+            MenuItem("X", item_id="x"),
+            MenuItem("Y", item_id="y"),
+        ),
+    ]
+    app = MenuTestApp(items)
+    async with app.run_test() as pilot:
+        assert app.focused.item_id == "a"
+
+        await pilot.press("right")  # -> "b"
+        await pilot.press("right")  # -> "c" (index 2)
+        assert app.focused.item_id == "c"
+
+        # Row 2 only has 2 items, so index 2 clamps to 1 = "y"
+        await pilot.press("down")
+        assert app.focused.item_id == "y"

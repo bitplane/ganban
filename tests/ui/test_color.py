@@ -169,10 +169,10 @@ async def test_arrow_navigation_in_grid():
         await pilot.press("right")
         assert app.focused.item_id == "#800000"
 
-        # Down to second row (index 1 remembered -> "#000080" blue)
+        # Down to second row, column 1 preserved -> "#800080" purple
         await pilot.press("down")
-        assert app.focused.item_id == "#000080"
+        assert app.focused.item_id == "#800080"
 
-        # Up back
+        # Up back, column 1 preserved -> "#800000" red
         await pilot.press("up")
         assert app.focused.item_id == "#800000"

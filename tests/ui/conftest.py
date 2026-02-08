@@ -83,6 +83,28 @@ def menu_with_row():
 
 
 @pytest.fixture
+def menu_with_rows():
+    """A menu with two consecutive horizontal rows.
+
+    Structure:
+    - [A] [B] [C]   (MenuRow)
+    - [D] [E] [F]   (MenuRow)
+    """
+    return [
+        MenuRow(
+            MenuItem("A", item_id="a"),
+            MenuItem("B", item_id="b"),
+            MenuItem("C", item_id="c"),
+        ),
+        MenuRow(
+            MenuItem("D", item_id="d"),
+            MenuItem("E", item_id="e"),
+            MenuItem("F", item_id="f"),
+        ),
+    ]
+
+
+@pytest.fixture
 def all_disabled_menu():
     """A menu where all items are disabled."""
     return [
