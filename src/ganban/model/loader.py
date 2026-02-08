@@ -1,6 +1,8 @@
 """Load a ganban board from git into a Node tree."""
 
 import re
+import subprocess
+from datetime import datetime, timezone
 from functools import cmp_to_key
 
 from git import Repo
@@ -90,6 +92,33 @@ def _get_committers(repo: Repo, max_count: int = MAX_COMMITS) -> list[str]:
     for commit in repo.iter_commits(max_count=max_count, all=True):
         seen.add(f"{commit.author.name} <{commit.author.email}>")
     return sorted(seen)
+
+
+def file_creation_date(repo_path: str, file_path: str, branch: str = BRANCH_NAME) -> datetime | None:
+    """Get the author date of the commit that first added a file on a branch.
+
+    Returns None if the file has no history on the branch.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "log",
+            "--diff-filter=A",
+            "--reverse",
+            "--format=%aI",
+            branch,
+            "--",
+            file_path,
+        ],
+        cwd=repo_path,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    first_line = result.stdout.decode("utf-8").strip().split("\n")[0]
+    if not first_line:
+        return None
+    return datetime.fromisoformat(first_line).astimezone(timezone.utc)
 
 
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:

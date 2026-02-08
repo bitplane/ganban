@@ -2,14 +2,14 @@
 
 import shutil
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from git import Repo
-
 from git.util import Actor
 
-from ganban.model.loader import _get_committers, load_board
+from ganban.model.loader import _get_committers, file_creation_date, load_board
 from ganban.model.node import ListNode, Node
 
 
@@ -296,6 +296,54 @@ def test_load_board_adopted_card_survives_save(tmp_path):
     card = list(reloaded.cards)[0]
     assert card.sections["Dropped in"] == "Via vim."
     assert reloaded.columns["1"].links[0] == list(reloaded.cards.keys())[0]
+
+
+def test_file_creation_date_returns_datetime(repo_with_ganban):
+    """Returns the author date of the commit that first added a file."""
+    result = file_creation_date(str(repo_with_ganban), ".all/001.md")
+    assert result is not None
+    assert isinstance(result, datetime)
+
+
+def test_file_creation_date_returns_none_for_missing_file(repo_with_ganban):
+    """Returns None for a file that doesn't exist on the branch."""
+    result = file_creation_date(str(repo_with_ganban), ".all/999.md")
+    assert result is None
+
+
+def test_file_creation_date_returns_first_commit(repo_with_ganban):
+    """If a file is modified later, we still get the original creation date."""
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+
+    # Modify the card in a second commit
+    card_path = repo_with_ganban / ".all" / "001.md"
+    original_date = file_creation_date(str(repo_with_ganban), ".all/001.md")
+
+    card_path.write_text("# First card\n\nEdited description.\n")
+    repo.index.add([".all/001.md"])
+    repo.index.commit("Edit card")
+
+    result = file_creation_date(str(repo_with_ganban), ".all/001.md")
+    assert result == original_date
+
+
+def test_file_creation_date_different_files(repo_with_ganban):
+    """Different files added in different commits get different dates."""
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+
+    date_001 = file_creation_date(str(repo_with_ganban), ".all/001.md")
+
+    # Add a second card in a new commit
+    (repo_with_ganban / ".all" / "002.md").write_text("# Second card\n")
+    repo.index.add([".all/002.md"])
+    repo.index.commit("Add second card")
+
+    date_002 = file_creation_date(str(repo_with_ganban), ".all/002.md")
+    assert date_001 is not None
+    assert date_002 is not None
+    assert date_002 >= date_001
 
 
 def test_load_board_missing_branch(tmp_path):
