@@ -198,6 +198,106 @@ def test_get_committers_multiple_authors(tmp_path):
     assert result == ["Alice <alice@example.com>", "Bob <bob@example.com>"]
 
 
+def test_load_board_adopts_regular_file_as_card(tmp_path):
+    """A regular .md file in a column directory is adopted as a new card."""
+    repo = Repo.init(tmp_path)
+    (tmp_path / ".gitkeep").write_text("")
+    repo.index.add([".gitkeep"])
+    repo.index.commit("Initial commit")
+
+    with tempfile.TemporaryDirectory() as board_tmp:
+        board_dir = Path(board_tmp)
+
+        all_dir = board_dir / ".all"
+        all_dir.mkdir()
+        (all_dir / "001.md").write_text("# Existing card\n\nAlready here.")
+
+        backlog = board_dir / "1.backlog"
+        backlog.mkdir()
+        (backlog / "01.existing-card.md").symlink_to("../.all/001.md")
+        # Regular file, not a symlink
+        (backlog / "02.new-card.md").write_text("# Adopted card\n\nFrom a file.")
+
+        (board_dir / "index.md").write_text("# Board\n")
+
+        repo.git.checkout("--orphan", "ganban")
+        repo.git.rm("-rf", ".", "--cached")
+        repo.git.clean("-fd")
+
+        for item in board_dir.iterdir():
+            dest = tmp_path / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest, symlinks=True)
+            else:
+                shutil.copy2(item, dest)
+
+    repo.git.add("-A")
+    repo.index.commit("Board with regular file")
+
+    board = load_board(str(tmp_path))
+
+    # Should have 2 cards: the original and the adopted one
+    assert len(board.cards) == 2
+
+    # The adopted card should be in the backlog links
+    backlog = board.columns["1"]
+    assert len(backlog.links) == 2
+    assert "001" in backlog.links
+
+    # Find the adopted card
+    adopted_id = [lid for lid in backlog.links if lid != "001"][0]
+    adopted = board.cards[adopted_id]
+    assert adopted.sections["Adopted card"] == "From a file."
+    assert adopted.file_path == f".all/{adopted_id}.md"
+
+
+def test_load_board_adopted_card_survives_save(tmp_path):
+    """An adopted regular file becomes a proper symlinked card after save."""
+    repo = Repo.init(tmp_path)
+    (tmp_path / ".gitkeep").write_text("")
+    repo.index.add([".gitkeep"])
+    repo.index.commit("Initial commit")
+
+    with tempfile.TemporaryDirectory() as board_tmp:
+        board_dir = Path(board_tmp)
+
+        all_dir = board_dir / ".all"
+        all_dir.mkdir()
+
+        backlog = board_dir / "1.backlog"
+        backlog.mkdir()
+        (backlog / "01.dropped-in.md").write_text("# Dropped in\n\nVia vim.")
+
+        (board_dir / "index.md").write_text("# Board\n")
+
+        repo.git.checkout("--orphan", "ganban")
+        repo.git.rm("-rf", ".", "--cached")
+        repo.git.clean("-fd")
+
+        for item in board_dir.iterdir():
+            dest = tmp_path / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest, symlinks=True)
+            else:
+                shutil.copy2(item, dest)
+
+    repo.git.add("-A")
+    repo.index.commit("Board with dropped file")
+
+    from ganban.model.writer import save_board
+
+    board = load_board(str(tmp_path))
+    assert len(board.cards) == 1
+    save_board(board, message="Adopt card")
+
+    # Reload and verify it's now a proper card
+    reloaded = load_board(str(tmp_path))
+    assert len(reloaded.cards) == 1
+    card = list(reloaded.cards)[0]
+    assert card.sections["Dropped in"] == "Via vim."
+    assert reloaded.columns["1"].links[0] == list(reloaded.cards.keys())[0]
+
+
 def test_load_board_missing_branch(tmp_path):
     repo = Repo.init(tmp_path)
     (tmp_path / ".gitkeep").write_text("")

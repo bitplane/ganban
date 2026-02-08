@@ -306,6 +306,27 @@ def test_save_custom_branch(empty_repo):
     assert loaded.cards["001"] is not None
 
 
+def test_save_noop_skips_commit(repo_with_ganban):
+    """Saving an unchanged board returns the same commit, no new history."""
+    # First save to normalize the tree (adds index.md etc.)
+    board = load_board(str(repo_with_ganban))
+    baseline_commit = save_board(board, message="Normalize")
+
+    # Reload from the normalized state
+    board = load_board(str(repo_with_ganban))
+    assert board.commit == baseline_commit
+
+    repo = Repo(repo_with_ganban)
+    commits_before = list(repo.iter_commits("ganban"))
+
+    result = save_board(board, message="Should not appear")
+
+    assert result == baseline_commit
+
+    commits_after = list(repo.iter_commits("ganban"))
+    assert len(commits_after) == len(commits_before)
+
+
 def test_save_with_explicit_parents(repo_with_ganban):
     """Can save with explicit parent commits for merge."""
     board = load_board(str(repo_with_ganban))

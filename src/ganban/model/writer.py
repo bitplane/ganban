@@ -212,6 +212,12 @@ def save_board(
             current_tip = _get_branch_tip(repo_path, branch)
             parents = [current_tip] if current_tip else []
 
+    # Skip commit if tree is unchanged from parent
+    if len(parents) == 1 and parents[0]:
+        parent_tree = _git(repo_path, ["rev-parse", f"{parents[0]}^{{tree}}"])
+        if parent_tree == tree:
+            return board.commit
+
     parent_args = []
     for parent in parents:
         if parent:
