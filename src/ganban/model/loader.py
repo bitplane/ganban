@@ -6,7 +6,7 @@ from functools import cmp_to_key
 from git import Repo
 from git.objects import Blob, Tree
 
-from ganban.ids import compare_ids
+from ganban.ids import compare_ids, max_id, next_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
 
@@ -168,19 +168,32 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         for link_item in col_tree:
             if link_item.type != "blob":
                 continue
-            if link_item.mode != 0o120000:
-                continue
             if not link_item.name.endswith(".md"):
+                continue
+            if link_item.name == "index.md":
                 continue
             position, slug = _parse_link_name(link_item.name)
             if position is None:
                 continue
-            target = link_item.data_stream.read().decode("utf-8")
-            card_id = target.split("/")[-1]
-            if card_id.endswith(".md"):
-                card_id = card_id[:-3]
-            if card_id not in card_ids:
-                continue
+            if link_item.mode == 0o120000:
+                target = link_item.data_stream.read().decode("utf-8")
+                card_id = target.split("/")[-1]
+                if card_id.endswith(".md"):
+                    card_id = card_id[:-3]
+                if card_id not in card_ids:
+                    continue
+            else:
+                # Regular file: adopt as a new card
+                card_id = next_id(max_id(list(card_ids)))
+                card_ids.add(card_id)
+                text = link_item.data_stream.read().decode("utf-8")
+                sections_ln, meta = _build_sections_list(text, fallback_title=slug)
+                card = Node(
+                    sections=sections_ln,
+                    meta=meta,
+                    file_path=f".all/{card_id}.md",
+                )
+                cards_ln[card_id] = card
             link_entries.append((position, card_id))
 
         link_entries.sort(key=cmp_to_key(lambda a, b: compare_ids(a[0], b[0])))
