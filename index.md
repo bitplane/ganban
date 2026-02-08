@@ -9,10 +9,6 @@ users:
     emails:
     - noreply@anthropic.com
     emoji: "\U0001F916"
-  squidding pall:
-    emails:
-    - jessanndavidson@gmail.com
-    emoji: "\U0001F431"
 ---
 
 # ganban
