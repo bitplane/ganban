@@ -383,3 +383,205 @@ async def test_date_button_with_initial_selection():
                 assert "selected" in day.classes
                 return
         pytest.fail("Selected date not found")
+
+
+# Keyboard navigation tests
+
+
+def _focused_day(app) -> CalendarDay | None:
+    """Return the currently focused CalendarDay, or None."""
+    focused = app.focused
+    return focused if isinstance(focused, CalendarDay) else None
+
+
+@pytest.mark.asyncio
+async def test_initial_focus_on_selected():
+    """Selected date gets focus on mount."""
+    selected = date(2026, 3, 15)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == selected
+
+
+@pytest.mark.asyncio
+async def test_initial_focus_on_today():
+    """Today gets focus when no selection."""
+    app = CalendarApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date.today()
+
+
+@pytest.mark.asyncio
+async def test_arrow_down_moves_next_day():
+    """Down arrow moves to next day (+1)."""
+    selected = date(2026, 3, 10)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("down")
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 3, 11)
+
+
+@pytest.mark.asyncio
+async def test_arrow_up_moves_prev_day():
+    """Up arrow moves to previous day (-1)."""
+    selected = date(2026, 3, 10)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("up")
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 3, 9)
+
+
+@pytest.mark.asyncio
+async def test_arrow_right_moves_next_week():
+    """Right arrow moves to next week (+7)."""
+    selected = date(2026, 3, 10)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("right")
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 3, 17)
+
+
+@pytest.mark.asyncio
+async def test_arrow_left_moves_prev_week():
+    """Left arrow moves to previous week (-7)."""
+    selected = date(2026, 3, 10)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("left")
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 3, 3)
+
+
+@pytest.mark.asyncio
+async def test_enter_selects_focused_day():
+    """Enter selects the focused day and emits DateSelected."""
+    selected = date(2026, 3, 10)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("down")  # Move to 11th
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.date_selected == date(2026, 3, 11)
+        cal = app.query_one(Calendar)
+        assert cal.selected == date(2026, 3, 11)
+
+
+@pytest.mark.asyncio
+async def test_pagedown_next_month():
+    """PageDown navigates to next month, focusing same day."""
+    selected = date(2026, 3, 15)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("pagedown")
+        await pilot.pause()
+        cal = app.query_one(Calendar)
+        title = cal.query_one("#title")
+        assert title.content == "Apr 2026"
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 4, 15)
+
+
+@pytest.mark.asyncio
+async def test_pageup_prev_month():
+    """PageUp navigates to previous month, focusing same day."""
+    selected = date(2026, 3, 15)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("pageup")
+        await pilot.pause()
+        cal = app.query_one(Calendar)
+        title = cal.query_one("#title")
+        assert title.content == "Feb 2026"
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 2, 15)
+
+
+@pytest.mark.asyncio
+async def test_pageup_clamps_day():
+    """PageUp from March 31 clamps to Feb 28."""
+    selected = date(2026, 3, 31)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("pageup")
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 2, 28)
+
+
+@pytest.mark.asyncio
+async def test_month_boundary_crossing_down():
+    """Navigating past month end changes the displayed month."""
+    # March 31 + down = April 1
+    selected = date(2026, 3, 31)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("down")
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 4, 1)
+
+
+@pytest.mark.asyncio
+async def test_month_boundary_crossing_up():
+    """Navigating before month start changes the displayed month."""
+    # March 1 + up = Feb 28
+    selected = date(2026, 3, 1)
+    app = CalendarApp(selected=selected)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+        assert focused.date == date(2026, 2, 28)
+
+
+@pytest.mark.asyncio
+async def test_keyboard_select_in_menu():
+    """Enter on a day in DateButton menu closes menu and emits message."""
+    app = DateButtonApp()
+    async with app.run_test() as pilot:
+        btn = app.query_one(DateButton)
+        await pilot.click(btn)
+        assert isinstance(app.screen, ContextMenu)
+
+        # Calendar should have initial focus on today
+        await pilot.pause()
+        focused = _focused_day(app)
+        assert focused is not None
+
+        # Navigate down then select
+        await pilot.press("down")
+        focused = _focused_day(app)
+        expected_date = focused.date
+        await pilot.press("enter")
+
+        # Menu should close
+        assert not isinstance(app.screen, ContextMenu)
+        assert app.date_selected == expected_date

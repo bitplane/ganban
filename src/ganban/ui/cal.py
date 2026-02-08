@@ -52,7 +52,7 @@ class NavButton(Static):
         self.post_message(self.Clicked(self))
 
 
-class CalendarDay(Static):
+class CalendarDay(Static, can_focus=True):
     """A single day cell."""
 
     class Clicked(Message):
@@ -95,15 +95,27 @@ class Calendar(Container):
     .cal-label { width: 3; color: $text-muted; }
     CalendarDay { width: 3; text-align: center; }
     CalendarDay:hover { background: $primary-darken-2; }
+    CalendarDay:focus { background: $primary-darken-2; }
     CalendarDay.today { text-style: bold; color: $primary; }
     CalendarDay.selected { background: $primary; color: $text; }
     CalendarDay.other-month { color: $text-disabled; }
     """
 
+    BINDINGS = [
+        ("up", "cursor_up", "Previous day"),
+        ("down", "cursor_down", "Next day"),
+        ("left", "cursor_left", "Previous week"),
+        ("right", "cursor_right", "Next week"),
+        ("enter", "select", "Select date"),
+        ("pageup", "prev_month", "Previous month"),
+        ("pagedown", "next_month", "Next month"),
+    ]
+
     def __init__(self, selected: date | None = None) -> None:
         super().__init__()
         self._selected = selected
         self._viewing = date.today().replace(day=1)
+        self._cursor_date: date | None = None
         if selected:
             self._viewing = selected.replace(day=1)
 
@@ -152,6 +164,89 @@ class Calendar(Container):
             classes.append("other-month")
         return CalendarDay(d, classes=" ".join(classes))
 
+    def on_mount(self) -> None:
+        self.call_after_refresh(self._focus_initial)
+
+    @property
+    def _focused_day(self) -> CalendarDay | None:
+        focused = self.app.focused
+        return focused if isinstance(focused, CalendarDay) else None
+
+    def _focus_date(self, target: date) -> None:
+        """Focus the CalendarDay matching target date."""
+        for day in self.query(CalendarDay):
+            if day.date == target:
+                day.focus()
+                return
+
+    def _focus_initial(self) -> None:
+        """Focus selected date if set, else today if visible, else 1st of month."""
+        if self._selected:
+            self._focus_date(self._selected)
+            return
+        today = date.today()
+        if today.month == self._viewing.month and today.year == self._viewing.year:
+            self._focus_date(today)
+            return
+        self._focus_date(self._viewing.replace(day=1))
+
+    def _navigate(self, delta_days: int) -> None:
+        """Move cursor by delta_days from focused day."""
+        focused = self._focused_day
+        if not focused:
+            return
+        target = focused.date + timedelta(days=delta_days)
+        self._cursor_date = target
+        # Check if target is in current grid
+        for day in self.query(CalendarDay):
+            if day.date == target:
+                day.focus()
+                return
+        # Target not visible — change month and focus after refresh
+        self._viewing = target.replace(day=1)
+        self._refresh()
+        self.call_after_refresh(self._focus_date, target)
+
+    def action_cursor_up(self) -> None:
+        self._navigate(-1)
+
+    def action_cursor_down(self) -> None:
+        self._navigate(1)
+
+    def action_cursor_left(self) -> None:
+        self._navigate(-7)
+
+    def action_cursor_right(self) -> None:
+        self._navigate(7)
+
+    def action_select(self) -> None:
+        focused = self._focused_day
+        if not focused:
+            return
+        self._selected = focused.date
+        self.post_message(self.DateSelected(focused.date))
+        self._refresh()
+        self.call_after_refresh(self._focus_date, focused.date)
+
+    def action_prev_month(self) -> None:
+        focused = self._focused_day
+        self._go_prev_month()
+        if focused:
+            # Try same day-of-month in new month, clamped
+            max_day = calendar.monthrange(self._viewing.year, self._viewing.month)[1]
+            target = self._viewing.replace(day=min(focused.date.day, max_day))
+            self._cursor_date = target
+            self.call_after_refresh(self._focus_date, target)
+
+    def action_next_month(self) -> None:
+        focused = self._focused_day
+        self._go_next_month()
+        if focused:
+            max_day = calendar.monthrange(self._viewing.year, self._viewing.month)[1]
+            target = self._viewing.replace(day=min(focused.date.day, max_day))
+            self._cursor_date = target
+            self.call_after_refresh(self._focus_date, target)
+
     def on_nav_button_clicked(self, event: NavButton.Clicked) -> None:
         event.stop()
         if event.button.id == "prev":
@@ -181,11 +276,15 @@ class Calendar(Container):
 
     def _refresh(self) -> None:
         """Rebuild the calendar grid."""
+        focused = self._focused_day
+        cursor = focused.date if focused else self._cursor_date
         self.query_one("#title", Static).update(self._viewing.strftime("%b %Y"))
         old_grid = self.query_one(".cal-grid")
         new_grid = self._build_grid()
         old_grid.remove()
         self.mount(new_grid)
+        if cursor:
+            self.call_after_refresh(self._focus_date, cursor)
 
 
 class CalendarMenuItem(Container):
