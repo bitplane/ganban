@@ -14,6 +14,7 @@ from ganban.cli.column import (
     column_set,
 )
 from ganban.cli.init import init_board
+from ganban.cli.sync import sync
 
 
 def _not_implemented(args):
@@ -122,8 +123,14 @@ def build_parser() -> argparse.ArgumentParser:
     col_archive_p.add_argument("id", help="Column ID")
     col_archive_p.set_defaults(func=column_archive)
 
+    # --- sync ---
+    sync_p = nouns.add_parser("sync", help="Sync board with remotes", parents=[common])
+    sync_p.add_argument("-d", "--daemon", action="store_true", help="Run as background daemon")
+    sync_p.add_argument("--interval", type=int, default=120, help="Daemon sync interval in seconds (default: 120)")
+    sync_p.set_defaults(func=sync)
+
     # --- reserved ---
-    for name in ("sync", "web", "serve"):
+    for name in ("web", "serve"):
         p = nouns.add_parser(name, help=f"{name} (not yet implemented)", parents=[common])
         p.set_defaults(func=_not_implemented, noun=name)
 
