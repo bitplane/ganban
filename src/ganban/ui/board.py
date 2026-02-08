@@ -2,8 +2,9 @@
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
+from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Footer, Static
 
 from ganban.model.card import archive_card, move_card
 from ganban.model.column import archive_column, move_column
@@ -25,7 +26,7 @@ class BoardScreen(NodeWatcherMixin, Screen):
     """Main board screen showing all columns."""
 
     BINDINGS = [
-        ("escape", "cancel_drag", "Cancel drag"),
+        Binding("escape", "cancel_drag", "Cancel drag", show=False),
         ("ctrl+s", "save", "Save"),
         ("ctrl+@", "context_menu", "Context menu"),
     ]
@@ -66,6 +67,8 @@ class BoardScreen(NodeWatcherMixin, Screen):
             for column in visible_columns:
                 yield ColumnWidget(column, self.board)
             yield AddColumn(self.board)
+
+        yield Footer()
 
     def on_mount(self) -> None:
         self.node_watch(self.board, "sections", self._on_board_sections_changed)
