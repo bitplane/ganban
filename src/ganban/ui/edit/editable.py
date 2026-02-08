@@ -29,6 +29,11 @@ class _FocusableView(Container):
             parent = parent.parent
         return parent
 
+    def on_mouse_down(self, event) -> None:
+        parent = self._get_editable_parent()
+        if parent:
+            parent.call_after_refresh(parent._apply_click_position, event.screen_x, event.screen_y)
+
     def on_focus(self) -> None:
         parent = self._get_editable_parent()
         if parent and not parent._skip_next_focus:
@@ -141,14 +146,22 @@ class EditableText(Container):
 
     def on_click(self, event) -> None:
         if not self.disabled and not self._editing:
-            self._start_edit(x=event.x, y=event.y)
+            self._start_edit()
 
-    def _start_edit(self, x: int = 0, y: int = 0) -> None:
+    def _start_edit(self) -> None:
         if self._editing:
             return
         self._editing = True
         self.query_one(ContentSwitcher).current = "edit"
-        self._editor.start_editing(self._value, x, y)
+        self._editor.start_editing(self._value)
+
+    def _apply_click_position(self, screen_x: int, screen_y: int) -> None:
+        """Position cursor using screen coords from the original click."""
+        region = self._editor.region
+        x = screen_x - region.x
+        y = screen_y - region.y
+        target = self._editor.get_target_document_location(type("_Pos", (), {"x": x, "y": y})())
+        self._editor.cursor_location = target
 
     def _stop_edit(self, save: bool, value: str = "") -> None:
         if not self._editing:

@@ -21,14 +21,11 @@ class BaseEditor(TextArea):
         super().__init__(**kwargs)
         self._done = False
 
-    def start_editing(self, value: str, x: int = 0, y: int = 0) -> None:
+    def start_editing(self, value: str) -> None:
         """Start editing. Called by EditableText."""
         self._done = False
         self.text = value
-        lines = value.split("\n")
-        y = min(y, len(lines) - 1) if lines else 0
-        x = min(x, len(lines[y])) if lines else 0
-        self.cursor_location = (y, x)
+        self.cursor_location = (0, 0)
         self.focus()
 
     def _finish(self, save: bool) -> None:
