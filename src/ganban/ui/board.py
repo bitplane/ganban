@@ -19,15 +19,14 @@ from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 from ganban.ui.constants import ICON_BOARD, ICON_EDIT
 from ganban.ui.detail import BoardDetailModal
-from ganban.ui.drag import DragStarted
-from ganban.ui.drag_managers import CardDragManager, ColumnDragManager
+from ganban.ui.drag import ColumnPlaceholder, DropTarget
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.sync_widget import SyncWidget
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-class BoardScreen(NodeWatcherMixin, Screen):
+class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
     """Main board screen showing all columns."""
 
     BINDINGS = [
@@ -62,8 +61,8 @@ class BoardScreen(NodeWatcherMixin, Screen):
         self._init_watcher()
         super().__init__()
         self.board = board
-        self._card_drag = CardDragManager(self)
-        self._column_drag = ColumnDragManager(self)
+        self._active_draggable = None
+        self._column_placeholder: ColumnPlaceholder | None = None
         self._sync_task: asyncio.Task | None = None
         self._last_sync: float = time.monotonic()
 
@@ -124,37 +123,87 @@ class BoardScreen(NodeWatcherMixin, Screen):
         if header.value != new_title:
             header.value = new_title
 
-    def on_drag_started(self, event: DragStarted) -> None:
-        """Handle drag start from a card."""
-        if isinstance(event.widget, CardWidget):
-            event.stop()
-            self._card_drag.start(event.widget, event.mouse_offset)
-
-    def on_column_widget_drag_started(self, event: ColumnWidget.DragStarted) -> None:
-        """Handle the start of a column drag."""
-        event.stop()
-        self._column_drag.start(event.column_widget, event.mouse_offset)
+    # -- Thin delegation: screen routes mouse events to active draggable --
 
     def on_mouse_move(self, event) -> None:
-        """Update drag overlay position."""
-        if self._column_drag.active:
-            self._column_drag.update_position(event.screen_x, event.screen_y)
-        elif self._card_drag.active:
-            self._card_drag.update_position(event.screen_x, event.screen_y)
+        if self._active_draggable is not None:
+            self._active_draggable._drag_move(event.screen_x, event.screen_y)
 
     def on_mouse_up(self, event) -> None:
-        """Complete the drag operation."""
-        if self._column_drag.active:
-            self._column_drag.finish()
-        elif self._card_drag.active:
-            self._card_drag.finish()
+        if self._active_draggable is not None:
+            self._active_draggable._drag_finish(event.screen_x, event.screen_y)
 
     def action_cancel_drag(self) -> None:
-        """Cancel the current drag operation."""
-        if self._column_drag.active:
-            self._column_drag.cancel()
-        elif self._card_drag.active:
-            self._card_drag.cancel()
+        if self._active_draggable is not None:
+            self._active_draggable._drag_cancel()
+
+    # -- DropTarget: board accepting column drops --
+
+    def drag_over(self, draggable, x: int, y: int) -> bool:
+        if not isinstance(draggable, ColumnWidget):
+            return False
+        insert_before = self._calculate_column_insert_position(draggable, x)
+        self._ensure_column_placeholder(insert_before)
+        return True
+
+    def drag_away(self, draggable) -> None:
+        if self._column_placeholder and self._column_placeholder.parent is not None:
+            self._column_placeholder.remove()
+        self._column_placeholder = None
+
+    def try_drop(self, draggable, x: int, y: int) -> bool:
+        if not isinstance(draggable, ColumnWidget):
+            return False
+
+        insert_before = self._calculate_column_insert_position(draggable, x)
+        new_index = self._calculate_column_model_position(draggable, insert_before)
+
+        draggable.remove_class("dragging")
+        draggable.styles.offset = (0, 0)
+
+        if self._column_placeholder and self._column_placeholder.parent is not None:
+            self._column_placeholder.remove()
+        self._column_placeholder = None
+
+        self._move_column_to_index(draggable, new_index)
+        return True
+
+    def _calculate_column_insert_position(self, draggable, screen_x: int) -> Static:
+        columns_container = self.query_one("#columns", Horizontal)
+        visible_columns = [c for c in columns_container.children if isinstance(c, ColumnWidget) and c is not draggable]
+        add_column = columns_container.query_one(AddColumn)
+
+        for col in visible_columns:
+            col_mid_x = col.region.x + col.region.width // 2
+            if screen_x < col_mid_x:
+                return col
+        return add_column
+
+    def _ensure_column_placeholder(self, insert_before: Static) -> None:
+        columns_container = self.query_one("#columns", Horizontal)
+
+        if self._column_placeholder is None:
+            self._column_placeholder = ColumnPlaceholder()
+            columns_container.mount(self._column_placeholder, before=insert_before)
+            return
+
+        children = list(columns_container.children)
+        placeholder_idx = children.index(self._column_placeholder)
+        insert_idx = children.index(insert_before)
+        if placeholder_idx + 1 != insert_idx:
+            columns_container.move_child(self._column_placeholder, before=insert_before)
+
+    def _calculate_column_model_position(self, draggable, insert_before: Static) -> int:
+        columns_container = self.query_one("#columns", Horizontal)
+        pos = 0
+        for child in columns_container.children:
+            if child is insert_before:
+                break
+            if isinstance(child, ColumnWidget) and child is not draggable:
+                pos += 1
+        return pos
+
+    # -- Existing board behavior --
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update board title when header is edited."""

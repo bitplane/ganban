@@ -34,8 +34,7 @@ src/ganban/
 │   ├── column.py        # ColumnWidget
 │   ├── card.py          # CardWidget
 │   ├── watcher.py       # NodeWatcherMixin (reactive watch + suppression)
-│   ├── drag.py          # DraggableMixin
-│   ├── drag_managers.py # Card/Column drag managers
+│   ├── drag.py          # DraggableMixin + DropTarget
 │   ├── detail.py        # Modal detail screens
 │   ├── menu.py          # Context menus
 │   └── edit/            # Editable widgets, section editors
@@ -85,8 +84,8 @@ Built on Textual. Message-driven — widgets post messages, screens handle them.
 `NodeWatcherMixin` manages watch lifecycle and provides `suppressing()` context
 to prevent feedback loops during writes.
 
-Drag-and-drop is handled by `CardDragManager` / `ColumnDragManager` at the
-screen level.
+Drag-and-drop uses `DraggableMixin` (on dragged widgets) and `DropTarget` (on
+containers). The screen delegates mouse events to the active draggable.
 
 ## Testing
 

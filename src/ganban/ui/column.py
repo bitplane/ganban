@@ -1,8 +1,7 @@
 """Column widgets for ganban UI."""
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
-from textual.geometry import Offset
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.color import Color, ColorParseError
 from textual.widgets import Rule, Static
@@ -24,13 +23,13 @@ from ganban.ui.constants import (
     ICON_PALETTE,
 )
 from ganban.ui.detail import ColumnDetailModal
-from ganban.ui.drag import DraggableMixin
+from ganban.ui.drag import CardPlaceholder, DraggableMixin, DropTarget
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
+class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     """A single column on the board."""
 
     DEFAULT_CSS = """
@@ -60,19 +59,6 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
 
     HORIZONTAL_ONLY = True
 
-    class DragStarted(Message):
-        """Posted when a column drag begins."""
-
-        def __init__(self, column_widget: "ColumnWidget", mouse_offset: Offset) -> None:
-            super().__init__()
-            self.column_widget = column_widget
-            self.mouse_offset = mouse_offset
-
-        @property
-        def control(self) -> "ColumnWidget":
-            """The column widget being dragged."""
-            return self.column_widget
-
     class MoveRequested(Message):
         """Posted when column should be moved."""
 
@@ -94,6 +80,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
         self._init_draggable()
         self.column = column
         self.board = board
+        self._card_placeholder: CardPlaceholder | None = None
 
     def compose(self) -> ComposeResult:
         name = first_title(self.column.sections)
@@ -103,11 +90,114 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
             yield CardWidget(card_id, self.board)
         yield AddCard(self.column, self.board)
 
-    def draggable_drag_started(self, mouse_pos: Offset) -> None:
-        self.post_message(self.DragStarted(self, mouse_pos))
+    # -- DraggableMixin: column being dragged --
+
+    def draggable_make_ghost(self):
+        """Column IS the ghost — use self with CSS overlay positioning."""
+        return self
+
+    def _reposition_ghost(self, x: int, y: int) -> None:
+        """Position column relative to its scroll container."""
+        columns_container = self.screen.query_one("#columns", Horizontal)
+        container_region = columns_container.region
+        new_x = (x - self._drag_offset.x) - container_region.x + columns_container.scroll_x
+        new_y = (y - self._drag_offset.y) - container_region.y + columns_container.scroll_y
+        self.styles.offset = (new_x, new_y)
+
+    def _drag_start(self, mouse_pos):
+        """Override to set initial scroll-relative position before base logic."""
+        super()._drag_start(mouse_pos)
+        # Re-set offset for scroll-relative positioning
+        columns_container = self.screen.query_one("#columns", Horizontal)
+        container_region = columns_container.region
+        col_region = self.region
+        content_x = col_region.x - container_region.x + columns_container.scroll_x
+        content_y = col_region.y - container_region.y + columns_container.scroll_y
+        self.styles.offset = (content_x, content_y)
+
+    def _drag_cleanup(self) -> None:
+        """Reset offset instead of removing ghost (ghost is self)."""
+        self.styles.offset = (0, 0)
+        self._ghost = None
+        self._dragging = False
+        self._drag_offset = type(self._drag_offset)(0, 0)
+        self.remove_class("dragging")
+        if hasattr(self.screen, "_active_draggable"):
+            self.screen._active_draggable = None
 
     def draggable_clicked(self) -> None:
         pass  # Click without drag - no action needed
+
+    # -- DropTarget: column accepting card drops --
+
+    def drag_over(self, draggable, x: int, y: int) -> bool:
+        if not isinstance(draggable, CardWidget):
+            return False
+        insert_before = self._calculate_card_insert_position(draggable, y)
+        self._ensure_card_placeholder(insert_before)
+        return True
+
+    def drag_away(self, draggable) -> None:
+        if self._card_placeholder and self._card_placeholder.parent is not None:
+            self._card_placeholder.remove()
+        self._card_placeholder = None
+
+    def try_drop(self, draggable, x: int, y: int) -> bool:
+        if not isinstance(draggable, CardWidget):
+            return False
+        insert_before = self._calculate_card_insert_position(draggable, y)
+        pos = self._calculate_card_model_position(draggable, insert_before)
+        card_id = draggable.card_id
+
+        move_card(draggable.board, card_id, self.column, position=pos)
+
+        draggable.remove_class("dragging")
+        if self._card_placeholder and self._card_placeholder.parent is not None:
+            self._card_placeholder.remove()
+        self._card_placeholder = None
+
+        self.call_after_refresh(self._refocus_card, self, card_id)
+        return True
+
+    def _calculate_card_insert_position(self, draggable, screen_y: int) -> Static:
+        add_widget = self.query_one(AddCard)
+        visible_cards = [c for c in self.children if isinstance(c, CardWidget) and c is not draggable]
+
+        for card in visible_cards:
+            card_mid_y = card.region.y + card.region.height // 2
+            if screen_y < card_mid_y:
+                return card
+        return add_widget
+
+    def _ensure_card_placeholder(self, insert_before: Static) -> None:
+        if self._card_placeholder is None:
+            self._card_placeholder = CardPlaceholder()
+            self.mount(self._card_placeholder, before=insert_before)
+            return
+
+        if self._card_placeholder.parent is self:
+            children = list(self.children)
+            placeholder_idx = children.index(self._card_placeholder)
+            insert_idx = children.index(insert_before)
+            if placeholder_idx + 1 == insert_idx:
+                return
+            self.move_child(self._card_placeholder, before=insert_before)
+        else:
+            if self._card_placeholder.parent is not None:
+                self._card_placeholder.remove()
+            self._card_placeholder = CardPlaceholder()
+            self.mount(self._card_placeholder, before=insert_before)
+
+    def _calculate_card_model_position(self, draggable, insert_before: Static) -> int:
+        pos = 0
+        for c in self.children:
+            if c is insert_before:
+                break
+            if isinstance(c, CardWidget) and c is not draggable:
+                pos += 1
+        return pos
+
+    # -- Other column behavior --
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update column name when header is edited."""
@@ -213,7 +303,11 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, Vertical):
                 return
 
     def on_mouse_move(self, event) -> None:
-        """Focus the child widget under the mouse cursor."""
+        """Handle DraggableMixin threshold first, then hover-focus tracking."""
+        super().on_mouse_move(event)
+        if self._drag_start_pos is not None or self.is_dragging:
+            return
+        # Hover-focus tracking
         focused = self.screen.focused
         for child in self.children:
             if child.can_focus and child.region.contains(event.screen_x, event.screen_y):

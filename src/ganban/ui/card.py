@@ -3,7 +3,6 @@
 from datetime import date
 
 from textual.app import ComposeResult
-from textual.geometry import Offset
 from textual.message import Message
 from textual.widgets import Rule, Static
 
@@ -22,7 +21,7 @@ from ganban.ui.constants import (
     ICON_UNCHECKED,
 )
 from ganban.ui.detail import CardDetailModal
-from ganban.ui.drag import DraggableMixin, DragStarted
+from ganban.ui.drag import DraggableMixin, DragGhost
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
@@ -125,8 +124,8 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         footer_text = build_footer_text(card.sections, card.meta, self.board.meta)
         self.query_one("#card-footer", PlainStatic).update(footer_text)
 
-    def draggable_drag_started(self, mouse_pos: Offset) -> None:
-        self.post_message(DragStarted(self, mouse_pos))
+    def draggable_make_ghost(self):
+        return DragGhost(self)
 
     def draggable_clicked(self) -> None:
         card = self.board.cards[self.card_id]
