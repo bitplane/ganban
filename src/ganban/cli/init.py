@@ -40,7 +40,8 @@ def init_board(args) -> int:
     board.meta = {}
     board.cards = ListNode()
     board.columns = ListNode()
-    create_column(board, "Backlog", order="1")
+    backlog = create_column(board, "Backlog", order="1")
+    backlog.meta.compact = True
     create_column(board, "Doing", order="2")
     create_column(board, "Done", order="3")
     save(board, "Initialize ganban board")
