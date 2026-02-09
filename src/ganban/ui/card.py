@@ -74,6 +74,12 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     CardWidget:focus {
         background: $primary;
     }
+    CardWidget.blocked {
+        background: $error-darken-3;
+    }
+    CardWidget.blocked:focus {
+        background: $error;
+    }
     CardWidget.dragging {
         display: none;
     }
@@ -119,10 +125,11 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self._refresh_indicators()
 
     def _refresh_indicators(self) -> None:
-        """Update footer indicator text."""
+        """Update footer indicator text and blocked state."""
         card = self.board.cards[self.card_id]
         footer_text = build_footer_text(card.sections, card.meta, self.board.meta)
         self.query_one("#card-footer", PlainStatic).update(footer_text)
+        self.set_class(bool(card.meta.blocked), "blocked")
 
     def draggable_make_ghost(self):
         return DragGhost(self)
@@ -153,12 +160,14 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         ]
         card = self.board.cards[self.card_id]
         done_label = f"{ICON_CHECKED} Done" if card.meta.done else f"{ICON_UNCHECKED} Done"
+        blocked_label = f"{ICON_CHECKED} Blocked" if card.meta.blocked else f"{ICON_UNCHECKED} Blocked"
         items = [
             MenuItem(f"{ICON_CARD} {self.title}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),
             MenuItem(done_label, "toggle-done"),
+            MenuItem(blocked_label, "toggle-blocked"),
             MenuSeparator(),
             MenuItem(f"{ICON_DELETE} Archive", "archive"),
         ]
@@ -176,6 +185,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             case "toggle-done":
                 card = self.board.cards[self.card_id]
                 card.meta.done = None if card.meta.done else date.today().isoformat()
+            case "toggle-blocked":
+                card = self.board.cards[self.card_id]
+                card.meta.blocked = None if card.meta.blocked else True
             case s if s and s.startswith("move:"):
                 col_name = s[5:]
                 self._move_to_column(col_name)

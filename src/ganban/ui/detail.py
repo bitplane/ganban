@@ -9,6 +9,7 @@ from textual.widgets import ContentSwitcher, Static
 
 from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
+from ganban.ui.blocked import BlockedWidget
 from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_META, ICON_TAB_RAW, ICON_TAB_USERS
 from ganban.ui.done import DoneWidget
@@ -145,10 +146,30 @@ class DetailModal(ModalScreen[None]):
 class CardDetailModal(DetailModal):
     """Modal screen showing full card details."""
 
+    DEFAULT_CSS = """
+    CardDetailModal.blocked #detail-container {
+        background: $error-darken-3;
+    }
+    CardDetailModal.blocked #detail-title-bar {
+        background: $error;
+    }
+    """
+
     def __init__(self, card: Node, board: Node | None = None) -> None:
         super().__init__()
         self.card = card
         self.board = board
+
+    def on_mount(self) -> None:
+        super().on_mount()
+        self.set_class(bool(self.card.meta.blocked), "blocked")
+        self._unwatch_blocked = self.card.meta.watch("blocked", self._on_blocked_changed)
+
+    def _on_blocked_changed(self, node, key, old, new) -> None:
+        self.set_class(bool(new), "blocked")
+
+    def on_unmount(self) -> None:
+        self._unwatch_blocked()
 
     def compose(self) -> ComposeResult:
         meta, committers = _board_context(self.board)
@@ -164,6 +185,7 @@ class CardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield DoneWidget(self.card.meta)
+                yield BlockedWidget(self.card.meta)
                 yield DueDateWidget(self.card.meta)
                 if self.board:
                     yield AssigneeWidget(self.card.meta, self.board)
