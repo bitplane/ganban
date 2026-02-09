@@ -81,6 +81,12 @@ class DetailModal(ModalScreen[None]):
         padding: 0 1;
     }
 
+    #detail-id {
+        width: auto;
+        height: 1;
+        text-style: bold;
+    }
+
     #detail-bar {
         width: 100%;
         height: 1;
@@ -147,8 +153,10 @@ class CardDetailModal(DetailModal):
     def compose(self) -> ComposeResult:
         meta, committers = _board_context(self.board)
         pf = ganban_parser_factory(meta, committers)
+        card_id = self.card.file_path.split("/")[-1].removesuffix(".md")
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
+                yield Static(f"#{card_id} ", id="detail-id")
                 yield DocHeader(self.card.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
