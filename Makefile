@@ -1,6 +1,6 @@
 # the things that don't have output files or run every time
 .PHONY: help all install test dev coverage clean \
-		pre-commit update-pre-commit docs
+		pre-commit update-pre-commit docs dist
 
 
 PROJECT_NAME := ganban
