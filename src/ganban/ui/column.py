@@ -55,6 +55,17 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     ColumnWidget > Rule.-horizontal {
         margin: 0;
     }
+    ColumnWidget.compact CardWidget {
+        height: 1;
+        padding: 0 1;
+        margin-bottom: 0;
+    }
+    ColumnWidget.compact CardWidget #card-header {
+        display: none;
+    }
+    ColumnWidget.compact CardWidget #card-footer {
+        display: none;
+    }
     """
 
     HORIZONTAL_ONLY = True
@@ -219,11 +230,13 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         name = first_title(self.column.sections)
         col_index = self._get_column_index()
         visible_count = sum(1 for c in self.board.columns if not c.hidden)
+        view_label = "\u2261\u2261 Compact" if not self.has_class("compact") else "\u2fbf Card"
         items = [
             MenuItem(f"{ICON_COLUMN} {name}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_PALETTE} Color", "color", submenu=build_color_menu()),
+            MenuItem(view_label, "compact"),
             MenuSeparator(),
             MenuItem(f"{ICON_MOVE_LEFT} Move Left", "move_left", disabled=(col_index == 0)),
             MenuItem(f"{ICON_MOVE_RIGHT} Move Right", "move_right", disabled=(col_index >= visible_count - 1)),
@@ -317,6 +330,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
 
     def on_mount(self) -> None:
         self._apply_color()
+        self.set_class(bool(self.column.meta.compact), "compact")
         self.node_watch(self.column, "sections", self._on_sections_changed)
         self.node_watch(self.column, "meta", self._on_meta_changed)
         self.node_watch(self.column, "links", self._on_links_changed)
@@ -346,8 +360,9 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
             add_card = existing[card_id]
 
     def _on_meta_changed(self, node, key, old, new) -> None:
-        """Re-apply color when meta changes."""
+        """Re-apply color and compact state when meta changes."""
         self._apply_color()
+        self.set_class(bool(self.column.meta.compact), "compact")
 
     def _on_sections_changed(self, node, key, old, new) -> None:
         """Sync UI when sections title changes."""
@@ -388,6 +403,8 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
                 self.post_message(self.MoveRequested(self, -1))
             case "move_right":
                 self.post_message(self.MoveRequested(self, 1))
+            case "compact":
+                self.column.meta.compact = None if self.column.meta.compact else True
             case "archive":
                 self._confirm_archive()
 

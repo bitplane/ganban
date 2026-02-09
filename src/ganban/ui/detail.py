@@ -175,6 +175,30 @@ class CardDetailModal(DetailModal):
                 yield Static("Coming soon", id="tab-raw")
 
 
+class CompactButton(Static):
+    """Toggle button for compact/card view mode."""
+
+    DEFAULT_CSS = """
+    CompactButton { width: 2; height: 1; }
+    CompactButton:hover { background: $primary-darken-2; }
+    """
+
+    def __init__(self, meta: Node, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._meta = meta
+
+    def on_mount(self) -> None:
+        self._refresh_label()
+
+    def on_click(self, event) -> None:
+        event.stop()
+        self._meta.compact = None if self._meta.compact else True
+        self._refresh_label()
+
+    def _refresh_label(self) -> None:
+        self.update("\u2261\u2261" if self._meta.compact else "\u2fbf")
+
+
 class ColumnDetailModal(DetailModal):
     """Modal screen showing full column details."""
 
@@ -196,6 +220,7 @@ class ColumnDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield ColorButton(color=color)
+                yield CompactButton(self.column.meta)
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.column.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
