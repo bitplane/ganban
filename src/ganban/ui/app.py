@@ -62,6 +62,9 @@ class GanbanApp(App):
     """Git-based kanban board TUI."""
 
     CSS = """
+    Static {
+        color: $text;
+    }
     Tooltip {
         padding: 0 1;
         margin: 0;

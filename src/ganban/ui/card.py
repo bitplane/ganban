@@ -235,6 +235,7 @@ class AddCard(Static, can_focus=True):
     }
     AddCard:focus {
         background: $primary;
+        color: $text;
     }
     AddCard > EditableText > ContentSwitcher > Static {
         text-align: center;
