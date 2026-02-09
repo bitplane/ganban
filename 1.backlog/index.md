@@ -1,1 +1,5 @@
+---
+compact: true
+---
+
 # Backlog
