@@ -8,6 +8,7 @@ from ganban.model.node import Node
 from ganban.ui.emoji import EmojiButton, emoji_for_email
 from ganban.ui.users import (
     AddUserRow,
+    EmailTag,
     UsersEditor,
     UserRow,
 )
@@ -76,13 +77,26 @@ async def test_add_user():
     app = UsersEditorApp()
     async with app.run_test() as pilot:
         add_row = app.query_one(AddUserRow)
-        add_row.post_message(AddUserRow.UserAdded())
+        add_row.post_message(AddUserRow.UserCreated("Alice"))
         await pilot.pause()
 
         rows = app.query(UserRow)
         assert len(rows) == 1
-        assert rows[0].user_name == "New User"
-        assert "New User" in app.meta.users.keys()
+        assert rows[0].user_name == "Alice"
+        assert "Alice" in app.meta.users.keys()
+
+
+@pytest.mark.asyncio
+async def test_add_user_with_name():
+    app = UsersEditorApp({"Bob": {"emails": []}})
+    async with app.run_test() as pilot:
+        add_row = app.query_one(AddUserRow)
+        add_row.post_message(AddUserRow.UserCreated("Charlie"))
+        await pilot.pause()
+
+        names = set(app.meta.users.keys())
+        assert "Bob" in names
+        assert "Charlie" in names
 
 
 @pytest.mark.asyncio
@@ -141,10 +155,10 @@ async def test_add_email():
     )
     async with app.run_test() as pilot:
         row = app.query_one(UserRow)
-        row.post_message(UserRow.EmailsChanged("Alice", ["alice@example.com", ""]))
+        row.post_message(UserRow.EmailsChanged("Alice", ["alice@example.com", "alice@work.com"]))
         await pilot.pause()
 
-        assert app.meta.users.Alice.emails == ["alice@example.com", ""]
+        assert app.meta.users.Alice.emails == ["alice@example.com", "alice@work.com"]
 
 
 @pytest.mark.asyncio
@@ -178,17 +192,17 @@ async def test_edit_email():
 
 
 @pytest.mark.asyncio
-async def test_unique_name():
+async def test_empty_email_deletes():
     app = UsersEditorApp(
         {
-            "New User": {"emails": []},
+            "Alice": {"emails": ["alice@example.com", "alice@work.com"]},
         }
     )
     async with app.run_test() as pilot:
-        add_row = app.query_one(AddUserRow)
-        add_row.post_message(AddUserRow.UserAdded())
+        row = app.query_one(UserRow)
+        tags = list(row.query(EmailTag))
+        assert len(tags) == 2
+        tags[0].post_message(EmailTag.ValueChanged(0, ""))
         await pilot.pause()
 
-        names = set(app.meta.users.keys())
-        assert "New User" in names
-        assert "New User 2" in names
+        assert app.meta.users.Alice.emails == ["alice@work.com"]

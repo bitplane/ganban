@@ -6,7 +6,6 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.events import Click
 from textual.message import Message
 from textual.widgets import Static
 
@@ -19,19 +18,14 @@ from ganban.ui.emoji import EmojiButton
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-class EmailTag(Horizontal):
-    """A single email address row with edit and delete."""
+class EmailTag(Container):
+    """A single email address tag — clear to empty to delete."""
 
     class ValueChanged(Message):
         def __init__(self, index: int, value: str) -> None:
             super().__init__()
             self.index = index
             self.value = value
-
-    class DeleteRequested(Message):
-        def __init__(self, index: int) -> None:
-            super().__init__()
-            self.index = index
 
     DEFAULT_CSS = """
     EmailTag {
@@ -41,14 +35,6 @@ class EmailTag(Horizontal):
     EmailTag .email-value {
         width: 1fr;
         height: auto;
-    }
-    EmailTag .email-delete {
-        width: 2;
-        height: 1;
-        dock: right;
-    }
-    EmailTag .email-delete:hover {
-        background: $primary-darken-2;
     }
     """
 
@@ -64,47 +50,56 @@ class EmailTag(Horizontal):
             TextEditor(),
             classes="email-value",
         )
-        yield Static("x", classes="email-delete")
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
         self.email = event.new_value
         self.post_message(self.ValueChanged(self.index, event.new_value))
 
-    def on_click(self, event: Click) -> None:
-        widget, _ = self.app.get_widget_at(event.screen_x, event.screen_y)
-        if isinstance(widget, Static) and "email-delete" in widget.classes:
-            event.stop()
-            self.post_message(self.DeleteRequested(self.index))
 
+class AddEmailButton(Static, can_focus=True):
+    """EditableText with '+' to add a new email address."""
 
-class AddEmailButton(Static):
-    """Clickable '+' to add a new email address."""
+    BINDINGS = [
+        ("space", "start_editing"),
+        ("enter", "start_editing"),
+    ]
 
     class EmailAdded(Message):
-        pass
+        def __init__(self, email: str) -> None:
+            super().__init__()
+            self.email = email
 
     DEFAULT_CSS = """
     AddEmailButton {
         width: 100%;
-        height: 1;
+        height: auto;
         color: $text-muted;
     }
-    AddEmailButton:hover {
-        background: $primary-darken-2;
+    AddEmailButton > EditableText > ContentSwitcher > Static {
+        color: $text-muted;
     }
     """
 
     def __init__(self, **kwargs) -> None:
-        super().__init__("+", **kwargs)
+        super().__init__(**kwargs)
 
-    def on_click(self, event: Click) -> None:
+    def action_start_editing(self) -> None:
+        self.query_one(EditableText)._start_edit()
+
+    def compose(self) -> ComposeResult:
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        self.post_message(self.EmailAdded())
+        if event.new_value:
+            self.post_message(self.EmailAdded(event.new_value))
+        self.query_one(EditableText).value = ""
+        self.focus()
 
 
 class UserRow(Vertical):
-    """A single user row with emoji, name, delete, and email list."""
+    """A single user card with title bar and email list."""
 
     class NameRenamed(Message):
         def __init__(self, old: str, new: str) -> None:
@@ -133,11 +128,15 @@ class UserRow(Vertical):
     UserRow {
         width: 100%;
         height: auto;
-        padding: 0 0 0 2;
+        padding: 0 1;
+        margin-bottom: 1;
+        background: $surface;
     }
-    UserRow > .user-header {
+    UserRow > .user-title-bar {
         width: 100%;
         height: auto;
+        background: $primary;
+        padding: 0 1;
     }
     UserRow .user-emoji {
         width: 2;
@@ -170,7 +169,7 @@ class UserRow(Vertical):
         return self._emails[0] if self._emails else None
 
     def compose(self) -> ComposeResult:
-        with Horizontal(classes="user-header"):
+        with Horizontal(classes="user-title-bar"):
             yield EmojiButton(self.user_node.emoji, email=self._first_email, classes="user-emoji")
             yield EditableText(
                 self.user_name,
@@ -209,54 +208,71 @@ class UserRow(Vertical):
 
     def on_email_tag_value_changed(self, event: EmailTag.ValueChanged) -> None:
         event.stop()
-        self._emails[event.index] = event.value
-        if event.index == 0:
-            self._update_emoji_default()
-        self.post_message(self.EmailsChanged(self.user_name, list(self._emails)))
-
-    def on_email_tag_delete_requested(self, event: EmailTag.DeleteRequested) -> None:
-        event.stop()
-        del self._emails[event.index]
-        tags = list(self.query(EmailTag))
-        tags[event.index].remove()
-        self._reindex_emails()
+        if event.value:
+            self._emails[event.index] = event.value
+        else:
+            del self._emails[event.index]
+            tags = list(self.query(EmailTag))
+            tags[event.index].remove()
+            self._reindex_emails()
         self._update_emoji_default()
         self.post_message(self.EmailsChanged(self.user_name, list(self._emails)))
 
     def on_add_email_button_email_added(self, event: AddEmailButton.EmailAdded) -> None:
         event.stop()
-        self._emails.append("")
-        tag = EmailTag(len(self._emails) - 1, "")
+        self._emails.append(event.email)
+        tag = EmailTag(len(self._emails) - 1, event.email)
         emails_container = self.query_one(".user-emails")
         self.app.call_later(emails_container.mount, tag, before=emails_container.query_one(AddEmailButton))
         self.post_message(self.EmailsChanged(self.user_name, list(self._emails)))
 
 
-class AddUserRow(Static):
-    """Clickable row to add a new user."""
+class AddUserRow(Static, can_focus=True):
+    """EditableText with '+' to add a new user."""
 
-    class UserAdded(Message):
-        pass
+    BINDINGS = [
+        ("space", "start_editing"),
+        ("enter", "start_editing"),
+    ]
+
+    class UserCreated(Message):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            self.name = name
 
     DEFAULT_CSS = """
     AddUserRow {
         width: 100%;
-        height: 1;
-        text-align: center;
-        color: $text-muted;
+        height: auto;
+        padding: 0 1;
+        margin-bottom: 1;
         border: dashed $surface-lighten-2;
     }
-    AddUserRow:hover {
-        background: $primary-darken-2;
+    AddUserRow:focus {
+        background: $primary;
+        color: $text;
+    }
+    AddUserRow > EditableText > ContentSwitcher > Static {
+        text-align: center;
+        color: $text-muted;
     }
     """
 
     def __init__(self, **kwargs) -> None:
-        super().__init__("+ Add user", **kwargs)
+        super().__init__(**kwargs)
 
-    def on_click(self, event: Click) -> None:
+    def action_start_editing(self) -> None:
+        self.query_one(EditableText)._start_edit()
+
+    def compose(self) -> ComposeResult:
+        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+
+    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()
-        self.post_message(self.UserAdded())
+        if event.new_value:
+            self.post_message(self.UserCreated(event.new_value))
+        self.query_one(EditableText).value = ""
+        self.focus()
 
 
 class UsersEditor(NodeWatcherMixin, Container):
@@ -280,19 +296,6 @@ class UsersEditor(NodeWatcherMixin, Container):
         if self.meta.users is None:
             self.meta.users = {}
         return self.meta.users
-
-    def _unique_name(self, base: str = "New User") -> str:
-        """Return a unique user name, appending ' 2', ' 3' etc if needed."""
-        users = self.meta.users
-        if users is None:
-            return base
-        existing = set(users.keys())
-        if base not in existing:
-            return base
-        n = 2
-        while f"{base} {n}" in existing:
-            n += 1
-        return f"{base} {n}"
 
     def compose(self) -> ComposeResult:
         users = self.meta.users
@@ -337,10 +340,10 @@ class UsersEditor(NodeWatcherMixin, Container):
                 row.remove()
                 break
 
-    def on_add_user_row_user_added(self, event: AddUserRow.UserAdded) -> None:
+    def on_add_user_row_user_created(self, event: AddUserRow.UserCreated) -> None:
         event.stop()
         users = self._ensure_users()
-        name = self._unique_name()
+        name = event.name
         with self.suppressing():
             setattr(users, name, {"emails": []})
         user_node = getattr(users, name)
