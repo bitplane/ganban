@@ -201,5 +201,5 @@ class BoardDetailModal(DetailModal):
                     self.board.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
                 )
                 yield MetaEditor(self.board.meta, id="tab-meta")
-                yield UsersEditor(self.board.meta, id="tab-users")
+                yield UsersEditor(self.board, id="tab-users")
                 yield Static("Coming soon", id="tab-raw")

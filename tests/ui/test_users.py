@@ -17,14 +17,15 @@ from ganban.ui.users import (
 class UsersEditorApp(App):
     """Test app wrapping a UsersEditor."""
 
-    def __init__(self, users=None):
+    def __init__(self, users=None, committers=None):
         super().__init__()
         meta = {"users": users} if users else {}
         self.meta = Node(**meta)
+        self.board = Node(meta=self.meta, git=Node(committers=committers or []))
 
     def compose(self) -> ComposeResult:
         yield Button("focus target", id="focus-target")
-        yield UsersEditor(self.meta)
+        yield UsersEditor(self.board)
 
 
 # --- Sync tests for EmojiButton defaults ---

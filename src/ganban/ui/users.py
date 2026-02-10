@@ -14,12 +14,36 @@ from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.viewers import TextViewer
-from ganban.ui.emoji import EmojiButton
+from ganban.ui.emoji import EmojiButton, parse_committer
+from ganban.ui.search import SearchInput
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-class EmailTag(Container):
-    """A single email address tag — clear to empty to delete."""
+def _build_email_options(committers: list[str] | None, exclude: set[str] | None = None) -> list[tuple[str, str]]:
+    """Build (label, value) options for the email search from git committers.
+
+    Labels show "Name <email>", values are the bare email address.
+    """
+    if not committers:
+        return []
+    exclude = exclude or set()
+    options: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for committer_str in committers:
+        _, name, email = parse_committer(committer_str)
+        if email not in seen and email not in exclude:
+            options.append((f"{name} <{email}>", email))
+            seen.add(email)
+    return options
+
+
+class EmailTag(Container, can_focus=True):
+    """A single email address tag — click to edit with committer search."""
+
+    BINDINGS = [
+        ("space", "start_editing"),
+        ("enter", "start_editing"),
+    ]
 
     class ValueChanged(Message):
         def __init__(self, index: int, value: str) -> None:
@@ -27,27 +51,54 @@ class EmailTag(Container):
             self.index = index
             self.value = value
 
-    def __init__(self, index: int, email: str, **kwargs) -> None:
+    def __init__(self, index: int, email: str, committers: list[str] | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.index = index
         self.email = email
+        self._committers = committers
 
     def compose(self) -> ComposeResult:
-        yield EditableText(
-            self.email,
-            TextViewer(self.email or '""'),
-            TextEditor(),
-            classes="email-value",
-        )
+        yield Static(self.email or '""', classes="email-label")
+        yield SearchInput([], placeholder="email@address", value=self.email, classes="email-search")
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+    def action_start_editing(self) -> None:
+        self.add_class("-editing")
+        search = self.query_one(SearchInput)
+        search.set_options(_build_email_options(self._committers, self._sibling_emails()))
+        inp = search.query_one("Input")
+        inp.value = self.email
+        inp.focus()
+
+    def _sibling_emails(self) -> set[str]:
+        result: set[str] = set()
+        if self.parent:
+            for tag in self.parent.query(EmailTag):
+                if tag is not self and tag.email:
+                    result.add(tag.email)
+        return result
+
+    def on_click(self, event) -> None:
         event.stop()
-        self.email = event.new_value
-        self.post_message(self.ValueChanged(self.index, event.new_value))
+        if not self.has_class("-editing"):
+            self.action_start_editing()
+
+    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
+        event.stop()
+        new_email = (event.value or event.text).strip()
+        self.remove_class("-editing")
+        self.email = new_email
+        self.query_one(".email-label", Static).update(new_email or '""')
+        self.post_message(self.ValueChanged(self.index, new_email))
+        self.focus()
+
+    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
+        event.stop()
+        self.remove_class("-editing")
+        self.focus()
 
 
-class AddEmailButton(Static, can_focus=True):
-    """EditableText with '+' to add a new email address."""
+class AddEmailButton(Container, can_focus=True):
+    """Searchable input to add a new email address from git committers."""
 
     BINDINGS = [
         ("space", "start_editing"),
@@ -59,20 +110,50 @@ class AddEmailButton(Static, can_focus=True):
             super().__init__()
             self.email = email
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, committers: list[str] | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
+        self._committers = committers
 
     def action_start_editing(self) -> None:
-        self.query_one(EditableText)._start_edit()
+        self.add_class("-editing")
+        search = self.query_one(SearchInput)
+        search.set_options(self._get_options())
+        inp = search.query_one("Input")
+        inp.value = ""
+        inp.focus()
+
+    def _get_options(self) -> list[tuple[str, str]]:
+        exclude = self._get_sibling_emails()
+        return _build_email_options(self._committers, exclude)
+
+    def _get_sibling_emails(self) -> set[str]:
+        result: set[str] = set()
+        if self.parent:
+            for tag in self.parent.query(EmailTag):
+                if tag.email:
+                    result.add(tag.email)
+        return result
 
     def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
+        yield Static("+", classes="add-email-label")
+        yield SearchInput([], placeholder="email@address", classes="add-email-search")
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+    def on_click(self, event) -> None:
         event.stop()
-        if event.new_value:
-            self.post_message(self.EmailAdded(event.new_value))
-        self.query_one(EditableText).value = ""
+        if not self.has_class("-editing"):
+            self.action_start_editing()
+
+    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
+        event.stop()
+        email = (event.value or event.text).strip()
+        if email:
+            self.post_message(self.EmailAdded(email))
+        self.remove_class("-editing")
+        self.focus()
+
+    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
+        event.stop()
+        self.remove_class("-editing")
         self.focus()
 
 
@@ -102,10 +183,11 @@ class UserRow(Vertical):
             super().__init__()
             self.name = name
 
-    def __init__(self, user_name: str, user_node: Node, **kwargs) -> None:
+    def __init__(self, user_name: str, user_node: Node, committers: list[str] | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.user_name = user_name
         self.user_node = user_node
+        self._committers = committers
         self._emails: list[str] = list(user_node.emails) if isinstance(user_node.emails, list) else []
 
     @property
@@ -124,8 +206,8 @@ class UserRow(Vertical):
             yield ConfirmButton(classes="user-delete")
         with Vertical(classes="user-emails"):
             for i, email in enumerate(self._emails):
-                yield EmailTag(i, email)
-            yield AddEmailButton()
+                yield EmailTag(i, email, committers=self._committers)
+            yield AddEmailButton(committers=self._committers)
 
     def _reindex_emails(self) -> None:
         for i, tag in enumerate(self.query(EmailTag)):
@@ -165,7 +247,7 @@ class UserRow(Vertical):
     def on_add_email_button_email_added(self, event: AddEmailButton.EmailAdded) -> None:
         event.stop()
         self._emails.append(event.email)
-        tag = EmailTag(len(self._emails) - 1, event.email)
+        tag = EmailTag(len(self._emails) - 1, event.email, committers=self._committers)
         emails_container = self.query_one(".user-emails")
         self.app.call_later(emails_container.mount, tag, before=emails_container.query_one(AddEmailButton))
         self.post_message(self.EmailsChanged(self.user_name, list(self._emails)))
@@ -204,10 +286,16 @@ class AddUserRow(Static, can_focus=True):
 class UsersEditor(NodeWatcherMixin, Container):
     """Editor for board.meta.users -- a dict of display name -> user info."""
 
-    def __init__(self, meta: Node, **kwargs) -> None:
+    def __init__(self, board: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)
-        self.meta = meta
+        self.board = board
+        self.meta = board.meta
+
+    @property
+    def _committers(self) -> list[str] | None:
+        committers = self.board.git.committers if self.board.git else None
+        return committers if isinstance(committers, list) else None
 
     def _ensure_users(self) -> Node:
         """Create meta.users = {} if missing, return the users node."""
@@ -219,7 +307,7 @@ class UsersEditor(NodeWatcherMixin, Container):
         users = self.meta.users
         if users is not None:
             for name, user_node in users.items():
-                yield UserRow(name, user_node)
+                yield UserRow(name, user_node, committers=self._committers)
         yield AddUserRow()
 
     def on_mount(self) -> None:
@@ -265,5 +353,5 @@ class UsersEditor(NodeWatcherMixin, Container):
         with self.suppressing():
             setattr(users, name, {"emails": []})
         user_node = getattr(users, name)
-        row = UserRow(name, user_node)
+        row = UserRow(name, user_node, committers=self._committers)
         self.mount(row, before=self.query_one(AddUserRow))

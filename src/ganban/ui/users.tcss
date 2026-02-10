@@ -1,11 +1,31 @@
+/* Shared: compact SearchInput inside email widgets */
+.user-emails SearchInput > Input {
+    border: none;
+    padding: 0;
+    height: 1;
+}
+.user-emails SearchInput > OptionList {
+    border: none;
+    padding: 0;
+}
+
 /* EmailTag */
 EmailTag {
     width: 100%;
     height: auto;
 }
-EmailTag .email-value {
+EmailTag .email-label {
     width: 1fr;
-    height: auto;
+    height: 1;
+}
+EmailTag .email-search {
+    display: none;
+}
+EmailTag.-editing .email-label {
+    display: none;
+}
+EmailTag.-editing .email-search {
+    display: block;
 }
 
 /* AddEmailButton */
@@ -14,8 +34,19 @@ AddEmailButton {
     height: auto;
     color: $text-muted;
 }
-AddEmailButton > EditableText > ContentSwitcher > Static {
+AddEmailButton .add-email-label {
+    width: 100%;
+    height: 1;
     color: $text-muted;
+}
+AddEmailButton .add-email-search {
+    display: none;
+}
+AddEmailButton.-editing .add-email-label {
+    display: none;
+}
+AddEmailButton.-editing .add-email-search {
+    display: block;
 }
 
 /* UserRow */
