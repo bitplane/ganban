@@ -54,6 +54,7 @@ class GanbanApp(App):
         "sync_widget.tcss",
         "cal.tcss",
         "emoji.tcss",
+        "search.tcss",
         "edit/editable.tcss",
         "edit/section.tcss",
         "edit/viewers.tcss",

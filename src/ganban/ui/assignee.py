@@ -6,13 +6,14 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
+from textual.events import DescendantBlur
 from textual.message import Message
-from textual.widgets import Static
+from textual.widgets import OptionList, Static
 
 from ganban.model.node import Node
-from ganban.ui.constants import ICON_DELETE, ICON_PERSON
+from ganban.ui.constants import ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_display
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
+from ganban.ui.search import SearchInput
 from ganban.ui.watcher import NodeWatcherMixin
 
 
@@ -31,12 +32,13 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
     return emoji_for_email(email), parsed_name, email
 
 
-def build_assignee_menu(board: Node) -> list[MenuItem | MenuSeparator]:
-    """Build a menu of assignable users from board.meta.users and git committers."""
-    items: list[MenuItem | MenuSeparator] = [
-        MenuItem(f"{ICON_DELETE} Unassigned", item_id="unassign"),
-        MenuSeparator(),
-    ]
+def build_assignee_options(board: Node) -> list[tuple[str, str]]:
+    """Build options for the assignee SearchInput from board users and git committers.
+
+    Returns (label, value) tuples where label includes emoji and value is the
+    committer string.
+    """
+    options: list[tuple[str, str]] = []
     seen: set[str] = set()
 
     users = board.meta.users if board.meta else None
@@ -48,7 +50,7 @@ def build_assignee_menu(board: Node) -> list[MenuItem | MenuSeparator]:
             primary = emails[0]
             committer = f"{name} <{primary}>"
             emoji = user_node.emoji if user_node.emoji else emoji_for_email(primary)
-            items.append(MenuItem(f"{emoji} {committer}", item_id=committer))
+            options.append((f"{emoji} {committer}", committer))
             seen.update(emails)
 
     committers = board.git.committers if board.git else None
@@ -56,37 +58,10 @@ def build_assignee_menu(board: Node) -> list[MenuItem | MenuSeparator]:
         for committer_str in committers:
             emoji, name, email = parse_committer(committer_str)
             if email not in seen:
-                items.append(MenuItem(f"{emoji} {committer_str}", item_id=committer_str))
+                options.append((f"{emoji} {committer_str}", committer_str))
                 seen.add(email)
 
-    return items
-
-
-class AssigneeButton(Static):
-    """Button that opens the assignee picker menu."""
-
-    class AssigneeSelected(Message):
-        def __init__(self, assigned: str | None) -> None:
-            super().__init__()
-            self.assigned = assigned
-
-    def __init__(self, board: Node, emoji: str = ICON_PERSON, **kwargs) -> None:
-        super().__init__(emoji, **kwargs)
-        self._board = board
-
-    def on_click(self, event) -> None:
-        event.stop()
-        items = build_assignee_menu(self._board)
-        menu = ContextMenu(items, event.screen_x, event.screen_y)
-        self.app.push_screen(menu, self._on_menu_closed)
-
-    def _on_menu_closed(self, item: MenuItem | None) -> None:
-        if item is None:
-            return
-        if item.item_id == "unassign":
-            self.post_message(self.AssigneeSelected(None))
-        else:
-            self.post_message(self.AssigneeSelected(item.item_id))
+    return options
 
 
 class AssigneeWidget(NodeWatcherMixin, Container):
@@ -95,6 +70,11 @@ class AssigneeWidget(NodeWatcherMixin, Container):
     Reads and writes ``meta.assigned`` on the given card meta Node,
     and watches the node so external changes are reflected immediately.
     """
+
+    class AssigneeSelected(Message):
+        def __init__(self, assigned: str | None) -> None:
+            super().__init__()
+            self.assigned = assigned
 
     def __init__(self, meta: Node, board: Node, **kwargs) -> None:
         self._init_watcher()
@@ -109,8 +89,9 @@ class AssigneeWidget(NodeWatcherMixin, Container):
         else:
             emoji = ICON_PERSON
         with Horizontal():
-            yield AssigneeButton(self.board, emoji=emoji, id="assignee-picker")
+            yield Static(emoji, id="assignee-picker")
             yield Static("", classes="assignee-name")
+            yield SearchInput([], placeholder="email@address", id="assignee-search")
 
     def on_mount(self) -> None:
         self.node_watch(self.meta, "assigned", self._on_assigned_changed)
@@ -121,7 +102,7 @@ class AssigneeWidget(NodeWatcherMixin, Container):
 
     def _update_label(self) -> None:
         label = self.query_one(".assignee-name", Static)
-        picker = self.query_one("#assignee-picker", AssigneeButton)
+        picker = self.query_one("#assignee-picker", Static)
         assigned = self.meta.assigned
         if assigned:
             emoji, name, _ = resolve_assignee(assigned, self.board)
@@ -136,6 +117,50 @@ class AssigneeWidget(NodeWatcherMixin, Container):
             self.meta.assigned = value
         self._update_label()
 
-    def on_assignee_button_assignee_selected(self, event: AssigneeButton.AssigneeSelected) -> None:
+    def _enter_edit_mode(self) -> None:
+        self.add_class("-editing")
+        search = self.query_one("#assignee-search", SearchInput)
+        search.set_options(build_assignee_options(self.board))
+        inp = search.query_one("Input")
+        inp.value = ""
+        inp.focus()
+
+    def _exit_edit_mode(self) -> None:
+        self.remove_class("-editing")
+        self._update_label()
+
+    def on_click(self, event) -> None:
         event.stop()
-        self._set_assigned(event.assigned)
+        if not self.has_class("-editing"):
+            self._enter_edit_mode()
+
+    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
+        event.stop()
+        if event.value:
+            self._set_assigned(event.value)
+        elif event.text.strip():
+            self._set_assigned(event.text.strip())
+        else:
+            self._set_assigned(None)
+        self._exit_edit_mode()
+
+    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
+        event.stop()
+        self._exit_edit_mode()
+
+    def on_descendant_blur(self, event: DescendantBlur) -> None:
+        if self.has_class("-editing"):
+            self.call_after_refresh(self._maybe_exit_on_blur)
+
+    def _maybe_exit_on_blur(self) -> None:
+        focused = self.app.focused
+        if focused is None or focused not in self.walk_children():
+            self._exit_edit_mode()
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        event.stop()
+        picker = self.query_one("#assignee-picker", Static)
+        if event.option and event.option.id:
+            _, _, email = parse_committer(event.option.id)
+            emoji, _, _ = resolve_assignee(event.option.id, self.board)
+            picker.update(emoji)

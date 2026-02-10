@@ -34,7 +34,7 @@ DetailModal #detail-title-bar {
 DetailModal #detail-id {
     width: auto;
     height: 1;
-    text-style: bold;
+    color: $text-muted;
 }
 DetailModal #detail-bar {
     width: 100%;

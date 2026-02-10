@@ -19,13 +19,9 @@ from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.users import UsersEditor
 
 
-def _board_context(board: Node | None) -> tuple[Node | None, list[str] | None]:
-    """Extract meta and committers from a board node."""
-    if not board:
-        return None, None
-    meta = board.meta
-    committers = board.git.committers if board.git else None
-    return meta, committers if isinstance(committers, list) else None
+def _board_meta(board: Node | None) -> Node | None:
+    """Extract meta from a board node."""
+    return board.meta if board else None
 
 
 class TabButton(Static):
@@ -104,8 +100,8 @@ class CardDetailModal(DetailModal):
         self._unwatch_blocked()
 
     def compose(self) -> ComposeResult:
-        meta, committers = _board_context(self.board)
-        pf = ganban_parser_factory(meta, committers)
+        meta = _board_meta(self.board)
+        pf = ganban_parser_factory(self.board)
         card_id = self.card.file_path.split("/")[-1].removesuffix(".md")
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
@@ -157,8 +153,8 @@ class ColumnDetailModal(DetailModal):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        meta, committers = _board_context(self.board)
-        pf = ganban_parser_factory(meta, committers)
+        meta = _board_meta(self.board)
+        pf = ganban_parser_factory(self.board)
         color = self.column.meta.color
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
@@ -190,8 +186,8 @@ class BoardDetailModal(DetailModal):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        meta, committers = _board_context(self.board)
-        pf = ganban_parser_factory(meta, committers)
+        meta = _board_meta(self.board)
+        pf = ganban_parser_factory(self.board)
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
                 yield DocHeader(self.board.sections)
