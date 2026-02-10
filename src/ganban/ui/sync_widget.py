@@ -83,7 +83,6 @@ class SyncWidget(NodeWatcherMixin, Container):
         sync = self.board.git.sync
         icon = _current_icon(sync)
         icon_widget.update(icon)
-        icon_widget.tooltip = sync.status or "idle"
 
     def on_click(self, event) -> None:
         event.stop()

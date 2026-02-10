@@ -53,10 +53,8 @@ class BlockedWidget(NodeWatcherMixin, Container):
         toggle = self.query_one(".blocked-toggle", Static)
         if self.meta.blocked:
             toggle.update(ICON_BLOCKED)
-            toggle.tooltip = "Blocked"
         else:
             toggle.update(ICON_UNBLOCKED)
-            toggle.tooltip = "Not blocked"
 
     def on_click(self, event) -> None:
         event.stop()

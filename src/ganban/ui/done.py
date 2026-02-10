@@ -55,10 +55,8 @@ class DoneWidget(NodeWatcherMixin, Container):
         toggle = self.query_one(".done-toggle", Static)
         if self.meta.done:
             toggle.update(ICON_CHECKED)
-            toggle.tooltip = self.meta.done
         else:
             toggle.update(ICON_UNCHECKED)
-            toggle.tooltip = "Not done"
 
     def on_click(self, event) -> None:
         event.stop()
