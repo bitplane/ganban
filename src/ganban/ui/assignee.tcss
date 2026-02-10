@@ -3,11 +3,11 @@ AssigneeWidget {
     width: auto;
     height: 1;
 }
-AssigneeWidget > Horizontal {
+#assignee-bar {
     width: auto;
     height: 1;
 }
-AssigneeWidget > Horizontal:hover {
+#assignee-bar:hover {
     background: $primary-darken-2;
 }
 AssigneeWidget #assignee-picker {

@@ -88,7 +88,7 @@ class AssigneeWidget(NodeWatcherMixin, Container):
             emoji, _, _ = resolve_assignee(assigned, self.board)
         else:
             emoji = ICON_PERSON
-        with Horizontal():
+        with Horizontal(id="assignee-bar"):
             yield Static(emoji, id="assignee-picker")
             yield Static("", classes="assignee-name")
             yield SearchInput([], placeholder="email@address", id="assignee-search")
