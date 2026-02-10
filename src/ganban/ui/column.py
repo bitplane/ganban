@@ -66,6 +66,10 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     ColumnWidget.compact CardWidget #card-footer {
         display: none;
     }
+    ColumnWidget.compact CardPlaceholder {
+        height: 1;
+        margin-bottom: 0;
+    }
     """
 
     HORIZONTAL_ONLY = True
