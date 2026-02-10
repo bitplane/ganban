@@ -7,10 +7,13 @@ from textual.app import App, ComposeResult
 
 from ganban.ui.cal import Calendar, CalendarDay, CalendarMenuItem, DateButton, date_diff
 from ganban.ui.menu import ContextMenu
+from tests.ui.conftest import GANBAN_CSS_PATH
 
 
 class CalendarApp(App):
     """Minimal app for testing calendar."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, selected: date | None = None):
         super().__init__()
@@ -289,6 +292,8 @@ def test_date_diff_boundary_24_months():
 
 class DateButtonApp(App):
     """Minimal app for testing date button."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, selected: date | None = None):
         super().__init__()

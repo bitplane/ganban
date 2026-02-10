@@ -55,13 +55,6 @@ class TextEditor(BaseEditor):
 
     SAVE_ON_ENTER = True
 
-    DEFAULT_CSS = """
-    TextEditor {
-        height: auto;
-        padding: 0;
-    }
-    """
-
     def __init__(self, **kwargs) -> None:
         kwargs.setdefault("soft_wrap", True)
         kwargs.setdefault("compact", True)
@@ -84,13 +77,6 @@ class MarkdownEditor(BaseEditor):
     """Multi-line editor. Enter inserts newline."""
 
     SAVE_ON_ENTER = False
-
-    DEFAULT_CSS = """
-    MarkdownEditor {
-        height: 100%;
-        padding: 0;
-    }
-    """
 
     def __init__(self, **kwargs) -> None:
         kwargs.setdefault("compact", True)

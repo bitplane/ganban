@@ -10,10 +10,13 @@ from ganban.model.node import Node
 from ganban.ui.cal import Calendar, CalendarDay, NavButton
 from ganban.ui.due import DueDateWidget
 from ganban.ui.menu import ContextMenu
+from tests.ui.conftest import GANBAN_CSS_PATH
 
 
 class DueDateApp(App):
     """Minimal app for testing due date widget."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, due: date | None = None):
         super().__init__()

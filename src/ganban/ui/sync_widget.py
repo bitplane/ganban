@@ -44,21 +44,6 @@ class SyncWidget(NodeWatcherMixin, Container):
     Click to open a context menu with local/remote toggles and interval presets.
     """
 
-    DEFAULT_CSS = """
-    SyncWidget {
-        width: auto;
-        height: 1;
-    }
-    SyncWidget .sync-icon {
-        width: auto;
-        height: 1;
-        padding: 0 1;
-    }
-    SyncWidget .sync-icon:hover {
-        background: $primary-darken-2;
-    }
-    """
-
     def __init__(self, board: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)

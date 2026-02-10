@@ -1,0 +1,4 @@
+/* MarkdownViewer */
+MarkdownViewer {
+    height: auto;
+}

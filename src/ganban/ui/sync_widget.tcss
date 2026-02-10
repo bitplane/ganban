@@ -1,0 +1,13 @@
+/* SyncWidget */
+SyncWidget {
+    width: auto;
+    height: 1;
+}
+SyncWidget .sync-icon {
+    width: auto;
+    height: 1;
+    padding: 0 1;
+}
+SyncWidget .sync-icon:hover {
+    background: $primary-darken-2;
+}

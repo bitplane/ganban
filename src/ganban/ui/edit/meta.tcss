@@ -1,0 +1,104 @@
+/* BoolToggle */
+BoolToggle {
+    width: auto;
+    height: 1;
+}
+BoolToggle:hover {
+    text-style: bold;
+}
+
+/* ListItemRow */
+ListItemRow {
+    width: 100%;
+    height: auto;
+}
+ListItemRow > .li-header {
+    width: 100%;
+    height: auto;
+}
+ListItemRow .li-bullet {
+    width: 2;
+    height: 1;
+}
+ListItemRow .li-value, ListItemRow .kv-value {
+    width: 1fr;
+    height: auto;
+}
+ListItemRow .li-delete {
+    width: 2;
+    height: 1;
+    dock: right;
+}
+
+/* AddListItemRow */
+AddListItemRow {
+    width: 100%;
+    height: 1;
+    text-align: center;
+    color: $text-muted;
+    border: dashed $surface-lighten-2;
+}
+AddListItemRow:hover {
+    background: $primary-darken-2;
+}
+
+/* ListEditor */
+ListEditor {
+    width: 100%;
+    height: auto;
+    padding: 0 0 0 2;
+}
+
+/* KeyValueRow */
+KeyValueRow {
+    width: 100%;
+    height: auto;
+    padding: 0;
+}
+KeyValueRow > .kv-header {
+    width: 100%;
+    height: auto;
+}
+KeyValueRow .kv-key {
+    width: 16;
+    height: auto;
+}
+KeyValueRow .kv-sep {
+    width: 3;
+    height: 1;
+    content-align: center middle;
+}
+KeyValueRow .kv-value {
+    width: 1fr;
+    height: auto;
+}
+KeyValueRow .kv-delete {
+    width: 2;
+    height: 1;
+    dock: right;
+}
+
+/* AddKeyRow */
+AddKeyRow {
+    width: 100%;
+    height: auto;
+    border: dashed $surface-lighten-2;
+}
+AddKeyRow > EditableText > ContentSwitcher > Static {
+    text-align: center;
+    color: $text-muted;
+}
+
+/* DictEditor */
+DictEditor {
+    width: 100%;
+    height: auto;
+    padding: 0 0 0 2;
+}
+
+/* MetaEditor */
+MetaEditor {
+    width: 100%;
+    height: 1fr;
+    overflow-y: auto;
+}

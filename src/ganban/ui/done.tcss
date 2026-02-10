@@ -1,0 +1,12 @@
+/* DoneWidget */
+DoneWidget {
+    width: auto;
+    height: 1;
+}
+DoneWidget .done-toggle {
+    width: auto;
+    height: 1;
+}
+DoneWidget .done-toggle:hover {
+    background: $primary-darken-2;
+}

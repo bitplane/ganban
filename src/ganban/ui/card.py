@@ -63,41 +63,6 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             super().__init__()
             self.card = card
 
-    DEFAULT_CSS = """
-    CardWidget {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        margin-bottom: 1;
-        background: $surface;
-    }
-    CardWidget:focus {
-        background: $primary;
-        color: $text;
-    }
-    CardWidget.blocked {
-        background: $error-darken-3;
-        color: $text;
-    }
-    CardWidget.blocked:focus {
-        background: $error;
-        color: $text;
-    }
-    CardWidget.dragging {
-        display: none;
-    }
-    CardWidget #card-header {
-        width: 100%;
-        height: 1;
-        margin: 0;
-    }
-    CardWidget #card-footer {
-        width: 100%;
-        height: 1;
-        color: $text-muted;
-    }
-    """
-
     def __init__(self, card_id: str, board: Node):
         self._init_watcher()
         Static.__init__(self)
@@ -238,24 +203,6 @@ class AddCard(Static, can_focus=True):
             self.column = column
             self.card_id = card_id
             self.title = title
-
-    DEFAULT_CSS = """
-    AddCard {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        margin-bottom: 1;
-        border: dashed $surface-lighten-2;
-    }
-    AddCard:focus {
-        background: $primary;
-        color: $text;
-    }
-    AddCard > EditableText > ContentSwitcher > Static {
-        text-align: center;
-        color: $text-muted;
-    }
-    """
 
     def __init__(self, column: Node, board: Node):
         super().__init__()

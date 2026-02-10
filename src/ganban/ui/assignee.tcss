@@ -1,0 +1,17 @@
+/* AssigneeButton */
+AssigneeButton { width: 2; height: 1; }
+AssigneeButton:hover { background: $primary-darken-2; }
+
+/* AssigneeWidget */
+AssigneeWidget {
+    width: auto;
+    height: 1;
+}
+AssigneeWidget > Horizontal {
+    width: auto;
+    height: 1;
+}
+AssigneeWidget .assignee-name {
+    width: auto;
+    height: 1;
+}

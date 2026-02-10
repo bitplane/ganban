@@ -18,31 +18,6 @@ from ganban.ui.board import BoardScreen
 class ConfirmInitScreen(ModalScreen[bool]):
     """Modal screen asking to initialize a git repo."""
 
-    CSS = """
-    ConfirmInitScreen {
-        align: center middle;
-    }
-    #dialog {
-        width: 70;
-        height: auto;
-        border: thick $primary;
-        background: $surface;
-        padding: 1 2;
-    }
-    #message {
-        text-align: center;
-        margin-bottom: 1;
-    }
-    #buttons {
-        width: 100%;
-        height: 3;
-        align: center middle;
-    }
-    Button {
-        margin: 0 2;
-    }
-    """
-
     def __init__(self, path: Path):
         super().__init__()
         self.path = path
@@ -61,12 +36,30 @@ class ConfirmInitScreen(ModalScreen[bool]):
 class GanbanApp(App):
     """Git-based kanban board TUI."""
 
-    CSS = """
-    Tooltip {
-        padding: 0 1;
-        margin: 0;
-    }
-    """
+    CSS_PATH = [
+        "app.tcss",
+        "board.tcss",
+        "card.tcss",
+        "column.tcss",
+        "detail.tcss",
+        "menu.tcss",
+        "drag.tcss",
+        "users.tcss",
+        "done.tcss",
+        "blocked.tcss",
+        "due.tcss",
+        "confirm.tcss",
+        "assignee.tcss",
+        "color.tcss",
+        "sync_widget.tcss",
+        "cal.tcss",
+        "emoji.tcss",
+        "edit/editable.tcss",
+        "edit/section.tcss",
+        "edit/viewers.tcss",
+        "edit/meta.tcss",
+        "edit/document.tcss",
+    ]
 
     TITLE = "ganban"
     BINDINGS = [("ctrl+q", "quit", "Quit")]

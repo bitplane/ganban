@@ -32,46 +32,6 @@ from ganban.ui.watcher import NodeWatcherMixin
 class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     """A single column on the board."""
 
-    DEFAULT_CSS = """
-    ColumnWidget {
-        width: 1fr;
-        height: auto;
-        min-height: 100%;
-        min-width: 25;
-        max-width: 25;
-        padding: 0 1;
-        border-right: tall $surface-lighten-1;
-    }
-    ColumnWidget.dragging {
-        layer: overlay;
-        border: solid $primary;
-        opacity: 0.8;
-    }
-    ColumnWidget > EditableText > ContentSwitcher > Static {
-        width: 100%;
-        text-align: center;
-        text-style: bold;
-    }
-    ColumnWidget > Rule.-horizontal {
-        margin: 0;
-    }
-    ColumnWidget.compact CardWidget {
-        height: 1;
-        padding: 0 1;
-        margin-bottom: 0;
-    }
-    ColumnWidget.compact CardWidget #card-header {
-        display: none;
-    }
-    ColumnWidget.compact CardWidget #card-footer {
-        display: none;
-    }
-    ColumnWidget.compact CardPlaceholder {
-        height: 1;
-        margin-bottom: 0;
-    }
-    """
-
     HORIZONTAL_ONLY = True
 
     class MoveRequested(Message):
@@ -447,20 +407,6 @@ class AddColumn(Vertical):
         def __init__(self, column: Node):
             super().__init__()
             self.column = column
-
-    DEFAULT_CSS = """
-    AddColumn {
-        width: 1fr;
-        height: 100%;
-        min-width: 25;
-        max-width: 25;
-        padding: 0 1;
-    }
-    AddColumn .column-header > ContentSwitcher > Static {
-        text-align: center;
-        text-style: bold;
-    }
-    """
 
     def __init__(self, board: Node):
         super().__init__()

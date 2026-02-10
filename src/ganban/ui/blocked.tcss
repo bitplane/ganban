@@ -1,0 +1,12 @@
+/* BlockedWidget */
+BlockedWidget {
+    width: auto;
+    height: 1;
+}
+BlockedWidget .blocked-toggle {
+    width: auto;
+    height: 1;
+}
+BlockedWidget .blocked-toggle:hover {
+    background: $primary-darken-2;
+}

@@ -15,41 +15,6 @@ from ganban.ui.edit.viewers import MarkdownViewer
 class SectionEditor(Container):
     """Editor for a section with heading and markdown body."""
 
-    DEFAULT_CSS = """
-    SectionEditor {
-        width: 100%;
-        height: auto;
-    }
-    SectionEditor > .section-heading {
-        width: 100%;
-        height: auto;
-        text-style: bold;
-        border-bottom: solid $primary-darken-2;
-    }
-    SectionEditor > .section-heading > ContentSwitcher > Static {
-        text-style: bold;
-    }
-    SectionEditor > .section-body {
-        height: auto;
-        min-height: 3;
-    }
-    SectionEditor > .section-body #view {
-        padding: 0;
-    }
-    SectionEditor > .section-body #view MarkdownViewer {
-        padding: 0;
-        margin: 0;
-    }
-    SectionEditor > .section-body #view Markdown {
-        padding: 0;
-        margin: 0;
-    }
-    SectionEditor > .section-body #edit {
-        height: auto;
-        scrollbar-size: 0 0;
-    }
-    """
-
     class HeadingChanged(Message):
         """Emitted when the section heading changes."""
 

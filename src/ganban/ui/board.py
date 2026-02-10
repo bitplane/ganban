@@ -35,29 +35,6 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         ("ctrl+@", "context_menu", "Context menu"),
     ]
 
-    DEFAULT_CSS = """
-    BoardScreen {
-        width: 100%;
-        height: 100%;
-        layout: vertical;
-        layers: base overlay;
-    }
-    #board-header {
-        width: 100%;
-        height: auto;
-        background: $primary;
-        color: $text;
-    }
-    #board-title {
-        width: 1fr;
-    }
-    #columns {
-        width: 100%;
-        height: 1fr;
-        overflow: auto;
-    }
-    """
-
     def __init__(self, board: Node):
         self._init_watcher()
         super().__init__()

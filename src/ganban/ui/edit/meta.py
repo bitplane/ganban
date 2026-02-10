@@ -28,16 +28,6 @@ class BoolToggle(Static):
             super().__init__()
             self.value = value
 
-    DEFAULT_CSS = """
-    BoolToggle {
-        width: auto;
-        height: 1;
-    }
-    BoolToggle:hover {
-        text-style: bold;
-    }
-    """
-
     def __init__(self, value: bool, **kwargs) -> None:
         super().__init__(str(value).lower(), **kwargs)
         self._value = value
@@ -117,30 +107,6 @@ class ListItemRow(Vertical):
         def __init__(self, index: int) -> None:
             super().__init__()
             self.index = index
-
-    DEFAULT_CSS = """
-    ListItemRow {
-        width: 100%;
-        height: auto;
-    }
-    ListItemRow > .li-header {
-        width: 100%;
-        height: auto;
-    }
-    ListItemRow .li-bullet {
-        width: 2;
-        height: 1;
-    }
-    ListItemRow .li-value, ListItemRow .kv-value {
-        width: 1fr;
-        height: auto;
-    }
-    ListItemRow .li-delete {
-        width: 2;
-        height: 1;
-        dock: right;
-    }
-    """
 
     def __init__(self, index: int, value: Any, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -226,19 +192,6 @@ class AddListItemRow(Static):
         "list": [],
     }
 
-    DEFAULT_CSS = """
-    AddListItemRow {
-        width: 100%;
-        height: 1;
-        text-align: center;
-        color: $text-muted;
-        border: dashed $surface-lighten-2;
-    }
-    AddListItemRow:hover {
-        background: $primary-darken-2;
-    }
-    """
-
     def __init__(self, **kwargs) -> None:
         super().__init__("+", **kwargs)
 
@@ -270,14 +223,6 @@ class ListEditor(Vertical):
         def __init__(self, items: list) -> None:
             super().__init__()
             self.items = items
-
-    DEFAULT_CSS = """
-    ListEditor {
-        width: 100%;
-        height: auto;
-        padding: 0 0 0 2;
-    }
-    """
 
     def __init__(self, items: list, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -346,36 +291,6 @@ class KeyValueRow(Vertical):
             super().__init__()
             self.key = key
 
-    DEFAULT_CSS = """
-    KeyValueRow {
-        width: 100%;
-        height: auto;
-        padding: 0;
-    }
-    KeyValueRow > .kv-header {
-        width: 100%;
-        height: auto;
-    }
-    KeyValueRow .kv-key {
-        width: 16;
-        height: auto;
-    }
-    KeyValueRow .kv-sep {
-        width: 3;
-        height: 1;
-        content-align: center middle;
-    }
-    KeyValueRow .kv-value {
-        width: 1fr;
-        height: auto;
-    }
-    KeyValueRow .kv-delete {
-        width: 2;
-        height: 1;
-        dock: right;
-    }
-    """
-
     def __init__(self, key: str, value: Any, **kwargs) -> None:
         super().__init__(**kwargs)
         self.key = key
@@ -440,18 +355,6 @@ class AddKeyRow(Container):
             self.key = key
             self.value = value
 
-    DEFAULT_CSS = """
-    AddKeyRow {
-        width: 100%;
-        height: auto;
-        border: dashed $surface-lighten-2;
-    }
-    AddKeyRow > EditableText > ContentSwitcher > Static {
-        text-align: center;
-        color: $text-muted;
-    }
-    """
-
     TYPE_DEFAULTS: dict[str, Any] = {
         "text": "",
         "number": 0,
@@ -498,14 +401,6 @@ class AddKeyRow(Container):
 
 class DictEditor(NodeWatcherMixin, Vertical):
     """Renders a Node's children as KeyValueRows + AddKeyRow."""
-
-    DEFAULT_CSS = """
-    DictEditor {
-        width: 100%;
-        height: auto;
-        padding: 0 0 0 2;
-    }
-    """
 
     def __init__(self, node: Node, **kwargs) -> None:
         self._init_watcher()
@@ -584,14 +479,6 @@ class DictEditor(NodeWatcherMixin, Vertical):
 
 class MetaEditor(Container):
     """Thin wrapper for the tree metadata editor with scroll support."""
-
-    DEFAULT_CSS = """
-    MetaEditor {
-        width: 100%;
-        height: 1fr;
-        overflow-y: auto;
-    }
-    """
 
     def __init__(self, meta: Node, **kwargs) -> None:
         super().__init__(**kwargs)

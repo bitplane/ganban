@@ -27,17 +27,6 @@ class EmailTag(Container):
             self.index = index
             self.value = value
 
-    DEFAULT_CSS = """
-    EmailTag {
-        width: 100%;
-        height: auto;
-    }
-    EmailTag .email-value {
-        width: 1fr;
-        height: auto;
-    }
-    """
-
     def __init__(self, index: int, email: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.index = index
@@ -69,17 +58,6 @@ class AddEmailButton(Static, can_focus=True):
         def __init__(self, email: str) -> None:
             super().__init__()
             self.email = email
-
-    DEFAULT_CSS = """
-    AddEmailButton {
-        width: 100%;
-        height: auto;
-        color: $text-muted;
-    }
-    AddEmailButton > EditableText > ContentSwitcher > Static {
-        color: $text-muted;
-    }
-    """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -123,41 +101,6 @@ class UserRow(Vertical):
         def __init__(self, name: str) -> None:
             super().__init__()
             self.name = name
-
-    DEFAULT_CSS = """
-    UserRow {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        margin-bottom: 1;
-        background: $surface;
-    }
-    UserRow > .user-title-bar {
-        width: 100%;
-        height: auto;
-        background: $primary;
-        color: $text;
-        padding: 0 1;
-    }
-    UserRow .user-emoji {
-        width: 2;
-        height: 1;
-    }
-    UserRow .user-name {
-        width: 1fr;
-        height: auto;
-    }
-    UserRow .user-delete {
-        width: 2;
-        height: 1;
-        dock: right;
-    }
-    UserRow > .user-emails {
-        width: 100%;
-        height: auto;
-        padding: 0 0 0 2;
-    }
-    """
 
     def __init__(self, user_name: str, user_node: Node, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -241,24 +184,6 @@ class AddUserRow(Static, can_focus=True):
             super().__init__()
             self.name = name
 
-    DEFAULT_CSS = """
-    AddUserRow {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-        margin-bottom: 1;
-        border: dashed $surface-lighten-2;
-    }
-    AddUserRow:focus {
-        background: $primary;
-        color: $text;
-    }
-    AddUserRow > EditableText > ContentSwitcher > Static {
-        text-align: center;
-        color: $text-muted;
-    }
-    """
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -278,14 +203,6 @@ class AddUserRow(Static, can_focus=True):
 
 class UsersEditor(NodeWatcherMixin, Container):
     """Editor for board.meta.users -- a dict of display name -> user info."""
-
-    DEFAULT_CSS = """
-    UsersEditor {
-        width: 100%;
-        height: 1fr;
-        overflow-y: auto;
-    }
-    """
 
     def __init__(self, meta: Node, **kwargs) -> None:
         self._init_watcher()

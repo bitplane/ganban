@@ -70,11 +70,6 @@ class AssigneeButton(Static):
             super().__init__()
             self.assigned = assigned
 
-    DEFAULT_CSS = """
-    AssigneeButton { width: 2; height: 1; }
-    AssigneeButton:hover { background: $primary-darken-2; }
-    """
-
     def __init__(self, board: Node, emoji: str = ICON_PERSON, **kwargs) -> None:
         super().__init__(emoji, **kwargs)
         self._board = board
@@ -99,21 +94,6 @@ class AssigneeWidget(NodeWatcherMixin, Container):
 
     Reads and writes ``meta.assigned`` on the given card meta Node,
     and watches the node so external changes are reflected immediately.
-    """
-
-    DEFAULT_CSS = """
-    AssigneeWidget {
-        width: auto;
-        height: 1;
-    }
-    AssigneeWidget > Horizontal {
-        width: auto;
-        height: 1;
-    }
-    AssigneeWidget .assignee-name {
-        width: auto;
-        height: 1;
-    }
     """
 
     def __init__(self, meta: Node, board: Node, **kwargs) -> None:

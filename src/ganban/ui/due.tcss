@@ -1,0 +1,16 @@
+/* DueDateWidget */
+DueDateWidget {
+    width: auto;
+    height: 1;
+}
+DueDateWidget > Horizontal {
+    width: auto;
+    height: 1;
+}
+DueDateWidget .due-text {
+    width: auto;
+    height: 1;
+}
+DueDateWidget .due-text.overdue {
+    color: $error;
+}

@@ -31,11 +31,7 @@ COLORS: dict[str, str] = {
 class ColorSwatch(MenuItem):
     """A colored menu item that uses outline for focus instead of background."""
 
-    DEFAULT_CSS = """
-    ColorSwatch:focus {
-        outline: solid white;
-    }
-    """
+    pass
 
 
 def build_color_menu() -> list[MenuRow]:
@@ -65,11 +61,6 @@ class ColorButton(Static):
         def __init__(self, color: str | None) -> None:
             super().__init__()
             self.color = color
-
-    DEFAULT_CSS = """
-    ColorButton { width: 2; height: 1; }
-    ColorButton:hover { background: $primary-darken-2; }
-    """
 
     def __init__(self, color: str | None = None, **kwargs) -> None:
         super().__init__(ICON_PALETTE, **kwargs)

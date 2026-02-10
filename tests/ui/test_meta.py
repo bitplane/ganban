@@ -19,10 +19,13 @@ from ganban.ui.edit.meta import (
     MetaEditor,
     _parse_number,
 )
+from tests.ui.conftest import GANBAN_CSS_PATH
 
 
 class MetaEditorApp(App):
     """Test app wrapping a MetaEditor."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, meta: Node):
         super().__init__()
@@ -40,6 +43,8 @@ class DictEditorApp(App):
     observe external changes via the parent chain.
     """
 
+    CSS_PATH = GANBAN_CSS_PATH
+
     def __init__(self, node: Node):
         super().__init__()
         self.root_node = Node(child=node)
@@ -52,6 +57,8 @@ class DictEditorApp(App):
 
 class ListEditorApp(App):
     """Test app wrapping a ListEditor."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, items: list):
         super().__init__()

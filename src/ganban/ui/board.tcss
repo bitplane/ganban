@@ -1,0 +1,21 @@
+/* BoardScreen */
+BoardScreen {
+    width: 100%;
+    height: 100%;
+    layout: vertical;
+    layers: base overlay;
+}
+#board-header {
+    width: 100%;
+    height: auto;
+    background: $primary;
+    color: $text;
+}
+#board-title {
+    width: 1fr;
+}
+#columns {
+    width: 100%;
+    height: 1fr;
+    overflow: auto;
+}

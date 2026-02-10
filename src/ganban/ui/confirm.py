@@ -21,16 +21,6 @@ class ConfirmButton(Static):
         def control(self) -> "ConfirmButton":
             return self._sender
 
-    DEFAULT_CSS = """
-    ConfirmButton {
-        width: 2;
-        height: 1;
-    }
-    ConfirmButton:hover {
-        background: $primary-darken-2;
-    }
-    """
-
     def __init__(self, icon: str = ICON_DELETE, **kwargs) -> None:
         super().__init__(icon, **kwargs)
 

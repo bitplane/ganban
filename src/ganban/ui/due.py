@@ -22,24 +22,6 @@ class DueDateWidget(NodeWatcherMixin, Container):
     are reflected immediately.
     """
 
-    DEFAULT_CSS = """
-    DueDateWidget {
-        width: auto;
-        height: 1;
-    }
-    DueDateWidget > Horizontal {
-        width: auto;
-        height: 1;
-    }
-    DueDateWidget .due-text {
-        width: auto;
-        height: 1;
-    }
-    DueDateWidget .due-text.overdue {
-        color: $error;
-    }
-    """
-
     def __init__(self, meta: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)

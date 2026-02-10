@@ -1,0 +1,29 @@
+/* GanbanApp */
+Tooltip {
+    padding: 0 1;
+    margin: 0;
+}
+
+/* ConfirmInitScreen */
+ConfirmInitScreen {
+    align: center middle;
+}
+ConfirmInitScreen #dialog {
+    width: 70;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+    padding: 1 2;
+}
+ConfirmInitScreen #message {
+    text-align: center;
+    margin-bottom: 1;
+}
+ConfirmInitScreen #buttons {
+    width: 100%;
+    height: 3;
+    align: center middle;
+}
+ConfirmInitScreen Button {
+    margin: 0 2;
+}

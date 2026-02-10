@@ -1,8 +1,14 @@
 """Fixtures for UI tests."""
 
+from pathlib import Path
+
 import pytest
 
 from ganban.ui.menu import MenuItem, MenuRow, MenuSeparator
+
+# Resolve all .tcss files from the source tree so test apps pick up widget styles.
+_UI_DIR = Path(__file__).resolve().parent.parent.parent / "src" / "ganban" / "ui"
+GANBAN_CSS_PATH = sorted(str(p) for p in _UI_DIR.rglob("*.tcss"))
 
 
 @pytest.fixture

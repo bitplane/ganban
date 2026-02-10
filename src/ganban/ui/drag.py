@@ -240,13 +240,6 @@ class DraggableMixin:
 class DragGhost(Static):
     """Floating overlay showing the card being dragged."""
 
-    DEFAULT_CSS = """
-    DragGhost {
-        layer: overlay;
-        height: auto;
-    }
-    """
-
     def __init__(self, card):
         super().__init__()
         self._card = card
@@ -265,27 +258,10 @@ class DragGhost(Static):
 class CardPlaceholder(Static):
     """Placeholder showing where a dragged card will drop."""
 
-    DEFAULT_CSS = """
-    CardPlaceholder {
-        width: 100%;
-        height: 3;
-        margin-bottom: 1;
-        border: dashed $primary;
-        background: $surface-darken-1;
-    }
-    """
+    pass
 
 
 class ColumnPlaceholder(Static):
     """Placeholder showing where a dragged column will drop."""
 
-    DEFAULT_CSS = """
-    ColumnPlaceholder {
-        width: 1fr;
-        min-width: 25;
-        max-width: 25;
-        height: 100%;
-        border: dashed $primary;
-        background: $surface-darken-1;
-    }
-    """
+    pass

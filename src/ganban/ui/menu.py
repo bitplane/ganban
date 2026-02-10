@@ -21,26 +21,6 @@ class MenuItem(Static, can_focus=True):
             super().__init__()
             self.item = item
 
-    DEFAULT_CSS = """
-    MenuItem {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-    }
-
-    MenuItem:focus {
-        background: $primary-darken-1;
-    }
-
-    MenuItem:disabled {
-        color: $text-muted;
-    }
-
-    MenuItem:disabled:focus {
-        background: transparent;
-    }
-    """
-
     def __init__(
         self,
         label: str,
@@ -73,25 +53,11 @@ class MenuItem(Static, can_focus=True):
 class MenuSeparator(Static):
     """A horizontal separator line."""
 
-    DEFAULT_CSS = """
-    MenuSeparator {
-        width: 100%;
-        height: 1;
-        border-bottom: solid $surface-lighten-1;
-    }
-    """
+    pass
 
 
 class MenuRow(Horizontal):
     """A horizontal row of menu items within a vertical menu."""
-
-    DEFAULT_CSS = """
-    MenuRow {
-        width: 100%;
-        height: auto;
-        padding: 0 1;
-    }
-    """
 
     def __init__(self, *items: MenuItem) -> None:
         super().__init__()
@@ -121,20 +87,6 @@ class MenuRow(Horizontal):
 
 class MenuList(VerticalScroll):
     """Container for menu items."""
-
-    DEFAULT_CSS = """
-    MenuList {
-        dock: top;
-        height: auto;
-        max-height: 80%;
-        background: $surface;
-        display: none;
-    }
-
-    MenuList.-visible {
-        display: block;
-    }
-    """
 
     class Ready(Message):
         """Posted when menu has been laid out and has a size."""
@@ -225,12 +177,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         def __init__(self, item: MenuItem) -> None:
             super().__init__()
             self.item = item
-
-    DEFAULT_CSS = """
-    ContextMenu {
-        background: transparent;
-    }
-    """
 
     BINDINGS = [
         ("up", "focus_prev", "Up"),

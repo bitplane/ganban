@@ -86,23 +86,6 @@ class Calendar(Container):
         def control(self) -> "Calendar":
             return self._sender
 
-    DEFAULT_CSS = """
-    Calendar { width: auto; height: auto; background: $background; }
-    .cal-header { width: 100%; height: 1; }
-    .cal-nav { width: 2; }
-    .cal-clear { width: auto; padding: 0 1; }
-    .cal-title { width: 1fr; text-align: center; }
-    .cal-grid { width: auto; height: auto; }
-    .cal-row { width: auto; height: 1; }
-    .cal-label { width: 3; color: $text-muted; }
-    CalendarDay { width: 3; text-align: center; }
-    CalendarDay:hover { background: $primary-darken-2; }
-    CalendarDay:focus { background: $primary-darken-2; }
-    CalendarDay.today { text-style: bold; color: $primary; }
-    CalendarDay.selected { background: $primary; color: $text; }
-    CalendarDay.other-month { color: $text-disabled; }
-    """
-
     BINDINGS = [
         ("up", "cursor_up", "Previous day"),
         ("down", "cursor_down", "Next day"),
@@ -303,13 +286,6 @@ class CalendarMenuItem(Container):
             super().__init__()
             self.item = item
 
-    DEFAULT_CSS = """
-    CalendarMenuItem {
-        width: auto;
-        height: auto;
-    }
-    """
-
     def __init__(self, selected: date | None = None) -> None:
         super().__init__()
         self._initial = selected
@@ -337,16 +313,6 @@ class DateButton(Static):
         @property
         def control(self) -> "DateButton":
             return self._sender
-
-    DEFAULT_CSS = """
-    DateButton {
-        width: 2;
-        height: 1;
-    }
-    DateButton:hover {
-        background: $primary-darken-2;
-    }
-    """
 
     def __init__(self, selected: date | None = None, icon: str = "🗓️", **kwargs) -> None:
         super().__init__(icon, **kwargs)

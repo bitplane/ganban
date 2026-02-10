@@ -16,13 +16,6 @@ class _FocusableView(Container):
 
     can_focus = True
 
-    DEFAULT_CSS = """
-    _FocusableView {
-        width: 100%;
-        height: auto;
-    }
-    """
-
     def _get_editable_parent(self) -> "EditableText | None":
         parent = self.parent
         while parent and not isinstance(parent, EditableText):
@@ -47,24 +40,6 @@ class _FocusableView(Container):
 
 class EditableText(Container):
     """Orchestrates view/edit switching for any viewer + editor pair."""
-
-    DEFAULT_CSS = """
-    EditableText {
-        width: 100%;
-        height: auto;
-    }
-    EditableText > ContentSwitcher {
-        width: 100%;
-        height: auto;
-    }
-    EditableText #view {
-        width: 100%;
-    }
-    EditableText #edit {
-        width: 100%;
-        height: auto;
-    }
-    """
 
     class Changed(Message):
         """Emitted when the value changes."""

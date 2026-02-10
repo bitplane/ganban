@@ -10,10 +10,13 @@ from ganban.ui.cal import Calendar, CalendarDay, NavButton
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import EditableText, MarkdownDocEditor, SectionEditor
+from tests.ui.conftest import GANBAN_CSS_PATH
 
 
 class DetailTestApp(App):
     """Minimal app for testing detail modals."""
+
+    CSS_PATH = GANBAN_CSS_PATH
 
     def __init__(self, modal):
         super().__init__()

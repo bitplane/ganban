@@ -21,20 +21,6 @@ class DoneWidget(NodeWatcherMixin, Container):
     menu) are reflected immediately.
     """
 
-    DEFAULT_CSS = """
-    DoneWidget {
-        width: auto;
-        height: 1;
-    }
-    DoneWidget .done-toggle {
-        width: auto;
-        height: 1;
-    }
-    DoneWidget .done-toggle:hover {
-        background: $primary-darken-2;
-    }
-    """
-
     def __init__(self, meta: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)

@@ -36,23 +36,6 @@ class TabButton(Static):
             super().__init__()
             self.tab_id = tab_id
 
-    DEFAULT_CSS = """
-    TabButton {
-        width: auto;
-        height: 1;
-        padding: 0 1;
-    }
-    TabButton:hover {
-        background: $primary-darken-2;
-        color: $text;
-    }
-    TabButton.-active {
-        background: $primary-darken-2;
-        color: $text;
-        text-style: bold;
-    }
-    """
-
     def __init__(self, label: str, tab_id: str, **kwargs) -> None:
         super().__init__(label, **kwargs)
         self.tab_id = tab_id
@@ -64,54 +47,6 @@ class TabButton(Static):
 
 class DetailModal(ModalScreen[None]):
     """Base modal screen for detail editing."""
-
-    DEFAULT_CSS = """
-    DetailModal {
-        align: center middle;
-        background: rgba(0, 0, 0, 0.6);
-    }
-
-    #detail-container {
-        width: 90%;
-        height: 90%;
-        background: $surface;
-    }
-
-    #detail-title-bar {
-        width: 100%;
-        height: auto;
-        background: $primary;
-        color: $text;
-        padding: 0 1;
-    }
-
-    #detail-id {
-        width: auto;
-        height: 1;
-        text-style: bold;
-    }
-
-    #detail-bar {
-        width: 100%;
-        height: 1;
-        padding: 0 1;
-    }
-    #detail-bar > * {
-        margin-right: 1;
-    }
-
-    #detail-tabs {
-        width: auto;
-        height: 1;
-        dock: right;
-    }
-
-    #detail-content {
-        width: 100%;
-        height: 1fr;
-        padding: 1 1 0 1;
-    }
-    """
 
     BINDINGS = [
         ("escape", "close", "Close"),
@@ -151,15 +86,6 @@ class DetailModal(ModalScreen[None]):
 
 class CardDetailModal(DetailModal):
     """Modal screen showing full card details."""
-
-    DEFAULT_CSS = """
-    CardDetailModal.blocked #detail-container {
-        background: $error-darken-3;
-    }
-    CardDetailModal.blocked #detail-title-bar {
-        background: $error;
-    }
-    """
 
     def __init__(self, card: Node, board: Node | None = None) -> None:
         super().__init__()
@@ -205,11 +131,6 @@ class CardDetailModal(DetailModal):
 
 class CompactButton(Static):
     """Toggle button for compact/card view mode."""
-
-    DEFAULT_CSS = """
-    CompactButton { width: 2; height: 1; }
-    CompactButton:hover { background: $primary-darken-2; }
-    """
 
     def __init__(self, meta: Node, **kwargs) -> None:
         super().__init__(**kwargs)

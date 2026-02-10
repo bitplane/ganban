@@ -19,21 +19,6 @@ from ganban.ui.watcher import NodeWatcherMixin
 class DocHeader(Container):
     """Editable document title with rule underneath."""
 
-    DEFAULT_CSS = """
-    DocHeader {
-        width: 1fr;
-        height: auto;
-    }
-    DocHeader #doc-title {
-        width: 100%;
-        height: auto;
-        text-style: bold;
-    }
-    DocHeader #doc-title > ContentSwitcher > Static {
-        text-style: bold;
-    }
-    """
-
     class TitleChanged(Message):
         """Emitted when the title changes."""
 
@@ -70,18 +55,6 @@ class AddSection(Static):
             super().__init__()
             self.heading = heading
 
-    DEFAULT_CSS = """
-    AddSection {
-        width: 100%;
-        height: auto;
-        border: dashed $surface-lighten-2;
-    }
-    AddSection > EditableText > ContentSwitcher > Static {
-        text-align: center;
-        color: $text-muted;
-    }
-    """
-
     def compose(self) -> ComposeResult:
         yield EditableText("", Static("+"), TextEditor(), placeholder="+")
 
@@ -94,32 +67,6 @@ class AddSection(Static):
 
 class MarkdownDocEditor(NodeWatcherMixin, Container):
     """Two-panel editor for markdown sections content."""
-
-    DEFAULT_CSS = """
-    MarkdownDocEditor {
-        width: 100%;
-        height: 100%;
-        layout: vertical;
-    }
-    #doc-editor-container {
-        width: 100%;
-        height: 1fr;
-    }
-    #doc-editor-left {
-        width: 2fr;
-        height: 100%;
-        padding-right: 1;
-    }
-    #doc-editor-right {
-        width: 1fr;
-        height: 100%;
-        border-left: tall $surface-lighten-1;
-        padding-left: 1;
-    }
-    #main-section {
-        height: auto;
-    }
-    """
 
     class Changed(Message):
         """Emitted when the document content changes."""

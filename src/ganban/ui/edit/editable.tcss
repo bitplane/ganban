@@ -1,0 +1,34 @@
+/* _FocusableView */
+_FocusableView {
+    width: 100%;
+    height: auto;
+}
+
+/* EditableText */
+EditableText {
+    width: 100%;
+    height: auto;
+}
+EditableText > ContentSwitcher {
+    width: 100%;
+    height: auto;
+}
+EditableText #view {
+    width: 100%;
+}
+EditableText #edit {
+    width: 100%;
+    height: auto;
+}
+
+/* TextEditor */
+TextEditor {
+    height: auto;
+    padding: 0;
+}
+
+/* MarkdownEditor */
+MarkdownEditor {
+    height: 100%;
+    padding: 0;
+}

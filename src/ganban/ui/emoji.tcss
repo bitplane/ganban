@@ -1,0 +1,6 @@
+/* EmojiButton */
+EmojiButton { width: 2; height: 1; }
+EmojiButton:hover { background: $primary-darken-2; }
+
+/* EmailEmoji */
+EmailEmoji { width: 2; height: 1; }

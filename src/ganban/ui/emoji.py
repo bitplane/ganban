@@ -76,11 +76,6 @@ class EmojiButton(Static):
             super().__init__()
             self.emoji = emoji
 
-    DEFAULT_CSS = """
-    EmojiButton { width: 2; height: 1; }
-    EmojiButton:hover { background: $primary-darken-2; }
-    """
-
     def __init__(self, emoji: str | None = None, *, email: str | None = None, **kwargs) -> None:
         self._emoji = emoji
         self._email = email
@@ -164,10 +159,6 @@ class EmailEmoji(NodeWatcherMixin, Static):
     """Display-only emoji resolved from an email address.
 
     Watches meta.users so it updates when custom emojis change.
-    """
-
-    DEFAULT_CSS = """
-    EmailEmoji { width: 2; height: 1; }
     """
 
     def __init__(self, email: str, meta: Node, **kwargs) -> None:

@@ -18,12 +18,6 @@ class TextViewer(Static):
 class MarkdownViewer(Container):
     """Markdown viewer container."""
 
-    DEFAULT_CSS = """
-    MarkdownViewer {
-        height: auto;
-    }
-    """
-
     def __init__(self, value: str = "", parser_factory=None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._value = value

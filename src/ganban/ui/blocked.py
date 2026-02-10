@@ -19,20 +19,6 @@ class BlockedWidget(NodeWatcherMixin, Container):
     Shows 🚧 when blocked, 🏭 when not. Click to toggle.
     """
 
-    DEFAULT_CSS = """
-    BlockedWidget {
-        width: auto;
-        height: 1;
-    }
-    BlockedWidget .blocked-toggle {
-        width: auto;
-        height: 1;
-    }
-    BlockedWidget .blocked-toggle:hover {
-        background: $primary-darken-2;
-    }
-    """
-
     def __init__(self, meta: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)

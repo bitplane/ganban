@@ -1,0 +1,46 @@
+/* MenuItem */
+MenuItem {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+}
+MenuItem:focus {
+    background: $primary-darken-1;
+}
+MenuItem:disabled {
+    color: $text-muted;
+}
+MenuItem:disabled:focus {
+    background: transparent;
+}
+
+/* MenuSeparator */
+MenuSeparator {
+    width: 100%;
+    height: 1;
+    border-bottom: solid $surface-lighten-1;
+}
+
+/* MenuRow */
+MenuRow {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+}
+
+/* MenuList */
+MenuList {
+    dock: top;
+    height: auto;
+    max-height: 80%;
+    background: $surface;
+    display: none;
+}
+MenuList.-visible {
+    display: block;
+}
+
+/* ContextMenu */
+ContextMenu {
+    background: transparent;
+}
