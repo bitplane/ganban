@@ -1,0 +1,21 @@
+SearchInput {
+    width: 100%;
+    height: auto;
+}
+
+SearchInput > Input {
+    width: 100%;
+}
+
+SearchInput > OptionList {
+    width: 100%;
+    max-height: 8;
+    display: none;
+    overlay: screen;
+    background: $surface;
+    border: solid $primary;
+}
+
+SearchInput > OptionList.-visible {
+    display: block;
+}
