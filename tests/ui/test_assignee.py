@@ -12,7 +12,6 @@ from ganban.ui.assignee import (
     build_assignee_menu,
     resolve_assignee,
 )
-from ganban.ui.confirm import ConfirmButton
 from ganban.ui.emoji import emoji_for_email
 
 
@@ -25,10 +24,10 @@ def test_menu_from_users():
         git={"committers": []},
     )
     items = build_assignee_menu(board)
-    assert len(items) == 1
-    assert items[0].item_id == "Alice <alice@example.com>"
-    assert "🤖" in str(items[0].label)
-    assert "Alice" in str(items[0].label)
+    assert items[0].item_id == "unassign"
+    assert items[2].item_id == "Alice <alice@example.com>"
+    assert "🤖" in str(items[2].label)
+    assert "Alice" in str(items[2].label)
 
 
 def test_menu_from_committers():
@@ -37,8 +36,7 @@ def test_menu_from_committers():
         git={"committers": ["Bob <bob@example.com>"]},
     )
     items = build_assignee_menu(board)
-    assert len(items) == 1
-    assert items[0].item_id == "Bob <bob@example.com>"
+    assert items[2].item_id == "Bob <bob@example.com>"
 
 
 def test_menu_deduplicates():
@@ -47,7 +45,7 @@ def test_menu_deduplicates():
         git={"committers": ["Alice <alice@example.com>"]},
     )
     items = build_assignee_menu(board)
-    assert len(items) == 1
+    assert len(items) == 3  # unassign + separator + Alice
 
 
 def test_menu_deduplicates_secondary_emails():
@@ -56,14 +54,14 @@ def test_menu_deduplicates_secondary_emails():
         git={"committers": ["Alice Work <alice@work.com>"]},
     )
     items = build_assignee_menu(board)
-    assert len(items) == 1
-    assert items[0].item_id == "Alice <alice@example.com>"
+    assert len(items) == 3  # unassign + separator + Alice
+    assert items[2].item_id == "Alice <alice@example.com>"
 
 
 def test_menu_empty_board():
     board = Node(meta={}, git={"committers": []})
     items = build_assignee_menu(board)
-    assert len(items) == 0
+    assert len(items) == 2  # unassign + separator
 
 
 # --- Sync tests for resolve_assignee ---
@@ -153,7 +151,7 @@ async def test_clear_assignee():
     app = AssigneeApp(assigned="Alice <alice@example.com>")
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
-        widget.on_confirm_button_confirmed(ConfirmButton.Confirmed())
+        widget.on_assignee_button_assignee_selected(AssigneeButton.AssigneeSelected(None))
         await pilot.pause()
 
         assert app.card_meta.assigned is None

@@ -10,47 +10,8 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.cal import DateButton, date_diff
-from ganban.ui.confirm import ConfirmButton
 from ganban.ui.constants import ICON_CALENDAR
 from ganban.ui.watcher import NodeWatcherMixin
-
-
-class DueDateLabel(Horizontal):
-    """Shows due date text, swaps to delete confirmation on hover."""
-
-    DEFAULT_CSS = """
-    DueDateLabel { width: auto; height: 1; }
-    DueDateLabel .due-text { width: auto; height: 1; }
-    DueDateLabel .due-text:hover { background: $primary-darken-2; }
-    DueDateLabel.overdue .due-text { color: $error; }
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def compose(self) -> ComposeResult:
-        yield Static("", classes="due-text")
-        btn = ConfirmButton(classes="due-clear")
-        btn.display = False
-        yield btn
-
-    def set_label(self, text: str) -> None:
-        self.query_one(".due-text", Static).update(text)
-        self.query_one(".due-text", Static).display = bool(text)
-        self.query_one(".due-clear", ConfirmButton).display = False
-
-    def on_enter(self, event) -> None:
-        text_widget = self.query_one(".due-text", Static)
-        if text_widget.display:
-            text_widget.display = False
-            self.query_one(".due-clear", ConfirmButton).display = True
-
-    def on_leave(self, event) -> None:
-        text_widget = self.query_one(".due-text", Static)
-        clear_widget = self.query_one(".due-clear", ConfirmButton)
-        if clear_widget.display:
-            clear_widget.display = False
-            text_widget.display = bool(text_widget.render())
 
 
 class DueDateWidget(NodeWatcherMixin, Container):
@@ -66,12 +27,16 @@ class DueDateWidget(NodeWatcherMixin, Container):
         width: auto;
         height: 1;
     }
-    DueDateWidget Horizontal {
+    DueDateWidget > Horizontal {
         width: auto;
         height: 1;
     }
-    DueDateWidget #due-picker {
-        margin-right: 1;
+    DueDateWidget .due-text {
+        width: auto;
+        height: 1;
+    }
+    DueDateWidget .due-text.overdue {
+        color: $error;
     }
     """
 
@@ -93,7 +58,7 @@ class DueDateWidget(NodeWatcherMixin, Container):
     def compose(self) -> ComposeResult:
         with Horizontal():
             yield DateButton(selected=self.due, icon=ICON_CALENDAR, id="due-picker")
-            yield DueDateLabel(id="due-label")
+            yield Static("", classes="due-text")
 
     def on_mount(self) -> None:
         self.node_watch(self.meta, "due", self._on_due_changed)
@@ -103,17 +68,14 @@ class DueDateWidget(NodeWatcherMixin, Container):
         self.call_later(self._update_label)
 
     def _update_label(self) -> None:
-        label = self.query_one("#due-label", DueDateLabel)
+        label = self.query_one(".due-text", Static)
         due = self.due
         if due:
-            text = date_diff(due, date.today())
-            label.set_label(text)
+            label.update(date_diff(due, date.today()))
             label.set_class(due <= date.today(), "overdue")
-            self.set_class(True, "has-due")
         else:
-            label.set_label("")
+            label.update("")
             label.set_class(False, "overdue")
-            self.set_class(False, "has-due")
 
     def _set_due(self, value: date | None) -> None:
         with self.suppressing():
@@ -123,7 +85,3 @@ class DueDateWidget(NodeWatcherMixin, Container):
     def on_date_button_date_selected(self, event: DateButton.DateSelected) -> None:
         event.stop()
         self._set_due(event.date)
-
-    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
-        event.stop()
-        self._set_due(None)

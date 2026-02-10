@@ -93,6 +93,9 @@ class DetailModal(ModalScreen[None]):
         height: 1;
         padding: 0 1;
     }
+    #detail-bar > * {
+        margin-right: 1;
+    }
 
     #detail-tabs {
         width: auto;

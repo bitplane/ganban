@@ -6,8 +6,7 @@ import pytest
 from textual.app import App
 
 from ganban.model.node import ListNode, Node
-from ganban.ui.cal import Calendar, CalendarDay
-from ganban.ui.confirm import ConfirmButton
+from ganban.ui.cal import Calendar, CalendarDay, NavButton
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import EditableText, MarkdownDocEditor, SectionEditor
@@ -310,14 +309,16 @@ async def test_setting_due_date_updates_card_meta(card):
 
 @pytest.mark.asyncio
 async def test_clearing_due_date_removes_meta(card_with_due):
-    """Clearing due date removes 'due' from card meta."""
+    """Clearing due date via calendar clear button removes 'due' from card meta."""
     app = DetailTestApp(CardDetailModal(card_with_due))
     async with app.run_test() as pilot:
         widget = app.screen.query_one(DueDateWidget)
-        btn = widget.query_one(".due-clear", ConfirmButton)
+        picker = widget.query_one("#due-picker")
 
-        # Directly post Confirmed to trigger the clear path
-        btn.post_message(ConfirmButton.Confirmed())
+        await pilot.click(picker)
+        cal = app.screen.query_one(Calendar)
+        clear_btn = cal.query_one("#clear", NavButton)
+        await pilot.click(clear_btn)
         await pilot.pause()
 
         assert card_with_due.meta.due is None

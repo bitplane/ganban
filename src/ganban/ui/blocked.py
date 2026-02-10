@@ -27,7 +27,6 @@ class BlockedWidget(NodeWatcherMixin, Container):
     BlockedWidget .blocked-toggle {
         width: auto;
         height: 1;
-        padding: 0 1 0 0;
     }
     BlockedWidget .blocked-toggle:hover {
         background: $primary-darken-2;

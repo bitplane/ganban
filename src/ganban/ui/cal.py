@@ -8,6 +8,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.ui.constants import ICON_DELETE
 from ganban.ui.menu import ContextMenu
 
 
@@ -75,9 +76,9 @@ class Calendar(Container):
     """Date picker widget."""
 
     class DateSelected(Message):
-        """Emitted when a date is selected."""
+        """Emitted when a date is selected (None to clear)."""
 
-        def __init__(self, selected: date) -> None:
+        def __init__(self, selected: date | None) -> None:
             super().__init__()
             self.date = selected
 
@@ -89,6 +90,7 @@ class Calendar(Container):
     Calendar { width: auto; height: auto; background: $background; }
     .cal-header { width: 100%; height: 1; }
     .cal-nav { width: 2; }
+    .cal-clear { width: auto; padding: 0 1; }
     .cal-title { width: 1fr; text-align: center; }
     .cal-grid { width: auto; height: auto; }
     .cal-row { width: auto; height: 1; }
@@ -126,6 +128,7 @@ class Calendar(Container):
     def compose(self) -> ComposeResult:
         with Horizontal(classes="cal-header"):
             yield NavButton("<<", classes="cal-nav", id="prev")
+            yield NavButton(ICON_DELETE, classes="cal-nav cal-clear", id="clear")
             yield Static(self._viewing.strftime("%b %Y"), classes="cal-title", id="title")
             yield NavButton(">>", classes="cal-nav", id="next")
 
@@ -249,7 +252,10 @@ class Calendar(Container):
 
     def on_nav_button_clicked(self, event: NavButton.Clicked) -> None:
         event.stop()
-        if event.button.id == "prev":
+        if event.button.id == "clear":
+            self._selected = None
+            self.post_message(self.DateSelected(None))
+        elif event.button.id == "prev":
             self._go_prev_month()
         elif event.button.id == "next":
             self._go_next_month()
@@ -322,9 +328,9 @@ class DateButton(Static):
     """A button that opens a calendar menu for date selection."""
 
     class DateSelected(Message):
-        """Emitted when a date is selected."""
+        """Emitted when a date is selected (None to clear)."""
 
-        def __init__(self, selected: date) -> None:
+        def __init__(self, selected: date | None) -> None:
             super().__init__()
             self.date = selected
 
@@ -359,6 +365,6 @@ class DateButton(Static):
         self.app.push_screen(menu, self._on_menu_closed)
 
     def _on_menu_closed(self, result) -> None:
-        if isinstance(result, CalendarMenuItem) and result.selected_date is not None:
+        if isinstance(result, CalendarMenuItem):
             self._selected = result.selected_date
             self.post_message(self.DateSelected(result.selected_date))
