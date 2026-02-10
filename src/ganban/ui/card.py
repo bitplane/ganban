@@ -73,12 +73,15 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     }
     CardWidget:focus {
         background: $primary;
+        color: $text;
     }
     CardWidget.blocked {
         background: $error-darken-3;
+        color: $text;
     }
     CardWidget.blocked:focus {
         background: $error;
+        color: $text;
     }
     CardWidget.dragging {
         display: none;

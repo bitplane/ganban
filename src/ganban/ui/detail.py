@@ -44,9 +44,11 @@ class TabButton(Static):
     }
     TabButton:hover {
         background: $primary-darken-2;
+        color: $text;
     }
     TabButton.-active {
         background: $primary-darken-2;
+        color: $text;
         text-style: bold;
     }
     """
@@ -79,6 +81,7 @@ class DetailModal(ModalScreen[None]):
         width: 100%;
         height: auto;
         background: $primary;
+        color: $text;
         padding: 0 1;
     }
 

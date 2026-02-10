@@ -46,6 +46,7 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         width: 100%;
         height: auto;
         background: $primary;
+        color: $text;
     }
     #board-title {
         width: 1fr;

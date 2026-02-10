@@ -136,6 +136,7 @@ class UserRow(Vertical):
         width: 100%;
         height: auto;
         background: $primary;
+        color: $text;
         padding: 0 1;
     }
     UserRow .user-emoji {
