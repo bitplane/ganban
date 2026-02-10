@@ -25,13 +25,13 @@ INTERVAL_PRESETS = [
 ]
 
 
-def _current_icon(sync: Node | None) -> str:
+def _current_icon(sync: Node | None, config: Node | None) -> str:
     """Return the icon for the current sync state."""
     if sync is None:
         return ICON_SYNC_IDLE
     if sync.status == "conflict":
         return ICON_SYNC_CONFLICT
-    if not sync.local and not sync.remote:
+    if config and not config.sync_local and not config.sync_remote:
         return ICON_SYNC_PAUSED
     if sync.status and sync.status != "idle":
         return ICON_SYNC_ACTIVE
@@ -50,14 +50,13 @@ class SyncWidget(NodeWatcherMixin, Container):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        icon = _current_icon(self.board.git.sync)
+        icon = _current_icon(self.board.git.sync, self.board.git.config)
         yield Static(icon, classes="sync-icon")
 
     def on_mount(self) -> None:
-        sync = self.board.git.sync
-        self.node_watch(sync, "status", self._on_sync_changed)
-        self.node_watch(sync, "local", self._on_sync_changed)
-        self.node_watch(sync, "remote", self._on_sync_changed)
+        self.node_watch(self.board.git.sync, "status", self._on_sync_changed)
+        for key in ("sync_local", "sync_remote"):
+            self.node_watch(self.board.git.config, key, self._on_sync_changed)
         self._update_display()
 
     def _on_sync_changed(self, node, key, old, new) -> None:
@@ -65,8 +64,7 @@ class SyncWidget(NodeWatcherMixin, Container):
 
     def _update_display(self) -> None:
         icon_widget = self.query_one(".sync-icon", Static)
-        sync = self.board.git.sync
-        icon = _current_icon(sync)
+        icon = _current_icon(self.board.git.sync, self.board.git.config)
         icon_widget.update(icon)
 
     def on_click(self, event) -> None:
@@ -74,10 +72,11 @@ class SyncWidget(NodeWatcherMixin, Container):
         self._show_menu(event.screen_x, event.screen_y)
 
     def _show_menu(self, x: int, y: int) -> None:
+        config = self.board.git.config
         sync = self.board.git.sync
-        local_check = "☑" if sync.local else "☐"
-        remote_check = "☑" if sync.remote else "☐"
-        current_time = sync.time or 30
+        local_check = "☑" if config.sync_local else "☐"
+        remote_check = "☑" if config.sync_remote else "☐"
+        current_time = config.sync_interval or 30
 
         items = [
             MenuItem(f"{local_check} Local sync", "toggle_local"),
@@ -98,14 +97,15 @@ class SyncWidget(NodeWatcherMixin, Container):
     def _on_menu_closed(self, item: MenuItem | None) -> None:
         if item is None:
             return
+        config = self.board.git.config
         sync = self.board.git.sync
         with self.suppressing():
             if item.item_id == "toggle_local":
-                sync.local = not sync.local
+                config.sync_local = not config.sync_local
             elif item.item_id == "toggle_remote":
-                sync.remote = not sync.remote
+                config.sync_remote = not config.sync_remote
             elif item.item_id == "dismiss_conflict":
                 sync.status = "idle"
             elif item.item_id and item.item_id.startswith("interval_"):
-                sync.time = int(item.item_id.split("_")[1])
+                config.sync_interval = int(item.item_id.split("_")[1])
         self._update_display()

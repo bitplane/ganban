@@ -5,6 +5,55 @@ from pathlib import Path
 
 from git import InvalidGitRepositoryError, Repo
 
+CONFIG_DEFAULTS = {
+    "sync-interval": 30,
+    "sync-local": True,
+    "sync-remote": True,
+}
+
+_GIT_TO_PYTHON = {k: k.replace("-", "_") for k in CONFIG_DEFAULTS}
+_PYTHON_TO_GIT = {v: k for k, v in _GIT_TO_PYTHON.items()}
+
+
+def _parse_config_value(git_key: str, raw: str):
+    """Parse a raw git config string into the right Python type."""
+    default = CONFIG_DEFAULTS[git_key]
+    if isinstance(default, bool):
+        return raw.lower() in ("true", "yes", "1")
+    if isinstance(default, int):
+        return int(raw)
+    return raw
+
+
+def read_ganban_config(repo_path: str | Path) -> dict:
+    """Read ganban.* keys from local git config, returned as python-keyed dict."""
+    repo = _get_repo(repo_path)
+    reader = repo.config_reader("repository")
+    result = {}
+    for git_key, default in CONFIG_DEFAULTS.items():
+        py_key = _GIT_TO_PYTHON[git_key]
+        try:
+            raw = reader.get_value("ganban", git_key)
+            result[py_key] = _parse_config_value(git_key, str(raw))
+        except Exception:
+            result[py_key] = default
+    return result
+
+
+def write_ganban_config_key(repo_path: str | Path, key: str, value) -> None:
+    """Write one ganban.* key to local git config.
+
+    key is the python name (e.g. sync_interval), converted to git name (sync-interval).
+    """
+    git_key = _PYTHON_TO_GIT[key]
+    repo = _get_repo(repo_path)
+    writer = repo.config_writer("repository")
+    if isinstance(value, bool):
+        writer.set_value("ganban", git_key, str(value).lower())
+    else:
+        writer.set_value("ganban", git_key, str(value))
+    writer.release()
+
 
 def _get_repo(repo_path: str | Path) -> Repo:
     return Repo(repo_path)

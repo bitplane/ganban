@@ -32,9 +32,10 @@ async def run_sync_cycle(board):
     All git I/O runs via asyncio.to_thread to stay non-blocking.
     """
     sync = board.git.sync
+    config = board.git.config
     repo_path = board.repo_path
-    do_local = sync.local
-    do_remote = sync.remote
+    do_local = config.sync_local
+    do_remote = config.sync_remote
 
     try:
         # --- PULL (fetch from all remotes) ---
@@ -102,9 +103,11 @@ async def run_sync_cycle(board):
 
             # Reload and update the live tree, preserving transient sync state
             sync_node = board.git.sync
+            config_node = board.git.config
             new_board = await asyncio.to_thread(load_board, repo_path)
             board.update(new_board)
             board.git.sync = sync_node
+            board.git.config = config_node
 
         # --- PUSH ---
         if do_remote and upstream_remote:

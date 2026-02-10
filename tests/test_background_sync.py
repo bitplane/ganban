@@ -28,10 +28,11 @@ def _make_board_and_save(repo_path):
 
 
 def _init_sync_state(board, local=True, remote=True):
-    """Attach transient sync state to a board node."""
+    """Attach transient sync state and config to a board node."""
     if not board.git:
         board.git = Node()
-    board.git.sync = Node(local=local, remote=remote, status="idle", time=30)
+    board.git.sync = Node(status="idle")
+    board.git.config = Node(sync_local=local, sync_remote=remote, sync_interval=30)
 
 
 @pytest.fixture

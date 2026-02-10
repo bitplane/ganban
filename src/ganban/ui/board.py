@@ -12,12 +12,13 @@ from textual.widgets import Footer, Static
 from ganban.model.card import archive_card, move_card
 from ganban.model.column import archive_column, move_column
 from ganban.model.node import Node
+from ganban.git import write_ganban_config_key
 from ganban.model.writer import save_board
 from ganban.parser import first_title
 from ganban.sync import run_sync_cycle
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
-from ganban.ui.constants import ICON_BOARD, ICON_EDIT
+from ganban.ui.constants import ICON_BOARD, ICON_EDIT, ICON_SETTINGS
 from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import ColumnPlaceholder, DropTarget
 from ganban.ui.edit import EditableText, TextEditor
@@ -44,15 +45,16 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         self._sync_task: asyncio.Task | None = None
         self._last_sync: float = time.monotonic()
 
-        # Initialize sync state (transient, not persisted to git)
+        # Initialize transient sync status (not persisted)
         if not board.git:
             board.git = Node()
-        board.git.sync = Node(local=True, remote=True, status="idle", time=30)
+        board.git.sync = Node(status="idle")
 
     def compose(self) -> ComposeResult:
         title = first_title(self.board.sections)
         with Horizontal(id="board-header"):
             yield EditableText(title, Static(title), TextEditor(), id="board-title")
+            yield Static(ICON_SETTINGS, id="board-settings")
             yield SyncWidget(self.board, id="sync-status")
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
@@ -66,6 +68,8 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
 
     def on_mount(self) -> None:
         self.node_watch(self.board, "sections", self._on_board_sections_changed)
+        for key in ("sync_interval", "sync_local", "sync_remote"):
+            self.node_watch(self.board.git.config, key, self._on_config_changed)
         self.call_after_refresh(self._focus_first_card)
         self.set_interval(1.0, self._sync_tick)
 
@@ -77,15 +81,20 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
                 focusable[0].focus()
                 return
 
+    def _on_config_changed(self, node, key, old, new) -> None:
+        """Persist changed config key to local git config."""
+        write_ganban_config_key(self.board.repo_path, key, new)
+
     def _sync_tick(self) -> None:
         """Called every 1s. Starts a sync cycle if interval has elapsed."""
         sync = self.board.git.sync
+        config = self.board.git.config
         if sync.status != "idle":
             return
-        if not sync.local and not sync.remote:
+        if not config.sync_local and not config.sync_remote:
             return
         now = time.monotonic()
-        interval = sync.time or 30
+        interval = config.sync_interval or 30
         if now - self._last_sync < interval:
             return
         self._last_sync = now
@@ -191,7 +200,12 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
             self.board.sections.rename_first_key(event.new_value)
 
     def on_click(self, event) -> None:
-        """Show context menu on right-click on board header."""
+        """Handle clicks on board header area."""
+        settings = self.query_one("#board-settings", Static)
+        if settings.region.contains(event.screen_x, event.screen_y):
+            event.stop()
+            self.app.push_screen(BoardDetailModal(self.board))
+            return
         if event.button != 3:
             return
         header = self.query_one("#board-title", EditableText)

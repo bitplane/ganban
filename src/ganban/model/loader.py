@@ -8,6 +8,7 @@ from functools import cmp_to_key
 from git import Repo
 from git.objects import Blob, Tree
 
+from ganban.git import read_ganban_config
 from ganban.ids import compare_ids, max_id, next_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
@@ -239,5 +240,6 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         columns_ln[order] = col
 
     board.columns = columns_ln
-    board.git = Node(committers=_get_committers(repo))
+    config = read_ganban_config(repo_path)
+    board.git = Node(committers=_get_committers(repo), config=Node(**config))
     return board
