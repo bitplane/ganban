@@ -10,7 +10,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import Node
-from ganban.ui.constants import ICON_PERSON
+from ganban.ui.constants import ICON_DELETE, ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_display
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.watcher import NodeWatcherMixin
@@ -34,7 +34,7 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
 def build_assignee_menu(board: Node) -> list[MenuItem | MenuSeparator]:
     """Build a menu of assignable users from board.meta.users and git committers."""
     items: list[MenuItem | MenuSeparator] = [
-        MenuItem("Unassigned", item_id="unassign"),
+        MenuItem(f"{ICON_DELETE} Unassigned", item_id="unassign"),
         MenuSeparator(),
     ]
     seen: set[str] = set()
