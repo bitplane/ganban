@@ -9,10 +9,6 @@ users:
     emails:
     - noreply@anthropic.com
     emoji: "\U0001F916"
-  test:
-    emails:
-    - user@email.com
-    emoji: "\U0001F4A9"
 ---
 
 # ganban
