@@ -2,7 +2,7 @@
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Button, Static
+from textual.widgets import Button, Input, Static
 
 from ganban.model.node import Node
 from ganban.ui.constants import ICON_PERSON
@@ -288,3 +288,26 @@ async def test_live_emoji_preview():
         await pilot.pause()
 
         assert picker.content == "🤖"
+
+
+@pytest.mark.asyncio
+async def test_emoji_updates_live_while_typing():
+    app = AssigneeApp()
+    async with app.run_test() as pilot:
+        widget = app.query_one(AssigneeWidget)
+        picker = widget.query_one("#assignee-picker", Static)
+        inp = widget.query_one("#assignee-search", SearchInput).query_one(Input)
+
+        assert picker.content == ICON_PERSON
+
+        # Simulate typing an email
+        inp.value = "test@example.com"
+        await pilot.pause()
+
+        assert picker.content == emoji_for_email("test@example.com")
+
+        # Clearing the input restores the default icon
+        inp.value = ""
+        await pilot.pause()
+
+        assert picker.content == ICON_PERSON

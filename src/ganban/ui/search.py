@@ -100,7 +100,6 @@ class SearchInput(Container):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Filter dropdown on every keystroke."""
-        event.stop()
         self._filter_options(event.value)
 
     def _on_key(self, event: Key) -> None:

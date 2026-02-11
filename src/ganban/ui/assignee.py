@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.events import DescendantBlur
 from textual.message import Message
-from textual.widgets import OptionList, Static
+from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
 from ganban.ui.constants import ICON_PERSON
@@ -156,6 +156,16 @@ class AssigneeWidget(NodeWatcherMixin, Container):
         focused = self.app.focused
         if focused is None or focused not in self.walk_children():
             self._exit_edit_mode()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        event.stop()
+        picker = self.query_one("#assignee-picker", Static)
+        text = event.value.strip()
+        if text:
+            emoji, _, _ = resolve_assignee(text, self.board)
+            picker.update(emoji)
+        else:
+            picker.update(ICON_PERSON)
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         event.stop()
