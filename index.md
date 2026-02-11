@@ -12,3 +12,6 @@ users:
 ---
 
 # ganban
+
+We're having a ganban, we're having a ball.
+We're having a ganban, against the wall.
