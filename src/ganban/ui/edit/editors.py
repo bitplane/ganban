@@ -20,13 +20,27 @@ class BaseEditor(TextArea):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._done = False
+        self._click_screen: tuple[int, int] | None = None
 
     def start_editing(self, value: str) -> None:
         """Start editing. Called by EditableText."""
         self._done = False
         self.text = value
-        self.cursor_location = (0, 0)
+        if self._click_screen is None:
+            self.cursor_location = (0, 0)
         self.focus()
+
+    def on_resize(self, event) -> None:
+        """Apply pending click position once we know our layout."""
+        if self._click_screen is None:
+            return
+        screen_x, screen_y = self._click_screen
+        self._click_screen = None
+        region = self.region
+        x = screen_x - region.x
+        y = screen_y - region.y
+        pos = type("_Pos", (), {"x": x, "y": y})()
+        self.cursor_location = self.get_target_document_location(pos)
 
     def _finish(self, save: bool) -> None:
         if self._done:
