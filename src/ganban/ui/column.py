@@ -299,11 +299,34 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         self.node_watch(self.column, "meta", self._on_meta_changed)
         self.node_watch(self.column, "links", self._on_links_changed)
 
+    def _focus_neighbour(self, widget) -> None:
+        """Schedule focus on the nearest focusable sibling of *widget*."""
+        focusable = [c for c in self.children if c.can_focus]
+        idx = focusable.index(widget)
+        # prefer next, fall back to previous; list slicing handles bounds
+        neighbours = focusable[idx + 1 :] + focusable[:idx]
+        if neighbours:
+            self.call_after_refresh(neighbours[0].focus)
+
     def _on_links_changed(self, node, key, old, new) -> None:
         """Sync card children to match column.links."""
         new_links = list(self.column.links) if self.column.links else []
         existing = {c.card_id: c for c in self.query(CardWidget)}
         new_ids = set(new_links)
+
+        # Focus next focusable child when a focused card is removed
+        removed = {cid for cid in existing if cid not in new_ids}
+        focused = self.screen.focused
+        focused_removal = next(
+            (
+                existing[cid]
+                for cid in removed
+                if existing[cid] is focused or (focused and existing[cid].is_ancestor_of(focused))
+            ),
+            None,
+        )
+        if focused_removal:
+            self._focus_neighbour(focused_removal)
 
         # Remove cards no longer in links
         for card_id, widget in existing.items():
