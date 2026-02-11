@@ -4,6 +4,7 @@ users:
     emails:
     - gaz@bitplane.net
     - garethdavidson@gmail.com
+    - gaz.davidson@gmail.com
     emoji: "\U0001F926"
   Claude:
     emails:
