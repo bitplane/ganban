@@ -9,9 +9,6 @@ users:
     emails:
     - noreply@anthropic.com
     emoji: "\U0001F916"
-  Test:
-    emails:
-    - own
 ---
 
 # ganban - decentralized kanban
