@@ -12,6 +12,7 @@ users:
   test:
     emails:
     - user@email.com
+    emoji: 💩
 ---
 
 # ganban
