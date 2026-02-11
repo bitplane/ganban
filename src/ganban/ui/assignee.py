@@ -122,7 +122,7 @@ class AssigneeWidget(NodeWatcherMixin, Container):
         search = self.query_one("#assignee-search", SearchInput)
         search.set_options(build_assignee_options(self.board))
         inp = search.query_one("Input")
-        inp.value = ""
+        inp.value = self.meta.assigned or ""
         inp.focus()
 
     def _exit_edit_mode(self) -> None:

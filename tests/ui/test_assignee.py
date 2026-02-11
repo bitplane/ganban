@@ -245,6 +245,30 @@ async def test_edit_mode_toggle():
 
 
 @pytest.mark.asyncio
+async def test_edit_mode_prepopulates_current_assignee():
+    app = AssigneeApp(assigned="user@email.whatever")
+    async with app.run_test() as pilot:
+        widget = app.query_one(AssigneeWidget)
+        widget._enter_edit_mode()
+        await pilot.pause()
+
+        inp = widget.query_one("#assignee-search", SearchInput).query_one("Input")
+        assert inp.value == "user@email.whatever"
+
+
+@pytest.mark.asyncio
+async def test_edit_mode_input_empty_when_unassigned():
+    app = AssigneeApp()
+    async with app.run_test() as pilot:
+        widget = app.query_one(AssigneeWidget)
+        widget._enter_edit_mode()
+        await pilot.pause()
+
+        inp = widget.query_one("#assignee-search", SearchInput).query_one("Input")
+        assert inp.value == ""
+
+
+@pytest.mark.asyncio
 async def test_live_emoji_preview():
     app = AssigneeApp(
         users={"Alice": {"emoji": "🤖", "emails": ["alice@example.com"]}},
