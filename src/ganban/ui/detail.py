@@ -11,7 +11,7 @@ from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.blocked import BlockedWidget
 from ganban.ui.color import ColorButton
-from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_META, ICON_TAB_RAW, ICON_TAB_USERS
+from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_RAW, ICON_TAB_USERS, ICON_SETTINGS
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
@@ -109,7 +109,7 @@ class CardDetailModal(DetailModal):
                 yield DocHeader(self.card.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
-                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield DoneWidget(self.card.meta)
@@ -161,7 +161,7 @@ class ColumnDetailModal(DetailModal):
                 yield DocHeader(self.column.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
-                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield ColorButton(color=color)
@@ -193,7 +193,7 @@ class BoardDetailModal(DetailModal):
                 yield DocHeader(self.board.sections)
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
-                    yield TabButton(ICON_TAB_META, "tab-meta")
+                    yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_USERS, "tab-users")
                     yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
