@@ -321,7 +321,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
             (
                 existing[cid]
                 for cid in removed
-                if existing[cid] is focused or (focused and existing[cid].is_ancestor_of(focused))
+                if existing[cid] is focused or (focused and existing[cid] in focused.ancestors)
             ),
             None,
         )
