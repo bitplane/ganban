@@ -11,4 +11,4 @@ users:
     emoji: "\U0001F916"
 ---
 
-# ganban
+# ganban - decentralized git ganban board
