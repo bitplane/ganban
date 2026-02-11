@@ -29,5 +29,4 @@ SectionEditor > .section-body #view Markdown {
 }
 SectionEditor > .section-body #edit {
     height: auto;
-    scrollbar-size: 0 0;
 }

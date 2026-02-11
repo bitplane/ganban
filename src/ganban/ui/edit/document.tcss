@@ -45,5 +45,20 @@ MarkdownDocEditor #doc-editor-right {
     padding-left: 1;
 }
 MarkdownDocEditor #main-section {
-    height: auto;
+    height: 100%;
+}
+MarkdownDocEditor #main-section > .section-body {
+    height: 100%;
+}
+MarkdownDocEditor #main-section > .section-body > ContentSwitcher {
+    height: 100%;
+}
+MarkdownDocEditor #main-section > .section-body #view {
+    height: 100%;
+}
+MarkdownDocEditor #main-section > .section-body #view MarkdownViewer {
+    height: 100%;
+}
+MarkdownDocEditor #main-section > .section-body #edit {
+    height: 100%;
 }

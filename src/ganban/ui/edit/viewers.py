@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import VerticalScroll
 from textual.widgets import Markdown, Static
 
 
@@ -15,7 +15,7 @@ class TextViewer(Static):
         super().update(value)
 
 
-class MarkdownViewer(Container):
+class MarkdownViewer(VerticalScroll):
     """Markdown viewer container."""
 
     def __init__(self, value: str = "", parser_factory=None, **kwargs) -> None:

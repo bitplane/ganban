@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, VerticalScroll
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static
 
@@ -94,7 +94,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         subsections = items[1:]
         pf = self._parser_factory
         with Horizontal(id="doc-editor-container"):
-            with VerticalScroll(id="doc-editor-left"):
+            with Vertical(id="doc-editor-left"):
                 yield SectionEditor(None, body, parser_factory=pf, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
