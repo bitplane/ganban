@@ -8,6 +8,9 @@ users:
   Claude:
     emails:
     - noreply@anthropic.com
+    emoji: "\U0001F916"
+  test:
+    emails: []
 ---
 
 # ganban
