@@ -136,8 +136,8 @@ def test_sync_merge_remote_changes(synced_repos):
 # --- merge conflict exits 1 ---
 
 
-def test_sync_merge_conflict(synced_repos):
-    """Both sides edit same card file, sync returns exit code 1."""
+def test_sync_merge_conflict_resolves(synced_repos):
+    """Both sides edit same card — most-recent-commit-wins resolves it."""
     local_path, remote_path = synced_repos
 
     # Remote edits card 001
@@ -157,9 +157,9 @@ def test_sync_merge_conflict(synced_repos):
 
     exit_code, result = _do_sync(str(local_path))
 
-    assert exit_code == 1
-    assert result["error"] is not None
-    assert "conflict" in result["error"]
+    assert exit_code == 0
+    assert result["error"] is None
+    assert "origin" in result["merged"]
 
 
 # --- push local changes ---

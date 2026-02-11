@@ -393,11 +393,11 @@ def test_auto_merge_clean(repo_with_ganban):
     assert loaded.cards["002"] is not None
 
 
-def test_auto_merge_conflict(repo_with_ganban):
-    """Auto-merge fails when same file changed."""
+def test_auto_merge_conflict_theirs_wins(repo_with_ganban):
+    """Conflict resolved by most-recent-commit-wins (theirs is newer)."""
     board = load_board(str(repo_with_ganban))
 
-    # External change: edit card 001
+    # External change: edit card 001 (committed after our load, so newer)
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
@@ -412,42 +412,74 @@ def test_auto_merge_conflict(repo_with_ganban):
     assert merge_info is not None
 
     result = try_auto_merge(board, merge_info)
-    assert result is None
+    assert result is not None
+
+    # Theirs is newer, so their content wins
+    repo.git.checkout("ganban")
+    loaded = load_board(str(repo_with_ganban))
+    assert loaded.cards["001"].sections["First card"] == "External edit."
+
+    # Merge commit has both parents
+    commit = repo.commit(result)
+    assert len(commit.parents) == 2
 
 
-def test_manual_merge_after_conflict(repo_with_ganban):
-    """Manual merge resolution flow."""
+def test_auto_merge_conflict_ours_wins(repo_with_ganban):
+    """Conflict resolved by most-recent-commit-wins (ours is newer)."""
     board = load_board(str(repo_with_ganban))
-    ours_commit = board.commit
 
-    # External change
+    # External change: edit card 001 with an old timestamp
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
     (all_dir / "001.md").write_text("# First card\n\nExternal edit.\n")
     repo.git.add("-A")
-    theirs_commit = repo.index.commit("External edit").hexsha
+    # Commit with a very old date so ours wins
+    repo.git.commit("-m", "External edit", date="2000-01-01T00:00:00")
 
-    # Our change conflicts
+    # Our change: also edit card 001
     board.cards["001"].sections["First card"] = "Our edit."
+
+    # Save our board so it gets a fresh (newer) commit
+    save_board(board)
 
     merge_info = check_for_merge(board)
     assert merge_info is not None
-    assert try_auto_merge(board, merge_info) is None
 
-    # Manual resolution
-    board.cards["001"].sections["First card"] = "Manually resolved."
-    new_commit = save_board(
-        board,
-        message="Resolve conflict",
-        parents=[ours_commit, theirs_commit],
-    )
+    result = try_auto_merge(board, merge_info)
+    assert result is not None
 
-    commit = repo.commit(new_commit)
+    # Ours is newer, so our content wins
+    loaded = load_board(str(repo_with_ganban))
+    assert loaded.cards["001"].sections["First card"] == "Our edit."
+
+    commit = repo.commit(result)
     assert len(commit.parents) == 2
 
+
+def test_auto_merge_conflict_preserves_clean_changes(repo_with_ganban):
+    """Conflict resolution preserves non-conflicting changes from both sides."""
+    board = load_board(str(repo_with_ganban))
+
+    # External change: edit card 001 AND card 002
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "001.md").write_text("# First card\n\nExternal edit.\n")
+    (all_dir / "002.md").write_text("# Second card\n\nTheir non-conflicting edit.\n")
+    repo.git.add("-A")
+    repo.index.commit("External edits")
+
+    # Our change: only edit card 001 (conflicts) — card 002 untouched by us
+    board.cards["001"].sections["First card"] = "Our edit."
+
+    merge_info = check_for_merge(board)
+    result = try_auto_merge(board, merge_info)
+    assert result is not None
+
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.cards["001"].sections["First card"] == "Manually resolved."
+    # Card 002 should have their non-conflicting edit preserved
+    assert loaded.cards["002"].sections["Second card"] == "Their non-conflicting edit."
 
 
 # --- Remote merge tests ---

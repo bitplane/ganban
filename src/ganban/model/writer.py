@@ -1,6 +1,9 @@
 """Save a ganban board (Node tree) to git without touching the working tree."""
 
+import os
+import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -95,6 +98,11 @@ def _get_ref(repo_path: Path, ref: str) -> str | None:
     return result.stdout.decode("utf-8").strip()
 
 
+def _commit_timestamp(repo_path: Path, commit: str) -> int:
+    """Get the committer timestamp of a commit as epoch seconds."""
+    return int(_git(repo_path, ["log", "-1", "--format=%ct", commit]))
+
+
 def _get_merge_base(repo_path: Path, commit1: str, commit2: str) -> str | None:
     """Find the merge base of two commits, or None if no common ancestor."""
     result = subprocess.run(
@@ -107,11 +115,17 @@ def _get_merge_base(repo_path: Path, commit1: str, commit2: str) -> str | None:
     return result.stdout.decode("utf-8").strip()
 
 
-def _merge_trees(repo_path: Path, base_commit: str, our_tree: str, their_commit: str) -> tuple[str, bool]:
+def _merge_trees(
+    repo_path: Path,
+    base_commit: str,
+    our_tree: str,
+    their_commit: str,
+) -> tuple[str, list[str]]:
     """Attempt a 3-way merge.
 
     Returns:
-        Tuple of (merged_tree_hash, has_conflicts)
+        Tuple of (merged_tree_hash, conflict_paths).
+        conflict_paths is empty on a clean merge.
     """
     our_temp_commit = _git(repo_path, ["commit-tree", our_tree, "-p", base_commit, "-m", "temp merge commit"])
 
@@ -122,10 +136,60 @@ def _merge_trees(repo_path: Path, base_commit: str, our_tree: str, their_commit:
     )
 
     output = result.stdout.decode("utf-8").strip()
-    tree_hash = output.split("\n")[0] if output else ""
-    has_conflicts = result.returncode != 0
+    lines = output.split("\n")
+    tree_hash = lines[0] if lines else ""
+    conflict_paths = re.findall(r"CONFLICT \([^)]+\): .+ (\S+)$", output, re.MULTILINE)
 
-    return tree_hash, has_conflicts
+    return tree_hash, conflict_paths
+
+
+def _resolve_conflicts(repo_path: Path, merged_tree: str, winner_commit: str, conflict_paths: list[str]) -> str:
+    """Replace conflicted paths in merged_tree with the winner's versions.
+
+    Uses a temporary index to surgically swap only the conflicted blobs,
+    preserving the cleanly-merged content for everything else.
+    """
+    fd, idx = tempfile.mkstemp(prefix="ganban_idx_")
+    os.close(fd)
+    try:
+        env = {**os.environ, "GIT_INDEX_FILE": idx}
+        subprocess.run(["git", "read-tree", merged_tree], cwd=repo_path, env=env, check=True)
+        for path in conflict_paths:
+            # Get the entry (mode + blob) from the winner's tree
+            entry = subprocess.run(
+                ["git", "ls-tree", winner_commit, path],
+                cwd=repo_path,
+                capture_output=True,
+            )
+            entry_line = entry.stdout.decode("utf-8").strip()
+            if entry_line:
+                # File exists in winner: replace the blob
+                mode, _, blob = entry_line.split(None, 2)
+                blob = blob.split("\t")[0]
+                subprocess.run(
+                    ["git", "update-index", "--cacheinfo", f"{mode},{blob},{path}"],
+                    cwd=repo_path,
+                    env=env,
+                    check=True,
+                )
+            else:
+                # File deleted in winner: remove from index
+                subprocess.run(
+                    ["git", "update-index", "--force-remove", path],
+                    cwd=repo_path,
+                    env=env,
+                    check=True,
+                )
+        result = subprocess.run(
+            ["git", "write-tree"],
+            cwd=repo_path,
+            env=env,
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout.decode("utf-8").strip()
+    finally:
+        os.unlink(idx)
 
 
 # --- Board tree building ---
@@ -295,9 +359,11 @@ def try_auto_merge(
     message: str = "Merge changes",
     branch: str = BRANCH_NAME,
 ) -> str | None:
-    """Attempt an automatic merge if there are no conflicts.
+    """Attempt an automatic merge, resolving conflicts with most-recent-commit-wins.
 
-    Returns the new merge commit hash if successful, None if there are conflicts.
+    Returns the new merge commit hash. Conflicts are resolved by replacing
+    conflicted files with the version from whichever commit is newer.
+    Returns None only if merge-tree fails entirely.
     """
     repo_path = Path(board.repo_path)
 
@@ -309,10 +375,16 @@ def try_auto_merge(
         _git(repo_path, ["update-ref", f"refs/heads/{branch}", merge_info.theirs])
         return merge_info.theirs
 
-    merged_tree, has_conflicts = _merge_trees(repo_path, merge_info.base, our_tree, merge_info.theirs)
+    merged_tree, conflict_paths = _merge_trees(repo_path, merge_info.base, our_tree, merge_info.theirs)
 
-    if has_conflicts:
-        return None
+    if conflict_paths:
+        # Most-recent-commit-wins: replace only the conflicted files.
+        # Non-conflicting changes from both sides are preserved in merged_tree.
+        # TODO: revisit with UI-assisted resolution.
+        ours_ts = _commit_timestamp(repo_path, merge_info.ours)
+        theirs_ts = _commit_timestamp(repo_path, merge_info.theirs)
+        winner = merge_info.theirs if theirs_ts >= ours_ts else merge_info.ours
+        merged_tree = _resolve_conflicts(repo_path, merged_tree, winner, conflict_paths)
 
     parent_args = ["-p", merge_info.ours, "-p", merge_info.theirs]
     new_commit = _git(

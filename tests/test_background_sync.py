@@ -139,8 +139,8 @@ async def test_sync_remote_merge(synced_repos):
 
 
 @pytest.mark.asyncio
-async def test_sync_conflict_sets_status(synced_repos):
-    """Same file edited both sides → status becomes 'conflict'."""
+async def test_sync_conflict_resolves(synced_repos):
+    """Same file edited both sides → most-recent-commit-wins resolves it."""
     local_path, remote_path = synced_repos
 
     # Remote edits card 001
@@ -163,7 +163,8 @@ async def test_sync_conflict_sets_status(synced_repos):
 
     await run_sync_cycle(board)
 
-    assert board.git.sync.status == "conflict"
+    # Conflict resolved, not stuck
+    assert board.git.sync.status == "idle"
 
 
 # --- git node survives update ---
