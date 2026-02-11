@@ -11,7 +11,7 @@ from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.blocked import BlockedWidget
 from ganban.ui.color import ColorButton
-from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_RAW, ICON_TAB_USERS, ICON_SETTINGS
+from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_USERS, ICON_SETTINGS
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
@@ -110,7 +110,6 @@ class CardDetailModal(DetailModal):
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
-                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield DoneWidget(self.card.meta)
                 yield BlockedWidget(self.card.meta)
@@ -122,7 +121,6 @@ class CardDetailModal(DetailModal):
                     self.card.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
                 )
                 yield MetaEditor(self.card.meta, id="tab-meta")
-                yield Static("Coming soon", id="tab-raw")
 
 
 class CompactButton(Static):
@@ -162,7 +160,6 @@ class ColumnDetailModal(DetailModal):
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
-                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with Horizontal(id="detail-bar"):
                 yield ColorButton(color=color)
                 yield CompactButton(self.column.meta)
@@ -171,7 +168,6 @@ class ColumnDetailModal(DetailModal):
                     self.column.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
                 )
                 yield MetaEditor(self.column.meta, id="tab-meta")
-                yield Static("Coming soon", id="tab-raw")
 
     def on_color_button_color_selected(self, event: ColorButton.ColorSelected) -> None:
         event.stop()
@@ -195,11 +191,9 @@ class BoardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_USERS, "tab-users")
-                    yield TabButton(ICON_TAB_RAW, "tab-raw")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.board.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
                 )
                 yield MetaEditor(self.board.meta, id="tab-meta")
                 yield UsersEditor(self.board, id="tab-users")
-                yield Static("Coming soon", id="tab-raw")
