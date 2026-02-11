@@ -11,7 +11,7 @@ users:
     emoji: "\U0001F916"
   test:
     emails:
-    - blah
+    - test@test.test
 ---
 
 # ganban
