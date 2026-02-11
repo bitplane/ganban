@@ -4,8 +4,10 @@ import pytest
 from textual.app import App, ComposeResult
 
 from ganban.model.node import ListNode
+from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.document import AddSection, MarkdownDocEditor
 from ganban.ui.edit.editable import EditableText
+from ganban.ui.edit.section import SectionEditor
 
 
 class AddSectionTestApp(App):
@@ -133,3 +135,21 @@ async def test_doc_editor_has_add_section(sections):
     async with app.run_test():
         add = app.query_one(AddSection)
         assert add is not None
+
+
+@pytest.mark.asyncio
+async def test_delete_subsection_removes_from_model(sections):
+    """Confirming delete on a subsection removes it from the model and DOM."""
+    app = DocEditorTestApp(sections)
+
+    async with app.run_test() as pilot:
+        subsections = app.query(".subsection")
+        assert len(subsections) == 1
+
+        # Simulate confirm on the delete button
+        btn = subsections.first(SectionEditor).query_one(ConfirmButton)
+        btn.post_message(ConfirmButton.Confirmed())
+        await pilot.pause()
+
+        assert "Notes" not in sections.keys()
+        assert len(app.query(".subsection")) == 0

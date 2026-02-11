@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import MarkdownEditor, TextEditor
 from ganban.ui.edit.viewers import MarkdownViewer
@@ -39,6 +40,13 @@ class SectionEditor(Container):
         def control(self) -> SectionEditor:
             return self._sender
 
+    class DeleteRequested(Message):
+        """Emitted when the section delete is confirmed."""
+
+        @property
+        def control(self) -> SectionEditor:
+            return self._sender
+
     def __init__(self, heading: str | None, body: str = "", parser_factory=None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._heading = heading
@@ -55,12 +63,14 @@ class SectionEditor(Container):
 
     def compose(self) -> ComposeResult:
         if self._heading is not None:
-            yield EditableText(
-                self._heading,
-                Static(self._heading),
-                TextEditor(),
-                classes="section-heading",
-            )
+            with Horizontal(classes="section-heading-row"):
+                yield EditableText(
+                    self._heading,
+                    Static(self._heading),
+                    TextEditor(),
+                    classes="section-heading",
+                )
+                yield ConfirmButton(classes="section-delete")
         yield EditableText(
             self._body,
             MarkdownViewer(self._body, parser_factory=self._parser_factory),
@@ -68,6 +78,10 @@ class SectionEditor(Container):
             classes="section-body",
             clean=False,
         )
+
+    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
+        event.stop()
+        self.post_message(self.DeleteRequested())
 
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         event.stop()

@@ -126,8 +126,11 @@ class AssigneeWidget(NodeWatcherMixin, Container):
         inp.focus()
 
     def _exit_edit_mode(self) -> None:
+        search = self.query_one("#assignee-search", SearchInput)
+        search._close_dropdown()
         self.remove_class("-editing")
         self._update_label()
+        self.screen.focus()
 
     def on_click(self, event) -> None:
         event.stop()

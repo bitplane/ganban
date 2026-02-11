@@ -133,10 +133,23 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
             self.sections[editor.heading] = event.new_value
         self.post_message(self.Changed())
 
+    def on_section_editor_delete_requested(self, event: SectionEditor.DeleteRequested) -> None:
+        """Remove a subsection."""
+        event.stop()
+        editor = event.control
+        self.sections[editor.heading] = None
+        editor.remove()
+        self.post_message(self.Changed())
+
+    def _focus_section_body(self, section: SectionEditor) -> None:
+        """Focus the body editor of a section."""
+        section.query_one(".section-body", EditableText).focus()
+
     def on_add_section_section_created(self, event: AddSection.SectionCreated) -> None:
         """Add a new subsection."""
         event.stop()
         self.sections[event.heading] = ""
         editor = SectionEditor(event.heading, "", parser_factory=self._parser_factory, classes="subsection")
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
+        self.call_after_refresh(self._focus_section_body, editor)
         self.post_message(self.Changed())

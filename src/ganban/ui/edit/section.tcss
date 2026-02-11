@@ -3,14 +3,23 @@ SectionEditor {
     width: 100%;
     height: auto;
 }
-SectionEditor > .section-heading {
+SectionEditor > .section-heading-row {
     width: 100%;
     height: auto;
-    text-style: bold;
     border-bottom: solid $primary-darken-2;
 }
-SectionEditor > .section-heading > ContentSwitcher > Static {
+SectionEditor .section-heading {
+    width: 1fr;
+    height: auto;
     text-style: bold;
+}
+SectionEditor .section-heading > ContentSwitcher > Static {
+    text-style: bold;
+}
+SectionEditor .section-delete {
+    width: 2;
+    height: 1;
+    dock: right;
 }
 SectionEditor > .section-body {
     height: auto;
