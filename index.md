@@ -11,7 +11,7 @@ users:
     emoji: "\U0001F916"
   Test:
     emails:
-    - whoever@wherever.wat
+    - own
 ---
 
 # ganban - decentralized kanban
