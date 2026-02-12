@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.message import Message
 from textual.widgets import Rule, Static
@@ -9,7 +10,7 @@ from textual.widgets import Rule, Static
 from ganban.model.card import create_card, find_card_column
 from ganban.model.node import Node
 from ganban.parser import first_title
-from ganban.ui.card_indicators import build_footer_text
+from ganban.ui.card_indicators import build_footer_text, build_label_text
 from ganban.ui.constants import (
     ICON_BACK,
     ICON_CARD,
@@ -92,18 +93,28 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         new_title = _card_title(self.board, self.card_id)
         if new_title != self.title:
             self.title = new_title
-            self.query_one("#card-title", PlainStatic).update(self.title or self.card_id)
         self._refresh_indicators()
 
     def _refresh_indicators(self) -> None:
-        """Update footer indicator text and blocked state."""
+        """Update title with label blocks, footer indicators, and blocked state."""
         card = self.board.cards[self.card_id]
+        label_text = build_label_text(card.meta, self.board.labels)
+
+        # Title: label blocks on the left, then card title
+        title_widget = self.query_one("#card-title", PlainStatic)
+        if label_text.plain:
+            title = label_text.copy()
+            title.append_text(Text(" "))
+            title.append_text(Text(self.title or self.card_id))
+            title_widget.update(title)
+        else:
+            title_widget.update(self.title or self.card_id)
+
         footer_text = build_footer_text(
             card.sections,
             card.meta,
             self.board.meta,
             blocked=bool(card.blocked),
-            board_labels=self.board.labels,
         )
         self.query_one("#card-footer", PlainStatic).update(footer_text)
         self.set_class(bool(card.blocked), "blocked")

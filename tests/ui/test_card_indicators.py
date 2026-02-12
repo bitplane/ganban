@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 
 from ganban.model.node import ListNode, Node
-from ganban.ui.card_indicators import build_footer_text
+from ganban.ui.card_indicators import build_footer_text, build_label_text
 from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
 from ganban.ui.emoji import emoji_for_email
 
@@ -109,21 +109,27 @@ def test_footer_assigned_no_board_meta():
     assert result.plain == ""
 
 
-def test_footer_label_indicators():
-    """Cards with labels show colored block indicators."""
-    sections, meta = _make_card()
-    meta.labels = ["bug", "urgent"]
+def test_label_text_shows_colored_blocks():
+    """Cards with labels show colored block characters."""
+    meta = Node(labels=["bug", "urgent"])
     board_labels = Node(
         bug=Node(color="#800000", cards=["001"]),
         urgent=Node(color="#ff6600", cards=["001"]),
     )
-    result = build_footer_text(sections, meta, board_labels=board_labels)
-    assert "\u2588" in result.plain
+    result = build_label_text(meta, board_labels)
+    assert result.plain == "\u2588\u2588"
 
 
-def test_footer_label_no_board_labels():
-    """No label indicators when board_labels not provided."""
-    sections, meta = _make_card()
-    meta.labels = ["bug"]
-    result = build_footer_text(sections, meta)
-    assert "\u2588" not in result.plain
+def test_label_text_empty_without_board_labels():
+    """No label text when board_labels not provided."""
+    meta = Node(labels=["bug"])
+    result = build_label_text(meta)
+    assert result.plain == ""
+
+
+def test_label_text_empty_without_card_labels():
+    """No label text when card has no labels."""
+    meta = Node()
+    board_labels = Node(bug=Node(color="#800000", cards=[]))
+    result = build_label_text(meta, board_labels)
+    assert result.plain == ""
