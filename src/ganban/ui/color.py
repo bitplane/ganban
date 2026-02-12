@@ -6,26 +6,11 @@ from textual.color import Color
 from textual.message import Message
 from textual.widgets import Static
 
+from ganban.palette import COLORS, color_for_label
 from ganban.ui.constants import ICON_PALETTE
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
-COLORS: dict[str, str] = {
-    "red": "#800000",
-    "green": "#008000",
-    "olive": "#808000",
-    "blue": "#000080",
-    "purple": "#800080",
-    "teal": "#008080",
-    "silver": "#c0c0c0",
-    "grey": "#808080",
-    "bright_red": "#ff0000",
-    "lime": "#00ff00",
-    "yellow": "#ffff00",
-    "bright_blue": "#0000ff",
-    "fuchsia": "#ff00ff",
-    "aqua": "#00ffff",
-    "white": "#ffffff",
-}
+__all__ = ["COLORS", "ColorButton", "ColorSwatch", "build_color_menu", "color_for_label"]
 
 
 class ColorSwatch(MenuItem):

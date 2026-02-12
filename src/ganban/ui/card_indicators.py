@@ -16,6 +16,7 @@ def build_footer_text(
     meta: Node,
     board_meta: Node | None = None,
     blocked: bool = False,
+    board_labels: Node | None = None,
 ) -> Text:
     """Build footer indicators from card sections and meta.
 
@@ -31,6 +32,15 @@ def build_footer_text(
     if assigned and board_meta:
         _, _, email = parse_committer(assigned)
         parts.append(Text(resolve_email_emoji(email, board_meta)))
+
+    # Label indicators
+    card_labels = meta.labels if meta else None
+    if card_labels and isinstance(card_labels, list) and board_labels:
+        for raw in card_labels:
+            name = raw.strip().lower()
+            label_node = getattr(board_labels, name) if board_labels else None
+            if label_node and label_node.color:
+                parts.append(Text("\u2588", style=label_node.color))
 
     # Body indicator
     body = first_body(sections)

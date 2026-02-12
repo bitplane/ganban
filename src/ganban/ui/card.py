@@ -83,6 +83,8 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self.node_watch(card, "blocked", self._on_card_changed)
         if self.board.meta:
             self.node_watch(self.board.meta, "users", self._on_card_changed)
+        if self.board.labels:
+            self.node_watch(self.board, "labels", self._on_card_changed)
         self._refresh_indicators()
 
     def _on_card_changed(self, node, key, old, new) -> None:
@@ -96,7 +98,13 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     def _refresh_indicators(self) -> None:
         """Update footer indicator text and blocked state."""
         card = self.board.cards[self.card_id]
-        footer_text = build_footer_text(card.sections, card.meta, self.board.meta, blocked=bool(card.blocked))
+        footer_text = build_footer_text(
+            card.sections,
+            card.meta,
+            self.board.meta,
+            blocked=bool(card.blocked),
+            board_labels=self.board.labels,
+        )
         self.query_one("#card-footer", PlainStatic).update(footer_text)
         self.set_class(bool(card.blocked), "blocked")
 

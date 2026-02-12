@@ -12,6 +12,7 @@ from ganban.git import read_git_config
 from ganban.ids import compare_ids, max_id, next_id, normalize_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
+from ganban.palette import color_for_label
 
 MAX_COMMITS = 100
 
@@ -294,6 +295,84 @@ def _setup_blocked(board: Node) -> None:
     board.watch("cards", on_cards_changed)
 
 
+def normalise_label(raw: str) -> str:
+    """Normalise a label name to lowercase, stripped."""
+    return raw.strip().lower()
+
+
+def _build_labels_index(board: Node) -> dict[str, Node]:
+    """Build {label_name: Node(color=..., cards=[...])} from current state."""
+    index: dict[str, list[str]] = {}
+
+    # Collect from all cards
+    for card_id, card in board.cards.items():
+        labels = card.meta.labels if card.meta else None
+        if not isinstance(labels, list):
+            continue
+        for raw in labels:
+            name = normalise_label(raw)
+            if name:
+                index.setdefault(name, []).append(card_id)
+
+    # Collect from board meta (may add labels with no cards)
+    meta_labels = board.meta.labels if board.meta else None
+    if meta_labels and isinstance(meta_labels, Node):
+        for name in meta_labels.keys():
+            norm = normalise_label(name)
+            if norm:
+                index.setdefault(norm, [])
+
+    # Build nodes with resolved colours
+    result = {}
+    for name, card_ids in index.items():
+        override = None
+        if meta_labels and isinstance(meta_labels, Node):
+            entry = getattr(meta_labels, name, None)
+            if entry and isinstance(entry, Node):
+                override = entry.color
+        color = override or color_for_label(name)
+        result[name] = Node(color=color, cards=card_ids)
+    return result
+
+
+def _recompute_labels(board: Node) -> None:
+    """Recompute board.labels index in-place."""
+    new_index = _build_labels_index(board)
+    existing = board.labels
+
+    # Remove labels that no longer exist
+    for key in list(existing.keys()):
+        if key not in new_index:
+            setattr(existing, key, None)
+
+    # Update/add labels
+    for name, node in new_index.items():
+        old = getattr(existing, name)
+        if old is None:
+            setattr(existing, name, node)
+        else:
+            old.color = node.color
+            old.cards = node.cards
+
+
+def _setup_labels(board: Node) -> None:
+    """Build board.labels index and watch for changes."""
+    board.labels = Node(**_build_labels_index(board))
+
+    def on_cards_changed(source_node, key, old, new):
+        if key == "labels":
+            _recompute_labels(board)
+        elif key == "*" and source_node is board.cards:
+            _recompute_labels(board)
+
+    def on_board_meta_labels_changed(source_node, key, old, new):
+        _recompute_labels(board)
+
+    board.watch("cards", on_cards_changed)
+    if board.meta:
+        board.meta.watch("labels", on_board_meta_labels_changed)
+
+
 def _activate(board: Node, repo: Repo) -> None:
     """Attach computed/derived properties to a loaded board."""
     config_dict = read_git_config(board.repo_path)
@@ -301,6 +380,7 @@ def _activate(board: Node, repo: Repo) -> None:
     board.git = Node(committers=_get_committers(repo), config=config_node)
     _setup_archived(board)
     _setup_blocked(board)
+    _setup_labels(board)
 
 
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:

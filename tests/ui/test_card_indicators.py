@@ -107,3 +107,23 @@ def test_footer_assigned_no_board_meta():
     meta.assigned = "alice@example.com"
     result = build_footer_text(sections, meta)
     assert result.plain == ""
+
+
+def test_footer_label_indicators():
+    """Cards with labels show colored block indicators."""
+    sections, meta = _make_card()
+    meta.labels = ["bug", "urgent"]
+    board_labels = Node(
+        bug=Node(color="#800000", cards=["001"]),
+        urgent=Node(color="#ff6600", cards=["001"]),
+    )
+    result = build_footer_text(sections, meta, board_labels=board_labels)
+    assert "\u2588" in result.plain
+
+
+def test_footer_label_no_board_labels():
+    """No label indicators when board_labels not provided."""
+    sections, meta = _make_card()
+    meta.labels = ["bug"]
+    result = build_footer_text(sections, meta)
+    assert "\u2588" not in result.plain

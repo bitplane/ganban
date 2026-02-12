@@ -8,11 +8,26 @@ from ganban.ui.color import (
     ColorButton,
     ColorSwatch,
     build_color_menu,
+    color_for_label,
 )
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 
 
 # --- Sync tests (no app needed) ---
+
+
+def test_color_for_label_deterministic():
+    """Same label always produces the same color."""
+    assert color_for_label("bug") == color_for_label("bug")
+    assert color_for_label("feature") == color_for_label("feature")
+
+
+def test_color_for_label_returns_hex():
+    """Returned color is a valid hex string from the COLORS palette."""
+    palette = set(COLORS.values())
+    assert color_for_label("bug") in palette
+    assert color_for_label("urgent") in palette
+    assert color_for_label("anything-else") in palette
 
 
 def test_build_color_menu_structure():
