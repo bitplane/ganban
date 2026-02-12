@@ -50,13 +50,13 @@ class SyncWidget(NodeWatcherMixin, Container):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        icon = _current_icon(self.board.git.sync, self.board.git.config)
+        icon = _current_icon(self.board.git.sync, self.board.git.config.ganban)
         yield Static(icon, classes="sync-icon")
 
     def on_mount(self) -> None:
         self.node_watch(self.board.git.sync, "status", self._on_sync_changed)
         for key in ("sync_local", "sync_remote"):
-            self.node_watch(self.board.git.config, key, self._on_sync_changed)
+            self.node_watch(self.board.git.config.ganban, key, self._on_sync_changed)
         self._update_display()
 
     def _on_sync_changed(self, node, key, old, new) -> None:
@@ -64,7 +64,7 @@ class SyncWidget(NodeWatcherMixin, Container):
 
     def _update_display(self) -> None:
         icon_widget = self.query_one(".sync-icon", Static)
-        icon = _current_icon(self.board.git.sync, self.board.git.config)
+        icon = _current_icon(self.board.git.sync, self.board.git.config.ganban)
         icon_widget.update(icon)
 
     def on_click(self, event) -> None:
@@ -72,7 +72,7 @@ class SyncWidget(NodeWatcherMixin, Container):
         self._show_menu(event.screen_x, event.screen_y)
 
     def _show_menu(self, x: int, y: int) -> None:
-        config = self.board.git.config
+        config = self.board.git.config.ganban
         sync = self.board.git.sync
         local_check = "☑" if config.sync_local else "☐"
         remote_check = "☑" if config.sync_remote else "☐"
@@ -97,7 +97,7 @@ class SyncWidget(NodeWatcherMixin, Container):
     def _on_menu_closed(self, item: MenuItem | None) -> None:
         if item is None:
             return
-        config = self.board.git.config
+        config = self.board.git.config.ganban
         sync = self.board.git.sync
         with self.suppressing():
             if item.item_id == "toggle_local":

@@ -32,7 +32,7 @@ async def run_sync_cycle(board):
     All git I/O runs via asyncio.to_thread to stay non-blocking.
     """
     sync = board.git.sync
-    config = board.git.config
+    config = board.git.config.ganban
     repo_path = board.repo_path
     do_local = config.sync_local
     do_remote = config.sync_remote

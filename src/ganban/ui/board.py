@@ -12,7 +12,7 @@ from textual.widgets import Footer, Static
 from ganban.model.card import archive_card, move_card
 from ganban.model.column import archive_column, move_column
 from ganban.model.node import Node
-from ganban.git import write_ganban_config_key
+from ganban.git import write_git_config_key
 from ganban.model.writer import save_board
 from ganban.parser import first_title
 from ganban.sync import run_sync_cycle
@@ -68,8 +68,7 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
 
     def on_mount(self) -> None:
         self.node_watch(self.board, "sections", self._on_board_sections_changed)
-        for key in ("sync_interval", "sync_local", "sync_remote"):
-            self.node_watch(self.board.git.config, key, self._on_config_changed)
+        self.node_watch(self.board.git, "config", self._on_config_changed)
         self.call_after_refresh(self._focus_first_card)
         self.set_interval(1.0, self._sync_tick)
 
@@ -82,13 +81,15 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
                 return
 
     def _on_config_changed(self, node, key, old, new) -> None:
-        """Persist changed config key to local git config."""
-        write_ganban_config_key(self.board.repo_path, key, new)
+        """Persist changed config key to git config."""
+        section = node._key
+        if section and key != "*":
+            write_git_config_key(self.board.repo_path, section, key, new)
 
     def _sync_tick(self) -> None:
         """Called every 1s. Starts a sync cycle if interval has elapsed."""
         sync = self.board.git.sync
-        config = self.board.git.config
+        config = self.board.git.config.ganban
         if sync.status != "idle":
             return
         if not config.sync_local and not config.sync_remote:

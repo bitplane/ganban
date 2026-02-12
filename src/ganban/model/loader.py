@@ -8,7 +8,7 @@ from functools import cmp_to_key
 from git import Repo
 from git.objects import Blob, Tree
 
-from ganban.git import read_ganban_config
+from ganban.git import read_git_config
 from ganban.ids import compare_ids, max_id, next_id, normalize_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
@@ -296,8 +296,9 @@ def _setup_blocked(board: Node) -> None:
 
 def _activate(board: Node, repo: Repo) -> None:
     """Attach computed/derived properties to a loaded board."""
-    config = read_ganban_config(board.repo_path)
-    board.git = Node(committers=_get_committers(repo), config=Node(**config))
+    config_dict = read_git_config(board.repo_path)
+    config_node = Node(**{section: Node(**keys) for section, keys in config_dict.items()})
+    board.git = Node(committers=_get_committers(repo), config=config_node)
     _setup_archived(board)
     _setup_blocked(board)
 

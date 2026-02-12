@@ -384,7 +384,7 @@ def test_load_tree_has_cards_and_columns(sample_board):
 
 
 def test_activate_adds_git_node(sample_board):
-    """_activate attaches a git node with committers and config."""
+    """_activate attaches a git node with committers and nested config."""
     repo = Repo(sample_board)
     tree = repo.commit("ganban").tree
     board = _load_tree(tree)
@@ -393,6 +393,8 @@ def test_activate_adds_git_node(sample_board):
     assert isinstance(board.git, Node)
     assert isinstance(board.git.committers, list)
     assert isinstance(board.git.config, Node)
+    assert isinstance(board.git.config.ganban, Node)
+    assert board.git.config.ganban.sync_interval == 30
 
 
 def test_links_are_tuples(sample_board):

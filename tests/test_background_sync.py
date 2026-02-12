@@ -32,7 +32,7 @@ def _init_sync_state(board, local=True, remote=True):
     if not board.git:
         board.git = Node()
     board.git.sync = Node(status="idle")
-    board.git.config = Node(sync_local=local, sync_remote=remote, sync_interval=30)
+    board.git.config = Node(ganban=Node(sync_local=local, sync_remote=remote, sync_interval=30))
 
 
 @pytest.fixture

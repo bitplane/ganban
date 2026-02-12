@@ -2,22 +2,32 @@
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from git import InvalidGitRepositoryError, Repo
 
-CONFIG_DEFAULTS = {
+GANBAN_DEFAULTS = {
     "sync-interval": 30,
     "sync-local": True,
     "sync-remote": True,
 }
 
-_GIT_TO_PYTHON = {k: k.replace("-", "_") for k in CONFIG_DEFAULTS}
-_PYTHON_TO_GIT = {v: k for k, v in _GIT_TO_PYTHON.items()}
+
+def _python_key(git_key: str) -> str:
+    """Convert git-style key (hyphenated) to Python-style (underscored)."""
+    return git_key.replace("-", "_")
 
 
-def _parse_config_value(git_key: str, raw: str):
-    """Parse a raw git config string into the right Python type."""
-    default = CONFIG_DEFAULTS[git_key]
+def _git_key(python_key: str) -> str:
+    """Convert Python-style key (underscored) to git-style (hyphenated)."""
+    return python_key.replace("_", "-")
+
+
+def _coerce_ganban_value(git_key: str, raw: str):
+    """Type-coerce ganban section values using defaults."""
+    default = GANBAN_DEFAULTS.get(git_key)
+    if default is None:
+        return raw
     if isinstance(default, bool):
         return raw.lower() in ("true", "yes", "1")
     if isinstance(default, int):
@@ -25,33 +35,45 @@ def _parse_config_value(git_key: str, raw: str):
     return raw
 
 
-def read_ganban_config(repo_path: str | Path) -> dict:
-    """Read ganban.* keys from local git config, returned as python-keyed dict."""
+def read_git_config(repo_path: str | Path) -> dict[str, dict[str, Any]]:
+    """Read git config into {section: {key: value}} dict.
+
+    Skips subsectioned entries (e.g. remote "origin").
+    Converts key hyphens to underscores. Applies type coercion
+    for the ganban section. Merges ganban defaults for missing keys.
+    """
     repo = _get_repo(repo_path)
-    reader = repo.config_reader("repository")
-    result = {}
-    for git_key, default in CONFIG_DEFAULTS.items():
-        py_key = _GIT_TO_PYTHON[git_key]
-        try:
-            raw = reader.get_value("ganban", git_key)
-            result[py_key] = _parse_config_value(git_key, str(raw))
-        except Exception:
-            result[py_key] = default
+    reader = repo.config_reader()
+    result: dict[str, dict[str, Any]] = {}
+    for section in reader.sections():
+        if '"' in section:
+            continue
+        items: dict[str, Any] = {}
+        for git_k, raw in reader.items(section):
+            py_key = _python_key(git_k)
+            if section == "ganban":
+                items[py_key] = _coerce_ganban_value(git_k, raw)
+            else:
+                items[py_key] = raw
+        result[section] = items
+    # Merge ganban defaults
+    ganban = result.setdefault("ganban", {})
+    for git_k, default in GANBAN_DEFAULTS.items():
+        py_key = _python_key(git_k)
+        if py_key not in ganban:
+            ganban[py_key] = default
     return result
 
 
-def write_ganban_config_key(repo_path: str | Path, key: str, value) -> None:
-    """Write one ganban.* key to local git config.
-
-    key is the python name (e.g. sync_interval), converted to git name (sync-interval).
-    """
-    git_key = _PYTHON_TO_GIT[key]
+def write_git_config_key(repo_path: str | Path, section: str, key: str, value) -> None:
+    """Write one key to git config. key is python-style (underscores)."""
+    git_k = _git_key(key)
     repo = _get_repo(repo_path)
     writer = repo.config_writer("repository")
     if isinstance(value, bool):
-        writer.set_value("ganban", git_key, str(value).lower())
+        writer.set_value(section, git_k, str(value).lower())
     else:
-        writer.set_value("ganban", git_key, str(value))
+        writer.set_value(section, git_k, str(value))
     writer.release()
 
 

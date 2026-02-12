@@ -11,6 +11,8 @@ from ganban.git import (
     init_repo,
     is_git_repo,
     push,
+    read_git_config,
+    write_git_config_key,
 )
 
 
@@ -152,3 +154,75 @@ async def test_has_branch_after_create(temp_repo):
     assert await has_branch(temp_repo, "ganban") is False
     await create_orphan_branch(temp_repo)
     assert await has_branch(temp_repo, "ganban") is True
+
+
+# --- read_git_config / write_git_config_key ---
+
+
+def test_read_git_config_returns_sections(temp_repo):
+    """Config includes user and core sections."""
+    config = read_git_config(temp_repo)
+    assert "core" in config
+    assert "ganban" in config  # defaults always present
+
+
+def test_read_git_config_ganban_defaults(temp_repo):
+    """Missing ganban keys get defaults."""
+    config = read_git_config(temp_repo)
+    ganban = config["ganban"]
+    assert ganban["sync_interval"] == 30
+    assert ganban["sync_local"] is True
+    assert ganban["sync_remote"] is True
+
+
+def test_read_git_config_ganban_types(temp_repo):
+    """Ganban values are coerced: bools are bool, ints are int."""
+    repo = Repo(temp_repo)
+    writer = repo.config_writer("repository")
+    writer.set_value("ganban", "sync-local", "false")
+    writer.set_value("ganban", "sync-interval", "60")
+    writer.release()
+
+    config = read_git_config(temp_repo)
+    ganban = config["ganban"]
+    assert ganban["sync_local"] is False
+    assert isinstance(ganban["sync_local"], bool)
+    assert ganban["sync_interval"] == 60
+    assert isinstance(ganban["sync_interval"], int)
+
+
+def test_read_git_config_skips_subsections(temp_repo_with_remote):
+    """Subsectioned entries like remote "origin" are skipped."""
+    config = read_git_config(temp_repo_with_remote)
+    for key in config:
+        assert '"' not in key
+
+
+def test_read_git_config_key_underscores(temp_repo):
+    """Hyphens in git keys are converted to underscores."""
+    repo = Repo(temp_repo)
+    writer = repo.config_writer("repository")
+    writer.set_value("ganban", "sync-local", "true")
+    writer.release()
+
+    config = read_git_config(temp_repo)
+    ganban = config["ganban"]
+    assert "sync_local" in ganban
+    assert "sync-local" not in ganban
+
+
+def test_write_git_config_key(temp_repo):
+    """Round-trips a string value through write and read."""
+    write_git_config_key(temp_repo, "ganban", "custom_key", "hello")
+
+    repo = Repo(temp_repo)
+    reader = repo.config_reader("repository")
+    assert reader.get_value("ganban", "custom-key") == "hello"
+
+
+def test_write_git_config_key_bool(temp_repo):
+    """Bools are written as lowercase strings and round-trip correctly."""
+    write_git_config_key(temp_repo, "ganban", "sync_local", False)
+
+    config = read_git_config(temp_repo)
+    assert config["ganban"]["sync_local"] is False

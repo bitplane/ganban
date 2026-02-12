@@ -13,7 +13,7 @@ from ganban.ui.sync_widget import _current_icon
 def _make_state(status="idle", local=True, remote=True):
     sync = Node(status=status)
     config = Node(sync_local=local, sync_remote=remote, sync_interval=30)
-    return sync, config
+    return sync, config  # _current_icon takes the ganban section node directly
 
 
 def test_idle_icon():
