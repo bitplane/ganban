@@ -3,6 +3,7 @@
 import pytest
 from textual.app import App, ComposeResult
 
+from ganban.palette import LABEL_COLORS
 from ganban.ui.color import (
     COLORS,
     ColorButton,
@@ -23,11 +24,31 @@ def test_color_for_label_deterministic():
 
 
 def test_color_for_label_returns_hex():
-    """Returned color is a valid hex string from the COLORS palette."""
-    palette = set(COLORS.values())
+    """Returned color is a valid hex string from the LABEL_COLORS palette."""
+    palette = set(LABEL_COLORS)
     assert color_for_label("bug") in palette
     assert color_for_label("urgent") in palette
     assert color_for_label("anything-else") in palette
+
+
+def test_color_for_label_sensible_defaults():
+    """Common label names land on appropriate colours."""
+    # Reds for danger/severity
+    assert color_for_label("bug") == "#aa2244"  # crimson
+    assert color_for_label("critical") == "#ee2222"  # bright red
+    assert color_for_label("hotfix") == "#cc0000"  # red
+    assert color_for_label("blocked") == "#880022"  # dark red
+    # Warm for urgency
+    assert color_for_label("urgent") == "#dd6600"  # orange
+    # Greens for positive/progress
+    assert color_for_label("feature") == "#22aa44"  # green
+    assert color_for_label("ready") == "#44cc44"  # bright green
+    # Blues for info/process
+    assert color_for_label("review") == "#2266cc"  # blue
+    assert color_for_label("docs") == "#4499cc"  # sky blue
+    assert color_for_label("todo") == "#5577cc"  # cornflower
+    # Neutral
+    assert color_for_label("wontfix") == "#808080"  # grey
 
 
 def test_build_color_menu_structure():
