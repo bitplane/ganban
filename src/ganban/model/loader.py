@@ -80,7 +80,7 @@ def _build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[L
     for i, (title, body) in enumerate(sections):
         if not title and i == 0:
             title = fallback_title
-        ln[title] = body
+        ln.add(title, body)
     return ln, meta
 
 

@@ -145,7 +145,12 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         content = self.sections[old_key] or ""
         with self.suppressing():
             self.sections[old_key] = None
-            self.sections[new_key] = content
+            actual_key = self.sections.add(new_key, content)
+        if actual_key != new_key:
+            event.control._heading = actual_key
+            heading_et = event.control.query_one(".section-heading", EditableText)
+            heading_et._value = actual_key
+            heading_et._update_viewer()
         self.post_message(self.Changed())
 
     def on_section_editor_body_changed(self, event: SectionEditor.BodyChanged) -> None:
@@ -176,8 +181,8 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         """Add a new subsection."""
         event.stop()
         with self.suppressing():
-            self.sections[event.heading] = ""
-        editor = SectionEditor(event.heading, "", parser_factory=self._parser_factory, classes="subsection")
+            actual_key = self.sections.add(event.heading, "")
+        editor = SectionEditor(actual_key, "", parser_factory=self._parser_factory, classes="subsection")
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
         self.call_after_refresh(self._focus_section_body, editor)
         self.post_message(self.Changed())

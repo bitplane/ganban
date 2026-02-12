@@ -677,6 +677,30 @@ def test_list_node_rename_first_key_conflict_multiple():
     assert lst["B (2)"] == "first"
 
 
+def test_list_node_add_no_conflict():
+    lst = ListNode()
+    actual = lst.add("Notes", "content")
+    assert actual == "Notes"
+    assert lst["Notes"] == "content"
+
+
+def test_list_node_add_conflict():
+    lst = ListNode()
+    lst["Notes"] = "existing"
+    actual = lst.add("Notes", "new content")
+    assert actual == "Notes (1)"
+    assert lst["Notes"] == "existing"
+    assert lst["Notes (1)"] == "new content"
+
+
+def test_list_node_add_conflict_multiple():
+    lst = ListNode()
+    lst["test"] = "first"
+    assert lst.add("test", "second") == "test (1)"
+    assert lst.add("test", "third") == "test (2)"
+    assert lst.keys() == ["test", "test (1)", "test (2)"]
+
+
 def test_rename_markdown_sections_conflict():
     """Renaming a markdown section heading to match an existing one gets suffixed."""
     doc = ListNode()

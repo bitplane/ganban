@@ -74,5 +74,5 @@ def markdown_to_sections(text: str) -> tuple[ListNode, dict]:
     sections_list, meta = parse_sections(text)
     sections = ListNode()
     for title, body in sections_list:
-        sections[title] = body
+        sections.add(title, body)
     return sections, meta

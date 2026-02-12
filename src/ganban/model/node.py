@@ -275,6 +275,15 @@ class ListNode:
             self._version += 1
             _emit(self, "*", old_keys, new_keys)
 
+    def add(self, key: str, value: Any) -> str:
+        """Add a new item, deduplicating the key if it already exists.
+
+        Returns the actual key used.
+        """
+        key = _unique_key(str(key), set(self._by_id.keys()))
+        self[key] = value
+        return key
+
     def rename_first_key(self, new_title: str) -> None:
         """Rename the first key by rebuilding the list."""
         items = self.items()
