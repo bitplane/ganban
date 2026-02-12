@@ -610,6 +610,24 @@ def test_node_rename_key_updates_child_key():
     assert node.renamed._key == "renamed"
 
 
+def test_node_rename_key_conflict():
+    node = Node(a="1", b="2", c="3")
+    node.rename_key("a", "b")
+    assert list(node.keys()) == ["b (1)", "b", "c"]
+    assert node._children["b (1)"] == "1"
+    assert node.b == "2"
+
+
+def test_node_rename_key_conflict_multiple():
+    node = Node()
+    node.x = "original"
+    setattr(node, "x (1)", "first copy")
+    node.y = "to rename"
+    node.rename_key("y", "x")
+    assert list(node.keys()) == ["x", "x (1)", "x (2)"]
+    assert node._children["x (2)"] == "to rename"
+
+
 # --- ListNode.rename_first_key ---
 
 
@@ -637,6 +655,47 @@ def test_list_node_rename_first_key_empty():
     lst = ListNode()
     lst.rename_first_key("Whatever")
     assert lst.keys() == []
+
+
+def test_list_node_rename_first_key_conflict():
+    lst = ListNode()
+    lst["Description"] = "about this card"
+    lst["Notes"] = "some notes"
+    lst.rename_first_key("Notes")
+    assert lst.keys() == ["Notes (1)", "Notes"]
+    assert lst["Notes (1)"] == "about this card"
+    assert lst["Notes"] == "some notes"
+
+
+def test_list_node_rename_first_key_conflict_multiple():
+    lst = ListNode()
+    lst["A"] = "first"
+    lst["B"] = "second"
+    lst["B (1)"] = "third"
+    lst.rename_first_key("B")
+    assert lst.keys() == ["B (2)", "B", "B (1)"]
+    assert lst["B (2)"] == "first"
+
+
+def test_rename_markdown_sections_conflict():
+    """Renaming a markdown section heading to match an existing one gets suffixed."""
+    doc = ListNode()
+    doc["Description"] = "Card description"
+    doc["Notes"] = "Existing notes"
+    doc.rename_first_key("Notes")
+    assert "Notes (1)" in doc.keys()
+    assert doc["Notes"] == "Existing notes"
+    assert doc["Notes (1)"] == "Card description"
+
+
+def test_rename_users_conflict():
+    """Renaming a user to a name that already exists gets suffixed."""
+    users = Node()
+    users.alice = {"email": "alice@example.com"}
+    users.bob = {"email": "bob@example.com"}
+    users.rename_key("alice", "bob")
+    assert users._children["bob (1)"].email == "alice@example.com"
+    assert users.bob.email == "bob@example.com"
 
 
 def test_list_node_update_emits_on_reorder():

@@ -9,6 +9,16 @@ BRANCH_NAME = "ganban"
 Callback = Callable[["Node | ListNode", str, Any, Any], None]
 
 
+def _unique_key(desired: str, existing: set[str]) -> str:
+    """Return desired if unused, otherwise append (1), (2), etc."""
+    if desired not in existing:
+        return desired
+    n = 1
+    while f"{desired} ({n})" in existing:
+        n += 1
+    return f"{desired} ({n})"
+
+
 def _wrap(value: Any, parent: Node | ListNode, key: str) -> Any:
     """Auto-wrap dicts as Nodes. Reparent existing Nodes/ListNodes."""
     if isinstance(value, dict) and not isinstance(value, Node):
@@ -127,6 +137,8 @@ class Node:
         value = self._children.get(old_key)
         if value is None:
             return
+        siblings = set(self._children.keys()) - {old_key}
+        new_key = _unique_key(new_key, siblings)
         items = list(self.items())
         for key, _ in items:
             self._children.pop(key, None)
@@ -266,6 +278,9 @@ class ListNode:
     def rename_first_key(self, new_title: str) -> None:
         """Rename the first key by rebuilding the list."""
         items = self.items()
+        if items:
+            other_keys = set(self._by_id.keys()) - {items[0][0]}
+            new_title = _unique_key(new_title, other_keys)
         for key, _ in items:
             self[key] = None
         if items:
