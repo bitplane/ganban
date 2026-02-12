@@ -122,17 +122,12 @@ def file_creation_date(repo_path: str, file_path: str, branch: str = BRANCH_NAME
     return datetime.fromisoformat(first_line).astimezone(timezone.utc)
 
 
-def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
-    """Load a complete board from a git branch as a Node tree."""
-    repo = Repo(repo_path)
+def _load_tree(tree: Tree) -> Node:
+    """Deserialize a ganban branch tree into a Node.
 
-    try:
-        commit = repo.commit(branch)
-    except Exception:
-        raise ValueError(f"Branch '{branch}' not found in repository")
-
-    tree = commit.tree
-    board = Node(repo_path=str(repo_path), commit=commit.hexsha)
+    Pure data loading — no repo_path, commit, or git node attached.
+    """
+    board = Node()
 
     # Root index.md
     index_blob = _tree_get(tree, "index.md")
@@ -192,7 +187,6 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
             col_sections[name] = ""
 
         # Build links list
-        links: list[str] = []
         link_entries: list[tuple[str, str]] = []
         for link_item in col_tree:
             if link_item.type != "blob":
@@ -238,6 +232,26 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
         columns_ln[order] = col
 
     board.columns = columns_ln
-    config = read_ganban_config(repo_path)
+    return board
+
+
+def _activate(board: Node, repo: Repo) -> None:
+    """Attach computed/derived properties to a loaded board."""
+    config = read_ganban_config(board.repo_path)
     board.git = Node(committers=_get_committers(repo), config=Node(**config))
+
+
+def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
+    """Load a complete board from a git branch as a Node tree."""
+    repo = Repo(repo_path)
+
+    try:
+        commit = repo.commit(branch)
+    except Exception:
+        raise ValueError(f"Branch '{branch}' not found in repository")
+
+    board = _load_tree(commit.tree)
+    board.repo_path = str(repo_path)
+    board.commit = commit.hexsha
+    _activate(board, repo)
     return board

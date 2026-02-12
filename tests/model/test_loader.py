@@ -9,7 +9,7 @@ import pytest
 from git import Repo
 from git.util import Actor
 
-from ganban.model.loader import _get_committers, file_creation_date, load_board
+from ganban.model.loader import _activate, _get_committers, _load_tree, file_creation_date, load_board
 from ganban.model.node import ListNode, Node
 
 
@@ -353,3 +353,42 @@ def test_load_board_missing_branch(tmp_path):
 
     with pytest.raises(ValueError, match="Branch 'ganban' not found"):
         load_board(str(tmp_path))
+
+
+def test_load_tree_has_no_git_node(sample_board):
+    """_load_tree returns a board with no git node."""
+    repo = Repo(sample_board)
+    tree = repo.commit("ganban").tree
+    board = _load_tree(tree)
+    assert "git" not in board
+
+
+def test_load_tree_has_no_repo_path(sample_board):
+    """_load_tree returns a board with no repo_path."""
+    repo = Repo(sample_board)
+    tree = repo.commit("ganban").tree
+    board = _load_tree(tree)
+    assert "repo_path" not in board
+
+
+def test_load_tree_has_cards_and_columns(sample_board):
+    """_load_tree returns a board with cards and columns populated."""
+    repo = Repo(sample_board)
+    tree = repo.commit("ganban").tree
+    board = _load_tree(tree)
+    assert isinstance(board.cards, ListNode)
+    assert len(board.cards) == 3
+    assert isinstance(board.columns, ListNode)
+    assert len(board.columns) == 3
+
+
+def test_activate_adds_git_node(sample_board):
+    """_activate attaches a git node with committers and config."""
+    repo = Repo(sample_board)
+    tree = repo.commit("ganban").tree
+    board = _load_tree(tree)
+    board.repo_path = str(sample_board)
+    _activate(board, repo)
+    assert isinstance(board.git, Node)
+    assert isinstance(board.git.committers, list)
+    assert isinstance(board.git.config, Node)
