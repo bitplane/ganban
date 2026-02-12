@@ -11,12 +11,18 @@ from ganban.ui.constants import ICON_BLOCKED, ICON_BODY, ICON_CALENDAR, ICON_CHE
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
 
 
-def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = None) -> Text:
+def build_footer_text(
+    sections: ListNode,
+    meta: Node,
+    board_meta: Node | None = None,
+    blocked: bool = False,
+) -> Text:
     """Build footer indicators from card sections and meta.
 
     Shows assignee emoji if meta.assigned is set.
     Shows body icon (dim) if first section has body content.
     Shows calendar icon + Xd if meta.due is set, red if overdue.
+    Shows blocked icon if blocked is True.
     """
     parts: list[Text] = []
 
@@ -45,7 +51,6 @@ def build_footer_text(sections: ListNode, meta: Node, board_meta: Node | None = 
             parts.append(Text(f"{ICON_CALENDAR}{diff}", style=style))
 
     # Blocked indicator
-    blocked = meta.blocked if meta else None
     if blocked:
         parts.append(Text(ICON_BLOCKED))
 

@@ -265,11 +265,41 @@ def _setup_archived(board: Node) -> None:
         col.watch("links", on_links_changed)
 
 
+def _is_ready(card: Node) -> bool:
+    """A card is ready if it's archived or marked done."""
+    return card.archived or bool(card.meta and card.meta.done)
+
+
+def _recompute_blocked(board: Node) -> None:
+    """Set or clear card.blocked for every card based on its deps."""
+    for card_id, card in board.cards.items():
+        deps = card.meta.deps if card.meta else None
+        if not deps:
+            card.blocked = None
+            continue
+        blocked = any(not _is_ready(board.cards[dep_id]) for dep_id in deps if board.cards[dep_id] is not None)
+        card.blocked = True if blocked else None
+
+
+def _setup_blocked(board: Node) -> None:
+    """Compute card.blocked and watch for changes that affect it."""
+    _recompute_blocked(board)
+
+    def on_cards_changed(source_node, key, old, new):
+        if key == "archived" and source_node._parent is board.cards:
+            _recompute_blocked(board)
+        elif key in ("done", "deps") and source_node._key == "meta" and source_node._parent._parent is board.cards:
+            _recompute_blocked(board)
+
+    board.watch("cards", on_cards_changed)
+
+
 def _activate(board: Node, repo: Repo) -> None:
     """Attach computed/derived properties to a loaded board."""
     config = read_ganban_config(board.repo_path)
     board.git = Node(committers=_get_committers(repo), config=Node(**config))
     _setup_archived(board)
+    _setup_blocked(board)
 
 
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:

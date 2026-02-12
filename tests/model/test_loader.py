@@ -432,3 +432,57 @@ def test_card_unarchived_on_add(sample_board):
     assert board.cards["1"].archived is True
     move_card(board, "1", board.columns["2"])
     assert board.cards["1"].archived is False
+
+
+def test_card_not_blocked_without_deps(sample_board):
+    """A card with no deps is not blocked."""
+    board = load_board(str(sample_board))
+    assert board.cards["1"].blocked is None
+
+
+def test_card_blocked_by_unready_dep(sample_board):
+    """A card depending on an active (not ready) card is blocked."""
+    board = load_board(str(sample_board))
+    board.cards["1"].meta.deps = ["2"]
+    assert board.cards["1"].blocked is True
+
+
+def test_card_not_blocked_when_dep_done(sample_board):
+    """A card whose dep is marked done is not blocked."""
+    board = load_board(str(sample_board))
+    board.cards["2"].meta.done = True
+    board.cards["1"].meta.deps = ["2"]
+    assert board.cards["1"].blocked is None
+
+
+def test_card_not_blocked_when_dep_archived(sample_board):
+    """A card whose dep is archived is not blocked."""
+    board = load_board(str(sample_board))
+    archive_card(board, "2")
+    board.cards["1"].meta.deps = ["2"]
+    assert board.cards["1"].blocked is None
+
+
+def test_card_unblocked_when_dep_completed(sample_board):
+    """Marking a dep as done unblocks the dependent card."""
+    board = load_board(str(sample_board))
+    board.cards["1"].meta.deps = ["2"]
+    assert board.cards["1"].blocked is True
+    board.cards["2"].meta.done = True
+    assert board.cards["1"].blocked is None
+
+
+def test_card_unblocked_when_dep_archived(sample_board):
+    """Archiving a dep unblocks the dependent card."""
+    board = load_board(str(sample_board))
+    board.cards["1"].meta.deps = ["2"]
+    assert board.cards["1"].blocked is True
+    archive_card(board, "2")
+    assert board.cards["1"].blocked is None
+
+
+def test_card_blocked_missing_dep_ignored(sample_board):
+    """A dep ID that doesn't exist in cards is skipped."""
+    board = load_board(str(sample_board))
+    board.cards["1"].meta.deps = ["999"]
+    assert board.cards["1"].blocked is None

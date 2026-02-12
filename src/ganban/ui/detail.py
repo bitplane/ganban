@@ -9,7 +9,6 @@ from textual.widgets import ContentSwitcher, Static
 
 from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
-from ganban.ui.blocked import BlockedWidget
 from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_USERS, ICON_SETTINGS
 from ganban.ui.done import DoneWidget
@@ -91,8 +90,8 @@ class CardDetailModal(DetailModal):
 
     def on_mount(self) -> None:
         super().on_mount()
-        self.set_class(bool(self.card.meta.blocked), "blocked")
-        self._unwatch_blocked = self.card.meta.watch("blocked", self._on_blocked_changed)
+        self.set_class(bool(self.card.blocked), "blocked")
+        self._unwatch_blocked = self.card.watch("blocked", self._on_blocked_changed)
 
     def _on_blocked_changed(self, node, key, old, new) -> None:
         self.set_class(bool(new), "blocked")
@@ -113,7 +112,6 @@ class CardDetailModal(DetailModal):
                     yield TabButton(ICON_SETTINGS, "tab-meta")
             with Horizontal(id="detail-bar"):
                 yield DoneWidget(self.card.meta)
-                yield BlockedWidget(self.card.meta)
                 yield DueDateWidget(self.card.meta)
                 if self.board:
                     yield AssigneeWidget(self.card.meta, self.board)

@@ -46,7 +46,6 @@ class GanbanApp(App):
         "drag.tcss",
         "users.tcss",
         "done.tcss",
-        "blocked.tcss",
         "due.tcss",
         "confirm.tcss",
         "assignee.tcss",
