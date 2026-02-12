@@ -62,6 +62,9 @@ CardDetailModal.blocked #detail-container {
 CardDetailModal.blocked #detail-title-bar {
     background: $error;
 }
+CardDetailModal.blocked TextArea {
+    background: $error-darken-3;
+}
 
 /* CompactButton */
 CompactButton { width: 2; height: 1; }
