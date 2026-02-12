@@ -1,6 +1,23 @@
 """Card ID comparison and generation."""
 
 
+def normalize_id(s: str) -> str:
+    """Strip leading zeros from an ID, preserving at least one digit.
+
+    "001" → "1", "0" → "0", "010" → "10"
+    """
+    stripped = s.lstrip("0")
+    return stripped or "0"
+
+
+def pad_id(s: str, width: int) -> str:
+    """Zero-pad an ID to the given width.
+
+    "1" with width=3 → "001", "10" with width=3 → "010"
+    """
+    return s.zfill(width)
+
+
 def compare_ids(left: str, right: str) -> int:
     """Compare two IDs, padding with leading zeros.
 
@@ -32,15 +49,14 @@ def max_id(ids: list[str]) -> str | None:
 def next_id(current_max: str | None) -> str:
     """Generate the next ID after current_max.
 
-    - If None, returns "001"
-    - If numeric (e.g., "99"), returns str(int + 1) (e.g., "100")
+    - If None, returns "1"
+    - If numeric (e.g., "9"), returns str(int + 1) (e.g., "10")
     - If non-numeric (e.g., "fish"), returns "1" + "0" * len (e.g., "10000")
     """
     if current_max is None:
-        return "001"
+        return "1"
 
     try:
-        next_val = int(current_max) + 1
-        return str(next_val).zfill(len(current_max))
+        return str(int(current_max) + 1)
     except ValueError:
         return "1" + "0" * len(current_max)

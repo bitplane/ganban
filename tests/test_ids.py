@@ -1,6 +1,6 @@
 """Tests for card ID comparison and generation."""
 
-from ganban.ids import compare_ids, max_id, next_id
+from ganban.ids import compare_ids, max_id, next_id, normalize_id, pad_id
 
 
 def test_compare_ids_numeric():
@@ -56,12 +56,13 @@ def test_max_id_mixed():
 
 def test_next_id_none():
     """None returns starting ID."""
-    assert next_id(None) == "001"
+    assert next_id(None) == "1"
 
 
 def test_next_id_numeric():
     """Numeric IDs increment."""
-    assert next_id("001") == "002"
+    assert next_id("1") == "2"
+    assert next_id("9") == "10"
     assert next_id("99") == "100"
     assert next_id("999") == "1000"
 
@@ -74,6 +75,61 @@ def test_next_id_alpha():
 
 
 def test_next_id_padded_numeric():
-    """Padded numeric IDs still parse as int."""
-    assert next_id("007") == "008"
-    assert next_id("0099") == "0100"
+    """Padded numeric IDs still parse as int and return normalized."""
+    assert next_id("007") == "8"
+    assert next_id("0099") == "100"
+
+
+# --- normalize_id tests ---
+
+
+def test_normalize_id_strips_leading_zeros():
+    """Leading zeros are stripped."""
+    assert normalize_id("001") == "1"
+    assert normalize_id("010") == "10"
+    assert normalize_id("00042") == "42"
+
+
+def test_normalize_id_preserves_zero():
+    """Single zero is preserved."""
+    assert normalize_id("0") == "0"
+    assert normalize_id("000") == "0"
+
+
+def test_normalize_id_no_change():
+    """Already normalized IDs are unchanged."""
+    assert normalize_id("1") == "1"
+    assert normalize_id("42") == "42"
+    assert normalize_id("100") == "100"
+
+
+# --- pad_id tests ---
+
+
+def test_pad_id_basic():
+    """IDs are zero-padded to the given width."""
+    assert pad_id("1", 3) == "001"
+    assert pad_id("10", 3) == "010"
+    assert pad_id("100", 3) == "100"
+
+
+def test_pad_id_already_wide():
+    """IDs wider than the width are unchanged."""
+    assert pad_id("1000", 3) == "1000"
+    assert pad_id("42", 1) == "42"
+
+
+def test_pad_id_exact_width():
+    """ID exactly matching width is unchanged."""
+    assert pad_id("001", 3) == "001"
+    assert pad_id("42", 2) == "42"
+
+
+# --- round-trip tests ---
+
+
+def test_normalize_pad_round_trip():
+    """Normalizing then padding recovers the padded form."""
+    assert pad_id(normalize_id("001"), 3) == "001"
+    assert pad_id(normalize_id("042"), 3) == "042"
+    assert pad_id(normalize_id("1"), 3) == "001"

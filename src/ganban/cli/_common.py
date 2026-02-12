@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+from ganban.ids import normalize_id
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
 from ganban.model.writer import _meta_to_dict, _sections_to_text, save_board
@@ -30,8 +31,8 @@ def find_column(board: Node, col_id: str, json_mode: bool) -> Node:
 
 
 def find_card(board: Node, card_id: str, json_mode: bool) -> Node:
-    """Lookup card by ID. Exit 1 if not found."""
-    card = board.cards[card_id]
+    """Lookup card by ID (normalizes leading zeros). Exit 1 if not found."""
+    card = board.cards[normalize_id(card_id)]
     if card is not None:
         return card
     error(f"Card '{card_id}' not found.", json_mode)

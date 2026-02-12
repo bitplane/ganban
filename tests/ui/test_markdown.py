@@ -28,7 +28,7 @@ def _make_board(*cards):
     for card_id, title in cards:
         sections = ListNode()
         sections[title] = ""
-        cards_ln[card_id] = Node(sections=sections, meta={}, file_path=f".all/{card_id}.md")
+        cards_ln[card_id] = Node(sections=sections, meta={})
     board.cards = cards_ln
     return board
 
@@ -125,33 +125,33 @@ def test_factory_with_committers():
 
 def test_card_ref_replaced():
     """#NNN in text is replaced with a link showing card title."""
-    board = _make_board(("038", "ID parser"))
+    board = _make_board(("38", "ID parser"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "see #38 for details")
     types = [c.type for c in children]
     assert types == ["text", "link_open", "text", "link_close", "text"]
     assert children[0].content == "see "
-    assert children[1].attrGet("href") == "card:038"
-    assert children[2].content == "#038 ID parser"
+    assert children[1].attrGet("href") == "card:38"
+    assert children[2].content == "#38 ID parser"
     assert children[4].content == " for details"
 
 
 def test_card_ref_multiple():
     """Multiple #NNN refs in one line are all replaced."""
-    board = _make_board(("001", "First"), ("002", "Second"))
+    board = _make_board(("1", "First"), ("2", "Second"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "#1 and #2")
     link_opens = [c for c in children if c.type == "link_open"]
     assert len(link_opens) == 2
-    assert link_opens[0].attrGet("href") == "card:001"
-    assert link_opens[1].attrGet("href") == "card:002"
+    assert link_opens[0].attrGet("href") == "card:1"
+    assert link_opens[1].attrGet("href") == "card:2"
 
 
 def test_card_ref_missing_card():
     """#NNN where the card doesn't exist is left as plain text."""
-    board = _make_board(("001", "First"))
+    board = _make_board(("1", "First"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "see #999")
@@ -161,32 +161,32 @@ def test_card_ref_missing_card():
 
 
 def test_card_ref_zero_padding():
-    """#38 matches card 038 with zero-padding."""
-    board = _make_board(("038", "Padded card"))
+    """#38 matches card 38 after normalization."""
+    board = _make_board(("38", "Padded card"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "#38")
     link_opens = [c for c in children if c.type == "link_open"]
     assert len(link_opens) == 1
-    assert link_opens[0].attrGet("href") == "card:038"
+    assert link_opens[0].attrGet("href") == "card:38"
     link_text = [c for c in children if c.type == "text" and c.content.startswith("#")]
-    assert link_text[0].content == "#038 Padded card"
+    assert link_text[0].content == "#38 Padded card"
 
 
 def test_card_ref_extra_leading_zeros():
-    """#00038 matches card 038 after stripping excess zeros."""
-    board = _make_board(("038", "Padded card"))
+    """#00038 matches card 38 after stripping excess zeros."""
+    board = _make_board(("38", "Padded card"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "see #00038")
     link_opens = [c for c in children if c.type == "link_open"]
     assert len(link_opens) == 1
-    assert link_opens[0].attrGet("href") == "card:038"
+    assert link_opens[0].attrGet("href") == "card:38"
 
 
 def test_card_ref_inside_link_not_processed():
     """#NNN inside an existing link is not double-processed."""
-    board = _make_board(("001", "First"))
+    board = _make_board(("1", "First"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "[see #1](https://example.com)")
@@ -201,7 +201,7 @@ def test_card_ref_inside_link_not_processed():
 
 def test_card_ref_no_refs_untouched():
     """Text with no refs is untouched."""
-    board = _make_board(("001", "First"))
+    board = _make_board(("1", "First"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "just some text")
@@ -212,27 +212,27 @@ def test_card_ref_no_refs_untouched():
 
 def test_card_ref_self_reference():
     """A card mentioning its own ID works fine."""
-    board = _make_board(("042", "Self ref card"))
+    board = _make_board(("42", "Self ref card"))
     md = MarkdownIt("gfm-like")
     md.use(card_ref_plugin, board)
     children = _inline_children(md, "this is #42")
     link_opens = [c for c in children if c.type == "link_open"]
     assert len(link_opens) == 1
-    assert link_opens[0].attrGet("href") == "card:042"
+    assert link_opens[0].attrGet("href") == "card:42"
 
 
 def test_card_ref_factory_integration():
     """Factory produces a parser with card_ref_plugin enabled."""
-    board = _make_board(("007", "Bond card"))
+    board = _make_board(("7", "Bond card"))
     board.meta = {}
     factory = ganban_parser_factory(board)
     md = factory()
     children = _inline_children(md, "see #7")
     link_opens = [c for c in children if c.type == "link_open"]
     assert len(link_opens) == 1
-    assert link_opens[0].attrGet("href") == "card:007"
+    assert link_opens[0].attrGet("href") == "card:7"
     link_text = [c for c in children if c.type == "text" and c.content.startswith("#")]
-    assert link_text[0].content == "#007 Bond card"
+    assert link_text[0].content == "#7 Bond card"
 
 
 def test_card_ref_no_cards():

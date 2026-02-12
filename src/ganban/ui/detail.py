@@ -83,10 +83,11 @@ class DetailModal(ModalScreen[None]):
 class CardDetailModal(DetailModal):
     """Modal screen showing full card details."""
 
-    def __init__(self, card: Node, board: Node | None = None) -> None:
+    def __init__(self, card: Node, board: Node | None = None, card_id: str = "") -> None:
         super().__init__()
         self.card = card
         self.board = board
+        self.card_id = card_id
 
     def on_mount(self) -> None:
         super().on_mount()
@@ -102,7 +103,7 @@ class CardDetailModal(DetailModal):
     def compose(self) -> ComposeResult:
         meta = _board_meta(self.board)
         pf = ganban_parser_factory(self.board)
-        card_id = self.card.file_path.split("/")[-1].removesuffix(".md")
+        card_id = self.card_id
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
                 yield Static(f"#{card_id} ", id="detail-id")

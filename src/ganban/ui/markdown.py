@@ -7,6 +7,7 @@ import re
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from ganban.ids import normalize_id
 from ganban.model.node import Node
 from ganban.parser import first_title
 from ganban.ui.emoji import emoji_for_email, resolve_email_display
@@ -74,7 +75,7 @@ def _split_card_refs(text: str, board: Node, level: int) -> list[Token]:
     last_end = 0
 
     for match in _CARD_REF_RE.finditer(text):
-        card_id = str(int(match.group(1))).zfill(3)
+        card_id = normalize_id(match.group(1))
         card = board.cards[card_id] if board.cards else None
         if card is None:
             continue

@@ -104,17 +104,17 @@ def test_create_card_basic(tmp_path):
         columns=[_make_column("1", "Backlog")],
     )
     card_id, card = create_card(board, "New card", "Body")
-    assert card_id == "001"
-    assert board.cards["001"] is not None
+    assert card_id == "1"
+    assert board.cards["1"] is not None
     assert "New card" in card.sections.keys()
-    assert list(board.columns["1"].links) == ["001"]
+    assert list(board.columns["1"].links) == ["1"]
 
 
 def test_create_card_at_position(tmp_path):
     board = _make_board(
         tmp_path,
-        cards={"001": _make_card("A")},
-        columns=[_make_column("1", "Backlog", links=["001"])],
+        cards={"1": _make_card("A")},
+        columns=[_make_column("1", "Backlog", links=["1"])],
     )
     card_id, _ = create_card(board, "B", column=board.columns["1"], position=0)
-    assert list(board.columns["1"].links) == [card_id, "001"]
+    assert list(board.columns["1"].links) == [card_id, "1"]

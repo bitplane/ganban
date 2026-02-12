@@ -11,7 +11,7 @@ def _make_card(title, body="", meta=None):
     """Helper to build a card Node with sections."""
     sections = ListNode()
     sections[title] = body
-    return Node(sections=sections, meta=meta or {}, file_path=".all/placeholder.md")
+    return Node(sections=sections, meta=meta or {})
 
 
 def _make_board(repo_path, columns=None, cards=None, sections=None, meta=None):

@@ -86,9 +86,9 @@ def test_load_board_has_cards(sample_board):
     board = load_board(str(sample_board))
     assert isinstance(board.cards, ListNode)
     assert len(board.cards) == 3
-    assert board.cards["001"] is not None
-    assert board.cards["002"] is not None
-    assert board.cards["003"] is not None
+    assert board.cards["1"] is not None
+    assert board.cards["2"] is not None
+    assert board.cards["3"] is not None
 
 
 def test_load_board_column_properties(sample_board):
@@ -105,10 +105,10 @@ def test_load_board_column_links(sample_board):
 
     backlog = board.columns["1"]
     assert isinstance(backlog.links, list)
-    assert backlog.links == ["001"]
+    assert backlog.links == ["1"]
 
     doing = board.columns["2"]
-    assert doing.links == ["002", "003"]
+    assert doing.links == ["2", "3"]
 
     done = board.columns["3"]
     assert done.links == []
@@ -116,7 +116,7 @@ def test_load_board_column_links(sample_board):
 
 def test_load_board_card_sections(sample_board):
     board = load_board(str(sample_board))
-    card = board.cards["001"]
+    card = board.cards["1"]
     assert isinstance(card.sections, ListNode)
     assert card.sections["Fix login bug"] == "Description here."
     assert card.sections["Notes"] == "Some notes."
@@ -124,7 +124,7 @@ def test_load_board_card_sections(sample_board):
 
 def test_load_board_card_meta(sample_board):
     board = load_board(str(sample_board))
-    card = board.cards["003"]
+    card = board.cards["3"]
     assert isinstance(card.meta, Node)
     assert card.meta.tags == ["urgent"]
 
@@ -242,13 +242,12 @@ def test_load_board_adopts_regular_file_as_card(tmp_path):
     # The adopted card should be in the backlog links
     backlog = board.columns["1"]
     assert len(backlog.links) == 2
-    assert "001" in backlog.links
+    assert "1" in backlog.links
 
     # Find the adopted card
-    adopted_id = [lid for lid in backlog.links if lid != "001"][0]
+    adopted_id = [lid for lid in backlog.links if lid != "1"][0]
     adopted = board.cards[adopted_id]
     assert adopted.sections["Adopted card"] == "From a file."
-    assert adopted.file_path == f".all/{adopted_id}.md"
 
 
 def test_load_board_adopted_card_survives_save(tmp_path):

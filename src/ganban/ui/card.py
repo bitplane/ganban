@@ -104,7 +104,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
 
     def draggable_clicked(self) -> None:
         card = self.board.cards[self.card_id]
-        self.app.push_screen(CardDetailModal(card, self.board))
+        self.app.push_screen(CardDetailModal(card, self.board, card_id=self.card_id))
 
     def _find_column(self) -> Node | None:
         """Find the column containing this card."""
@@ -147,7 +147,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         match item.item_id:
             case "edit":
                 card = self.board.cards[self.card_id]
-                self.app.push_screen(CardDetailModal(card, self.board))
+                self.app.push_screen(CardDetailModal(card, self.board, card_id=self.card_id))
             case "archive":
                 self._confirm_archive()
             case "toggle-done":

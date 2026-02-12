@@ -23,7 +23,6 @@ def create_card(
     card = Node(
         sections=sections,
         meta={},
-        file_path=f".all/{card_id}.md",
     )
     board.cards[card_id] = card
 

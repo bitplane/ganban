@@ -51,7 +51,7 @@ def test_card_get_json(initialized_repo, capsys):
     assert card_get(args) == 0
 
     data = json.loads(capsys.readouterr().out)
-    assert data["id"] == "001"
+    assert data["id"] == "1"
     assert data["title"] == "First card"
     assert data["column"]["name"] == "Backlog"
     assert "# First card" in data["markdown"]
@@ -71,10 +71,10 @@ def test_card_set(initialized_repo, capsys, monkeypatch):
     assert card_set(args) == 0
 
     out = capsys.readouterr().out
-    assert "Updated card 001" in out
+    assert "Updated card 1" in out
 
     board = load_board(str(initialized_repo))
-    assert board.cards["001"].sections.keys()[0] == "Updated Title"
+    assert board.cards["1"].sections.keys()[0] == "Updated Title"
 
 
 def test_card_set_round_trip(initialized_repo, capsys, monkeypatch):
@@ -92,7 +92,7 @@ def test_card_set_round_trip(initialized_repo, capsys, monkeypatch):
 
     # Verify unchanged
     board = load_board(str(initialized_repo))
-    assert board.cards["001"].sections.keys()[0] == "First card"
+    assert board.cards["1"].sections.keys()[0] == "First card"
 
 
 def test_card_add(initialized_repo, capsys):
@@ -100,11 +100,11 @@ def test_card_add(initialized_repo, capsys):
     assert card_add(args) == 0
 
     out = capsys.readouterr().out
-    assert "Created card 003" in out
+    assert "Created card 3" in out
     assert "Backlog" in out
 
     board = load_board(str(initialized_repo))
-    assert board.cards["003"] is not None
+    assert board.cards["3"] is not None
 
 
 def test_card_add_to_column(initialized_repo, capsys):
@@ -112,7 +112,7 @@ def test_card_add_to_column(initialized_repo, capsys):
     assert card_add(args) == 0
 
     board = load_board(str(initialized_repo))
-    assert "003" in board.columns["2"].links
+    assert "3" in board.columns["2"].links
 
 
 def test_card_add_json(initialized_repo, capsys):
@@ -120,7 +120,7 @@ def test_card_add_json(initialized_repo, capsys):
     assert card_add(args) == 0
 
     data = json.loads(capsys.readouterr().out)
-    assert data["id"] == "003"
+    assert data["id"] == "3"
     assert "commit" in data
 
 
@@ -129,11 +129,11 @@ def test_card_move(initialized_repo, capsys):
     assert card_move(args) == 0
 
     out = capsys.readouterr().out
-    assert "Moved card 001 to Done" in out
+    assert "Moved card 1 to Done" in out
 
     board = load_board(str(initialized_repo))
-    assert "001" in board.columns["3"].links
-    assert "001" not in board.columns["1"].links
+    assert "1" in board.columns["3"].links
+    assert "1" not in board.columns["1"].links
 
 
 def test_card_move_json(initialized_repo, capsys):
@@ -150,12 +150,12 @@ def test_card_archive(initialized_repo, capsys):
     assert card_archive(args) == 0
 
     out = capsys.readouterr().out
-    assert "Archived card 001" in out
+    assert "Archived card 1" in out
 
     board = load_board(str(initialized_repo))
-    assert "001" not in board.columns["1"].links
+    assert "1" not in board.columns["1"].links
     # Card data still exists
-    assert board.cards["001"] is not None
+    assert board.cards["1"] is not None
 
 
 def test_card_archive_json(initialized_repo, capsys):
@@ -163,5 +163,5 @@ def test_card_archive_json(initialized_repo, capsys):
     assert card_archive(args) == 0
 
     data = json.loads(capsys.readouterr().out)
-    assert data["id"] == "001"
+    assert data["id"] == "1"
     assert "commit" in data

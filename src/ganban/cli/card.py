@@ -12,6 +12,7 @@ from ganban.cli._common import (
     save,
     sections_to_markdown,
 )
+from ganban.ids import normalize_id
 from ganban.model.card import archive_card, create_card, find_card_column, move_card
 from ganban.parser import first_title
 
@@ -53,6 +54,7 @@ def card_list(args) -> int:
 
 def card_get(args) -> int:
     """Dump card markdown content."""
+    args.id = normalize_id(args.id)
     board = load_board_or_die(args.repo, args.json)
     card = find_card(board, args.id, args.json)
 
@@ -77,6 +79,7 @@ def card_get(args) -> int:
 
 def card_set(args) -> int:
     """Write card markdown from stdin."""
+    args.id = normalize_id(args.id)
     board = load_board_or_die(args.repo, args.json)
     find_card(board, args.id, args.json)
 
@@ -126,6 +129,7 @@ def card_add(args) -> int:
 
 def card_move(args) -> int:
     """Move a card to a column."""
+    args.id = normalize_id(args.id)
     board = load_board_or_die(args.repo, args.json)
     find_card(board, args.id, args.json)
     target = find_column(board, args.column, args.json)
@@ -151,6 +155,7 @@ def card_move(args) -> int:
 
 def card_archive(args) -> int:
     """Archive a card."""
+    args.id = normalize_id(args.id)
     board = load_board_or_die(args.repo, args.json)
     find_card(board, args.id, args.json)
 

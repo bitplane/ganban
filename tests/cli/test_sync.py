@@ -67,7 +67,7 @@ def _clone_and_push_card(remote_path, card_title="Remote card", card_body="Added
             # Add card with explicit ID to avoid collisions
             sections = ListNode()
             sections[card_title] = card_body
-            board.cards[card_id] = Node(sections=sections, meta={}, file_path=f".all/{card_id}.md")
+            board.cards[card_id] = Node(sections=sections, meta={})
             col = list(board.columns)[0]
             col.links = list(col.links) + [card_id]
         else:
@@ -146,13 +146,13 @@ def test_sync_merge_conflict_resolves(synced_repos):
         other_repo.git.checkout("ganban")
 
         board = load_board(other_path)
-        board.cards["001"].sections["First card"] = "Remote edit."
+        board.cards["1"].sections["First card"] = "Remote edit."
         save_board(board, message="Remote edit card")
         other_repo.git.push("origin", "ganban")
 
     # Local edits card 001
     board = load_board(str(local_path))
-    board.cards["001"].sections["First card"] = "Local edit."
+    board.cards["1"].sections["First card"] = "Local edit."
     save_board(board, message="Local edit card")
 
     exit_code, result = _do_sync(str(local_path))

@@ -9,7 +9,7 @@ from git import Repo
 from git.objects import Blob, Tree
 
 from ganban.git import read_ganban_config
-from ganban.ids import compare_ids, max_id, next_id
+from ganban.ids import compare_ids, max_id, next_id, normalize_id
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import parse_sections
 
@@ -156,14 +156,13 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
                 continue
             if not item.name.endswith(".md"):
                 continue
-            card_id = item.name[:-3]
+            card_id = normalize_id(item.name[:-3])
             card_ids.add(card_id)
             text = item.data_stream.read().decode("utf-8")
             sections_ln, meta = _build_sections_list(text, fallback_title=card_id)
             card = Node(
                 sections=sections_ln,
                 meta=meta,
-                file_path=f".all/{item.name}",
             )
             cards_ln[card_id] = card
     board.cards = cards_ln
@@ -209,7 +208,7 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
                 target = link_item.data_stream.read().decode("utf-8")
                 card_id = target.split("/")[-1]
                 if card_id.endswith(".md"):
-                    card_id = card_id[:-3]
+                    card_id = normalize_id(card_id[:-3])
                 if card_id not in card_ids:
                     continue
             else:
@@ -221,7 +220,6 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
                 card = Node(
                     sections=sections_ln,
                     meta=meta,
-                    file_path=f".all/{card_id}.md",
                 )
                 cards_ln[card_id] = card
             link_entries.append((position, card_id))

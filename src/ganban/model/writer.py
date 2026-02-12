@@ -7,6 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from ganban.ids import pad_id
 from ganban.model.column import slugify
 from ganban.model.node import BRANCH_NAME, ListNode, Node
 from ganban.parser import first_title, serialize_sections
@@ -198,18 +199,19 @@ def _resolve_conflicts(repo_path: Path, merged_tree: str, winner_commit: str, co
 def _build_board_tree(repo_path: Path, board: Node) -> str:
     """Build the complete git tree for a board and return its hash."""
     # Build card blobs and .all tree
+    width = max(max((len(cid) for cid in board.cards.keys()), default=1), 3)
     card_entries = []
     for card_id, card in board.cards.items():
         text = _sections_to_text(card.sections, card.meta)
         blob = _hash_object(repo_path, text)
-        card_entries.append(("100644", "blob", blob, f"{card_id}.md"))
+        card_entries.append(("100644", "blob", blob, f"{pad_id(card_id, width)}.md"))
 
     all_tree = _mktree(repo_path, card_entries)
 
     # Build column trees
     column_trees = []
     for col in board.columns:
-        col_tree = _build_column_tree(repo_path, col, board)
+        col_tree = _build_column_tree(repo_path, col, board, width)
         column_trees.append((col.dir_path, col_tree))
 
     # Build root tree entries
@@ -224,7 +226,7 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
     return _mktree(repo_path, root_entries)
 
 
-def _build_column_tree(repo_path: Path, col: Node, board: Node) -> str:
+def _build_column_tree(repo_path: Path, col: Node, board: Node, width: int = 3) -> str:
     """Build a git tree for a column directory."""
     entries = []
 
@@ -237,7 +239,7 @@ def _build_column_tree(repo_path: Path, col: Node, board: Node) -> str:
         title = first_title(card.sections) if card else ""
         slug = slugify(title)
         position = f"{i + 1:02d}"
-        target = f"../.all/{card_id}.md"
+        target = f"../.all/{pad_id(card_id, width)}.md"
         symlink_blob = _hash_object(repo_path, target)
         filename = f"{position}.{slug}.md"
         entries.append(("120000", "blob", symlink_blob, filename))

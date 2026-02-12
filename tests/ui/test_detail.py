@@ -33,7 +33,7 @@ def card():
     sections["Test Card"] = "Card body content"
     sections["Notes"] = "Some notes"
     sections["Tasks"] = "- [ ] Task 1"
-    return Node(sections=sections, meta={}, file_path=".all/001.md")
+    return Node(sections=sections, meta={})
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ def card_with_due():
     """A card with a due date."""
     sections = ListNode()
     sections["Due Card"] = ""
-    return Node(sections=sections, meta={"due": "2026-06-15"}, file_path=".all/002.md")
+    return Node(sections=sections, meta={"due": "2026-06-15"})
 
 
 @pytest.fixture

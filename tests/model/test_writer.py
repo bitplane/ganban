@@ -38,10 +38,10 @@ def test_save_new_board(empty_repo):
 
     loaded = load_board(str(empty_repo))
     assert len(loaded.cards) == 1
-    assert loaded.cards["001"] is not None
-    assert loaded.cards["001"].sections["Test card"] == "Body text."
+    assert loaded.cards["1"] is not None
+    assert loaded.cards["1"].sections["Test card"] == "Body text."
     assert len(loaded.columns) == 1
-    assert loaded.columns["1"].links == ["001"]
+    assert loaded.columns["1"].links == ["1"]
 
 
 def test_save_updates_existing_board(repo_with_ganban):
@@ -52,10 +52,10 @@ def test_save_updates_existing_board(repo_with_ganban):
     # Add a new card
     new_sections = ListNode()
     new_sections["New card"] = "New description."
-    board.cards["002"] = Node(sections=new_sections, meta={}, file_path=".all/002.md")
+    board.cards["2"] = Node(sections=new_sections, meta={})
 
     # Add a new column with the card
-    col = _make_column("2", "Done", links=["002"])
+    col = _make_column("2", "Done", links=["2"])
     board.columns["2"] = col
 
     new_commit = save_board(board, message="Add card and column")
@@ -113,7 +113,7 @@ def test_save_preserves_card_metadata(empty_repo):
     save_board(board)
 
     loaded = load_board(str(empty_repo))
-    card_meta = loaded.cards["001"].meta
+    card_meta = loaded.cards["1"].meta
     assert card_meta.tags == ["urgent", "bug"]
     assert card_meta.priority == 1
 
@@ -134,23 +134,23 @@ def test_save_move_card_between_columns(repo_with_ganban):
 
     loaded = load_board(str(repo_with_ganban))
     assert loaded.columns["1"].links == []
-    assert loaded.columns["2"].links == ["001"]
+    assert loaded.columns["2"].links == ["1"]
 
 
 def test_save_delete_card(repo_with_ganban):
     """Deleting a card removes it from .all/"""
     board = load_board(str(repo_with_ganban))
-    assert board.cards["001"] is not None
+    assert board.cards["1"] is not None
 
     # Remove card and its link
-    board.cards["001"] = None
+    board.cards["1"] = None
     backlog = board.columns["1"]
     backlog.links = []
 
     save_board(board, message="Delete card")
 
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.cards["001"] is None
+    assert loaded.cards["1"] is None
 
 
 def test_save_reorder_cards_in_column(empty_repo):
@@ -170,12 +170,12 @@ def test_save_reorder_cards_in_column(empty_repo):
     # Reorder: move third to first position
     loaded = load_board(str(empty_repo))
     backlog = loaded.columns["1"]
-    backlog.links = ["003", "001", "002"]
+    backlog.links = ["3", "1", "2"]
 
     save_board(loaded, message="Reorder cards")
 
     reloaded = load_board(str(empty_repo))
-    assert reloaded.columns["1"].links == ["003", "001", "002"]
+    assert reloaded.columns["1"].links == ["3", "1", "2"]
 
 
 def test_save_empty_column(empty_repo):
@@ -228,7 +228,7 @@ def test_save_custom_branch(empty_repo):
         load_board(str(empty_repo))
 
     loaded = load_board(str(empty_repo), branch="my-board")
-    assert loaded.cards["001"] is not None
+    assert loaded.cards["1"] is not None
 
 
 def test_save_custom_message(empty_repo):
@@ -273,12 +273,12 @@ def test_save_with_explicit_parents(repo_with_ganban):
     first_commit = board.commit
 
     # Make a change and save
-    board.cards["001"].sections["First card"] = "Changed"
+    board.cards["1"].sections["First card"] = "Changed"
     second_commit = save_board(board)
 
     # Now create a "merge" commit with both as parents
     board = load_board(str(repo_with_ganban))
-    board.cards["001"].sections["First card"] = "Merged"
+    board.cards["1"].sections["First card"] = "Merged"
     merge_commit = save_board(board, message="Merge", parents=[first_commit, second_commit])
 
     repo = Repo(repo_with_ganban)
@@ -374,7 +374,7 @@ def test_auto_merge_clean(repo_with_ganban):
     external_commit = repo.index.commit("Add external card").hexsha
 
     # Our change: edit card 001
-    board.cards["001"].sections["First card"] = "Modified description."
+    board.cards["1"].sections["First card"] = "Modified description."
 
     merge_info = check_for_merge(board)
     assert merge_info is not None
@@ -389,8 +389,8 @@ def test_auto_merge_clean(repo_with_ganban):
     assert external_commit in parent_shas
 
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.cards["001"].sections["First card"] == "Modified description."
-    assert loaded.cards["002"] is not None
+    assert loaded.cards["1"].sections["First card"] == "Modified description."
+    assert loaded.cards["2"] is not None
 
 
 def test_auto_merge_conflict_theirs_wins(repo_with_ganban):
@@ -406,7 +406,7 @@ def test_auto_merge_conflict_theirs_wins(repo_with_ganban):
     repo.index.commit("External edit")
 
     # Our change: also edit card 001
-    board.cards["001"].sections["First card"] = "Our edit."
+    board.cards["1"].sections["First card"] = "Our edit."
 
     merge_info = check_for_merge(board)
     assert merge_info is not None
@@ -417,7 +417,7 @@ def test_auto_merge_conflict_theirs_wins(repo_with_ganban):
     # Theirs is newer, so their content wins
     repo.git.checkout("ganban")
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.cards["001"].sections["First card"] == "External edit."
+    assert loaded.cards["1"].sections["First card"] == "External edit."
 
     # Merge commit has both parents
     commit = repo.commit(result)
@@ -438,7 +438,7 @@ def test_auto_merge_conflict_ours_wins(repo_with_ganban):
     repo.git.commit("-m", "External edit", date="2000-01-01T00:00:00")
 
     # Our change: also edit card 001
-    board.cards["001"].sections["First card"] = "Our edit."
+    board.cards["1"].sections["First card"] = "Our edit."
 
     # Save our board so it gets a fresh (newer) commit
     save_board(board)
@@ -451,7 +451,7 @@ def test_auto_merge_conflict_ours_wins(repo_with_ganban):
 
     # Ours is newer, so our content wins
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.cards["001"].sections["First card"] == "Our edit."
+    assert loaded.cards["1"].sections["First card"] == "Our edit."
 
     commit = repo.commit(result)
     assert len(commit.parents) == 2
@@ -471,7 +471,7 @@ def test_auto_merge_conflict_preserves_clean_changes(repo_with_ganban):
     repo.index.commit("External edits")
 
     # Our change: only edit card 001 (conflicts) — card 002 untouched by us
-    board.cards["001"].sections["First card"] = "Our edit."
+    board.cards["1"].sections["First card"] = "Our edit."
 
     merge_info = check_for_merge(board)
     result = try_auto_merge(board, merge_info)
@@ -479,7 +479,7 @@ def test_auto_merge_conflict_preserves_clean_changes(repo_with_ganban):
 
     loaded = load_board(str(repo_with_ganban))
     # Card 002 should have their non-conflicting edit preserved
-    assert loaded.cards["002"].sections["Second card"] == "Their non-conflicting edit."
+    assert loaded.cards["2"].sections["Second card"] == "Their non-conflicting edit."
 
 
 # --- Remote merge tests ---
@@ -600,7 +600,7 @@ def test_check_remote_we_are_ahead(repo_with_remote):
     local_path, _ = repo_with_remote
     board = load_board(str(local_path))
 
-    board.cards["001"].sections["First card"] = "Local change."
+    board.cards["1"].sections["First card"] = "Local change."
     save_board(board)
 
     board = load_board(str(local_path))
@@ -612,7 +612,7 @@ def test_remote_auto_merge(repo_with_remote):
     local_path, remote_path = repo_with_remote
     board = load_board(str(local_path))
 
-    board.cards["001"].sections["First card"] = "Local edit."
+    board.cards["1"].sections["First card"] = "Local edit."
 
     with tempfile.TemporaryDirectory() as other_path:
         other_repo = Repo.clone_from(str(remote_path), other_path)
@@ -634,8 +634,8 @@ def test_remote_auto_merge(repo_with_remote):
     assert new_commit is not None
 
     loaded = load_board(str(local_path))
-    assert loaded.cards["001"].sections["First card"] == "Local edit."
-    assert loaded.cards["002"] is not None
+    assert loaded.cards["1"].sections["First card"] == "Local edit."
+    assert loaded.cards["2"] is not None
 
 
 # --- create_card tests ---
@@ -649,13 +649,13 @@ def test_create_card_basic(repo_with_ganban):
     card_id, card = create_card(board, "New card", "Description here")
 
     assert card is not None
-    assert card_id == "002"  # next_id after "001" is "002"
+    assert card_id == "2"  # next_id after "1" is "2"
     assert "New card" in card.sections.keys()
     assert len(board.cards) == original_count + 1
 
     # Should be added to first column's links
     backlog = board.columns["1"]
-    assert backlog.links[-1] == "002"
+    assert backlog.links[-1] == "2"
 
 
 def test_create_card_empty_board(empty_repo):
@@ -668,9 +668,9 @@ def test_create_card_empty_board(empty_repo):
     card_id, card = create_card(board, "First card")
 
     assert card is not None
-    assert card_id == "001"
-    assert board.cards["001"] is not None
-    assert board.columns["1"].links == ["001"]
+    assert card_id == "1"
+    assert board.cards["1"] is not None
+    assert board.columns["1"].links == ["1"]
 
 
 def test_create_card_saves(repo_with_ganban):

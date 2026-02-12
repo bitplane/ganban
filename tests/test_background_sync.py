@@ -120,7 +120,7 @@ async def test_sync_remote_merge(synced_repos):
         other_board = load_board(other_path)
         sections = ListNode()
         sections["Remote card"] = "Added remotely."
-        other_board.cards["r01"] = Node(sections=sections, meta={}, file_path=".all/r01.md")
+        other_board.cards["r01"] = Node(sections=sections, meta={})
         col = list(other_board.columns)[0]
         col.links = list(col.links) + ["r01"]
         save_board(other_board, message="Add remote card")
@@ -148,13 +148,13 @@ async def test_sync_conflict_resolves(synced_repos):
         other_repo = Repo.clone_from(str(remote_path), other_path)
         other_repo.git.checkout("ganban")
         other_board = load_board(other_path)
-        other_board.cards["001"].sections["First card"] = "Remote edit."
+        other_board.cards["1"].sections["First card"] = "Remote edit."
         save_board(other_board, message="Remote edit")
         other_repo.git.push("origin", "ganban")
 
     # Local edits card 001
     board = load_board(str(local_path))
-    board.cards["001"].sections["First card"] = "Local edit."
+    board.cards["1"].sections["First card"] = "Local edit."
     save_board(board, message="Local edit")
 
     # Reload so commit is fresh
