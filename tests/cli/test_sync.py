@@ -69,7 +69,7 @@ def _clone_and_push_card(remote_path, card_title="Remote card", card_body="Added
             sections[card_title] = card_body
             board.cards[card_id] = Node(sections=sections, meta={})
             col = list(board.columns)[0]
-            col.links = list(col.links) + [card_id]
+            col.links = tuple(list(col.links) + [card_id])
         else:
             create_card(board, card_title, card_body)
         save_board(board, message=f"Add {card_title}")

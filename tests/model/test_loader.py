@@ -9,6 +9,7 @@ import pytest
 from git import Repo
 from git.util import Actor
 
+from ganban.model.card import archive_card, move_card
 from ganban.model.loader import _activate, _get_committers, _load_tree, file_creation_date, load_board
 from ganban.model.node import ListNode, Node
 
@@ -104,14 +105,14 @@ def test_load_board_column_links(sample_board):
     board = load_board(str(sample_board))
 
     backlog = board.columns["1"]
-    assert isinstance(backlog.links, list)
-    assert backlog.links == ["1"]
+    assert isinstance(backlog.links, tuple)
+    assert backlog.links == ("1",)
 
     doing = board.columns["2"]
-    assert doing.links == ["2", "3"]
+    assert doing.links == ("2", "3")
 
     done = board.columns["3"]
-    assert done.links == []
+    assert done.links == ()
 
 
 def test_load_board_card_sections(sample_board):
@@ -392,3 +393,42 @@ def test_activate_adds_git_node(sample_board):
     assert isinstance(board.git, Node)
     assert isinstance(board.git.committers, list)
     assert isinstance(board.git.config, Node)
+
+
+def test_links_are_tuples(sample_board):
+    """Column links are tuples after loading."""
+    board = load_board(str(sample_board))
+    for col in board.columns:
+        assert isinstance(col.links, tuple)
+
+
+def test_card_not_archived_when_in_column(sample_board):
+    """Cards linked from a column are not archived."""
+    board = load_board(str(sample_board))
+    assert board.cards["1"].archived is False
+    assert board.cards["2"].archived is False
+    assert board.cards["3"].archived is False
+
+
+def test_card_archived_when_not_in_column(sample_board):
+    """Cards in .all but not in any column are archived."""
+    board = load_board(str(sample_board))
+    archive_card(board, "1")
+    assert board.cards["1"].archived is True
+
+
+def test_card_becomes_archived_on_remove(sample_board):
+    """Removing a card from its column marks it archived."""
+    board = load_board(str(sample_board))
+    assert board.cards["1"].archived is False
+    archive_card(board, "1")
+    assert board.cards["1"].archived is True
+
+
+def test_card_unarchived_on_add(sample_board):
+    """Adding a card to a column marks it not archived."""
+    board = load_board(str(sample_board))
+    archive_card(board, "1")
+    assert board.cards["1"].archived is True
+    move_card(board, "1", board.columns["2"])
+    assert board.cards["1"].archived is False

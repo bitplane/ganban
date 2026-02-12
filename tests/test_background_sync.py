@@ -122,7 +122,7 @@ async def test_sync_remote_merge(synced_repos):
         sections["Remote card"] = "Added remotely."
         other_board.cards["r01"] = Node(sections=sections, meta={})
         col = list(other_board.columns)[0]
-        col.links = list(col.links) + ["r01"]
+        col.links = tuple(list(col.links) + ["r01"])
         save_board(other_board, message="Add remote card")
         other_repo.git.push("origin", "ganban")
 

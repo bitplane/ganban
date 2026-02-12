@@ -43,7 +43,7 @@ def _make_column(order, name, links=None, hidden=False, sections=None, meta=None
         order=order,
         dir_path=build_column_path(order, name, hidden),
         hidden=hidden,
-        links=links or [],
+        links=tuple(links) if links else (),
         sections=sections,
         meta=meta or {},
     )

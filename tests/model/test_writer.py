@@ -41,7 +41,7 @@ def test_save_new_board(empty_repo):
     assert loaded.cards["1"] is not None
     assert loaded.cards["1"].sections["Test card"] == "Body text."
     assert len(loaded.columns) == 1
-    assert loaded.columns["1"].links == ["1"]
+    assert loaded.columns["1"].links == ("1",)
 
 
 def test_save_updates_existing_board(repo_with_ganban):
@@ -125,7 +125,7 @@ def test_save_move_card_between_columns(repo_with_ganban):
     # Move card from backlog to a new done column
     backlog = board.columns["1"]
     card_id = backlog.links[0]
-    backlog.links = []
+    backlog.links = ()
 
     col = _make_column("2", "Done", links=[card_id])
     board.columns["2"] = col
@@ -133,8 +133,8 @@ def test_save_move_card_between_columns(repo_with_ganban):
     save_board(board, message="Move card to done")
 
     loaded = load_board(str(repo_with_ganban))
-    assert loaded.columns["1"].links == []
-    assert loaded.columns["2"].links == ["1"]
+    assert loaded.columns["1"].links == ()
+    assert loaded.columns["2"].links == ("1",)
 
 
 def test_save_delete_card(repo_with_ganban):
@@ -145,7 +145,7 @@ def test_save_delete_card(repo_with_ganban):
     # Remove card and its link
     board.cards["1"] = None
     backlog = board.columns["1"]
-    backlog.links = []
+    backlog.links = ()
 
     save_board(board, message="Delete card")
 
@@ -170,12 +170,12 @@ def test_save_reorder_cards_in_column(empty_repo):
     # Reorder: move third to first position
     loaded = load_board(str(empty_repo))
     backlog = loaded.columns["1"]
-    backlog.links = ["3", "1", "2"]
+    backlog.links = ("3", "1", "2")
 
     save_board(loaded, message="Reorder cards")
 
     reloaded = load_board(str(empty_repo))
-    assert reloaded.columns["1"].links == ["3", "1", "2"]
+    assert reloaded.columns["1"].links == ("3", "1", "2")
 
 
 def test_save_empty_column(empty_repo):
@@ -194,7 +194,7 @@ def test_save_empty_column(empty_repo):
     loaded = load_board(str(empty_repo))
     assert len(loaded.columns) == 2
     for col in loaded.columns:
-        assert col.links == []
+        assert col.links == ()
 
 
 def test_save_returns_valid_commit(empty_repo):
@@ -670,7 +670,7 @@ def test_create_card_empty_board(empty_repo):
     assert card is not None
     assert card_id == "1"
     assert board.cards["1"] is not None
-    assert board.columns["1"].links == ["1"]
+    assert board.columns["1"].links == ("1",)
 
 
 def test_create_card_saves(repo_with_ganban):

@@ -43,7 +43,7 @@ def create_column(
         hidden=hidden,
         sections=sections,
         meta={},
-        links=[],
+        links=(),
     )
     board.columns[order] = col
 

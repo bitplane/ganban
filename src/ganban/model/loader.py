@@ -219,7 +219,7 @@ def _load_tree(tree: Tree) -> Node:
             link_entries.append((position, card_id))
 
         link_entries.sort(key=cmp_to_key(lambda a, b: compare_ids(a[0], b[0])))
-        links = [card_id for _, card_id in link_entries]
+        links = tuple(card_id for _, card_id in link_entries)
 
         col = Node(
             order=order,
@@ -235,10 +235,41 @@ def _load_tree(tree: Tree) -> Node:
     return board
 
 
+def _on_board_card_ids(board: Node) -> set[str]:
+    """Return the set of card IDs that appear in any column's links."""
+    on_board: set[str] = set()
+    for col in board.columns:
+        on_board.update(col.links)
+    return on_board
+
+
+def _setup_archived(board: Node) -> None:
+    """Set card.archived for each card and watch columns to keep it in sync."""
+    on_board = _on_board_card_ids(board)
+    for card_id, card in board.cards.items():
+        card.archived = card_id not in on_board
+
+    def on_links_changed(source_node, key, old, new):
+        old_set = set(old) if old else set()
+        new_set = set(new) if new else set()
+        for card_id in old_set - new_set:
+            card = board.cards[card_id]
+            if card is not None:
+                card.archived = card_id not in _on_board_card_ids(board)
+        for card_id in new_set - old_set:
+            card = board.cards[card_id]
+            if card is not None:
+                card.archived = False
+
+    for col in board.columns:
+        col.watch("links", on_links_changed)
+
+
 def _activate(board: Node, repo: Repo) -> None:
     """Attach computed/derived properties to a loaded board."""
     config = read_ganban_config(board.repo_path)
     board.git = Node(committers=_get_committers(repo), config=Node(**config))
+    _setup_archived(board)
 
 
 def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:

@@ -39,7 +39,7 @@ def create_card(
             links.insert(position, card_id)
         else:
             links.append(card_id)
-        target_column.links = links
+        target_column.links = tuple(links)
 
     return card_id, card
 
@@ -70,18 +70,18 @@ def move_card(
         links.remove(card_id)
         insert_pos = min(position, len(links)) if position is not None else len(links)
         links.insert(insert_pos, card_id)
-        source_column.links = links
+        source_column.links = tuple(links)
         return
 
     if source_column is not None:
         links = list(source_column.links)
         links.remove(card_id)
-        source_column.links = links
+        source_column.links = tuple(links)
 
     links = list(target_column.links)
     insert_pos = min(position, len(links)) if position is not None else len(links)
     links.insert(insert_pos, card_id)
-    target_column.links = links
+    target_column.links = tuple(links)
 
 
 def archive_card(board: Node, card_id: str) -> None:
@@ -90,4 +90,4 @@ def archive_card(board: Node, card_id: str) -> None:
     if col is not None:
         links = list(col.links)
         links.remove(card_id)
-        col.links = links
+        col.links = tuple(links)
