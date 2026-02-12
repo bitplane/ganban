@@ -50,6 +50,7 @@ class GanbanApp(App):
         "confirm.tcss",
         "assignee.tcss",
         "deps.tcss",
+        "labels.tcss",
         "color.tcss",
         "sync_widget.tcss",
         "cal.tcss",
