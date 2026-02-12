@@ -1,0 +1,54 @@
+/* DepsWidget */
+DepsWidget {
+    width: auto;
+    height: 1;
+}
+#deps-bar {
+    width: auto;
+    height: 1;
+}
+#deps-bar:hover {
+    background: $primary-darken-2;
+}
+DepsWidget #deps-add {
+    width: 2;
+    height: 1;
+}
+#deps-ids {
+    width: auto;
+    height: 1;
+}
+.dep-id {
+    width: auto;
+    height: 1;
+    padding: 0 1 0 0;
+}
+
+/* SearchInput hidden by default, shown in edit mode */
+DepsWidget #deps-search {
+    display: none;
+    width: 40;
+}
+DepsWidget.-editing #deps-search {
+    display: block;
+}
+DepsWidget.-editing #deps-ids {
+    display: none;
+}
+
+/* Compact input styling for deps search */
+DepsWidget #deps-search Input {
+    height: 1;
+    border: none;
+    padding: 0;
+}
+
+/* Dropdown: no border, no wrap, shifted left to align under icon */
+DepsWidget #deps-search OptionList {
+    border: none;
+    offset-x: -3;
+    width: 43;
+}
+DepsWidget #deps-search OptionList > .option-list--option {
+    text-wrap: nowrap;
+}

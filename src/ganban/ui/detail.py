@@ -11,6 +11,7 @@ from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_USERS, ICON_SETTINGS
+from ganban.ui.deps import DepsWidget
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
@@ -115,6 +116,7 @@ class CardDetailModal(DetailModal):
                 yield DueDateWidget(self.card.meta)
                 if self.board:
                     yield AssigneeWidget(self.card.meta, self.board)
+                    yield DepsWidget(self.card.meta, self.board, self.card_id)
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.card.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
