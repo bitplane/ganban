@@ -6,7 +6,7 @@ from typing import Any
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Static
 
@@ -15,22 +15,23 @@ from ganban.model.node import Node
 from ganban.ui.constants import ICON_COLOR_SWATCH
 from ganban.ui.palette import color_for_label, get_label_color
 from ganban.ui.color import ColorButton
-from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.viewers import TextViewer
+from ganban.ui.tag import Tag
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-def _swatch_text(color: str) -> Text:
-    """Build a colored block swatch."""
+def _label_display(name: str, board: Node) -> Text:
+    """Build a colored block + name Text for a label."""
+    color = get_label_color(name, board)
     result = Text()
     result.append(ICON_COLOR_SWATCH, style=color)
+    result.append_text(Text(name))
     return result
 
 
-class SavedLabelRow(Vertical):
-    """A saved label row (from board.meta.labels) with colour picker.
+class SavedLabelRow(Horizontal):
+    """A saved label (from board.meta.labels) shown as a tag with count.
 
     Delete removes the override only - label stays on cards with computed color.
     """
@@ -61,45 +62,37 @@ class SavedLabelRow(Vertical):
 
     def compose(self) -> ComposeResult:
         color = get_label_color(self.label_name, self.board)
-        # Count cards with this label
         label_node = getattr(self.board.labels, self.label_name) if self.board.labels else None
         cards = label_node.cards if label_node else []
         count = len(cards) if isinstance(cards, list) else 0
-        with Horizontal(classes="label-title-bar"):
-            yield ColorButton(color=color, classes="label-color")
-            yield Static(classes="label-swatch")
-            yield EditableText(
-                self.label_name,
-                TextViewer(self.label_name),
-                TextEditor(),
-                classes="label-name",
-            )
-            yield Static(f"({count})", classes="label-count")
-            yield ConfirmButton(classes="label-delete")
+        yield ColorButton(color=color, classes="label-color")
+        yield Tag(value=self.label_name, display=_label_display(self.label_name, self.board))
+        yield Static(f"({count})", classes="label-count")
 
-    def on_mount(self) -> None:
-        color = get_label_color(self.label_name, self.board)
-        self.query_one(".label-swatch", Static).update(_swatch_text(color))
+    def on_click(self, event) -> None:
+        if event.widget.has_class("tag-label"):
+            tag = self.query_one(Tag)
+            if not tag.has_class("-editing"):
+                tag.start_editing([])
 
     def on_color_button_color_selected(self, event: ColorButton.ColorSelected) -> None:
         event.stop()
         self.post_message(self.ColorChanged(self.label_name, event.color))
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+    def on_tag_changed(self, event: Tag.Changed) -> None:
         event.stop()
-        sender = event.control
-        if "label-name" in sender.classes:
-            old = self.label_name
-            self.label_name = event.new_value
-            self.post_message(self.NameRenamed(old, event.new_value))
+        old = event.old_value
+        self.label_name = event.new_value
+        event.tag.update_display(_label_display(event.new_value, self.board))
+        self.post_message(self.NameRenamed(old, event.new_value))
 
-    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
         event.stop()
         self.post_message(self.DeleteRequested(self.label_name))
 
 
-class UsedLabelRow(Vertical):
-    """A used label row (on cards, no override) with read-only color swatch.
+class UsedLabelRow(Horizontal):
+    """A used label (on cards, no override) shown as a tag with count and save.
 
     Delete removes from all cards. Save creates an override.
     """
@@ -130,37 +123,31 @@ class UsedLabelRow(Vertical):
         self.board = board
 
     def compose(self) -> ComposeResult:
-        color = get_label_color(self.label_name, self.board)
         label_node = getattr(self.board.labels, self.label_name) if self.board.labels else None
         cards = label_node.cards if label_node else []
         count = len(cards) if isinstance(cards, list) else 0
-        with Horizontal(classes="label-title-bar"):
-            yield Static(_swatch_text(color), classes="label-swatch-static")
-            yield EditableText(
-                self.label_name,
-                TextViewer(self.label_name),
-                TextEditor(),
-                classes="label-name",
-            )
-            yield Static(f"({count})", classes="label-count")
-            yield Static("💾", classes="label-save")
-            yield ConfirmButton(classes="label-delete")
+        yield Tag(value=self.label_name, display=_label_display(self.label_name, self.board))
+        yield Static(f"({count})", classes="label-count")
+        yield Static("💾", classes="label-save")
 
     def on_click(self, event) -> None:
         target = event.widget
         if target.has_class("label-save"):
             event.stop()
             self.post_message(self.SaveRequested(self.label_name))
+        elif target.has_class("tag-label"):
+            tag = self.query_one(Tag)
+            if not tag.has_class("-editing"):
+                tag.start_editing([])
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
+    def on_tag_changed(self, event: Tag.Changed) -> None:
         event.stop()
-        sender = event.control
-        if "label-name" in sender.classes:
-            old = self.label_name
-            self.label_name = event.new_value
-            self.post_message(self.NameRenamed(old, event.new_value))
+        old = event.old_value
+        self.label_name = event.new_value
+        event.tag.update_display(_label_display(event.new_value, self.board))
+        self.post_message(self.NameRenamed(old, event.new_value))
 
-    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
         event.stop()
         self.post_message(self.DeleteRequested(self.label_name))
 
@@ -223,6 +210,8 @@ class LabelsEditor(NodeWatcherMixin, Container):
                 for name in meta_labels.keys():
                     yield SavedLabelRow(name, self.board)
 
+        yield AddLabelRow()
+
         # Used labels (on cards but not in meta)
         used_names = []
         if self.board.labels:
@@ -233,8 +222,6 @@ class LabelsEditor(NodeWatcherMixin, Container):
             yield Static("Used Labels", classes="section-header")
             for name in used_names:
                 yield UsedLabelRow(name, self.board)
-
-        yield AddLabelRow()
 
     def on_mount(self) -> None:
         if self.meta:
@@ -256,10 +243,10 @@ class LabelsEditor(NodeWatcherMixin, Container):
                 setattr(meta_labels, event.name, {"color": event.color})
             else:
                 entry.color = event.color
-        # Update swatch immediately
+        # Update tag display with new color
         for row in self.query(SavedLabelRow):
             if row.label_name == event.name:
-                row.query_one(".label-swatch", Static).update(_swatch_text(event.color))
+                row.query_one(Tag).update_display(_label_display(event.name, self.board))
                 break
 
     def on_saved_label_row_name_renamed(self, event: SavedLabelRow.NameRenamed) -> None:
