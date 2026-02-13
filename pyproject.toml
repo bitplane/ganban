@@ -1,7 +1,7 @@
 [project]
 name = "ganban"
 description = "Git-based kanban board TUI"
-version = "0.4.2"
+version = "0.5.0"
 authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
 ]
