@@ -11,7 +11,7 @@ users:
     emoji: "\U0001F916"
 labels:
   ui:
-    color: '#bb5500'
+    color: '#008000'
 ---
 
 # ganban - decentralized kanban
