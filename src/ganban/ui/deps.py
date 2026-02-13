@@ -118,7 +118,6 @@ class DepsWidget(NodeWatcherMixin, Container):
         elif idx is not None and idx < len(deps):
             deps[idx] = new_id
 
-        tag.value = new_id
         tag.update_display(str(new_id))
         with self.suppressing():
             self.meta.deps = deps or None

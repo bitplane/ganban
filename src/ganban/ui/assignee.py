@@ -6,7 +6,6 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.message import Message
 from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
@@ -70,11 +69,6 @@ class AssigneeWidget(NodeWatcherMixin, Container):
     and watches the node so external changes are reflected immediately.
     Uses a single optional Tag widget for the assigned user.
     """
-
-    class AssigneeSelected(Message):
-        def __init__(self, assigned: str | None) -> None:
-            super().__init__()
-            self.assigned = assigned
 
     def __init__(self, meta: Node, board: Node, **kwargs) -> None:
         self._init_watcher()
@@ -155,9 +149,7 @@ class AssigneeWidget(NodeWatcherMixin, Container):
             self.meta.assigned = new_value
         emoji, name, _ = resolve_assignee(new_value, self.board)
         self.query_one("#assignee-picker", Static).update(emoji)
-        tag.value = new_value
         tag.update_display(name)
-        self._update_picker_emoji("")
 
     def on_tag_deleted(self, event: Tag.Deleted) -> None:
         event.stop()

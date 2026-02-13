@@ -12,6 +12,7 @@ from textual.widgets import Static
 
 from ganban.model.card import delete_label, rename_label
 from ganban.model.node import Node
+from ganban.ui.constants import ICON_COLOR_SWATCH
 from ganban.ui.palette import color_for_label, get_label_color
 from ganban.ui.color import ColorButton
 from ganban.ui.confirm import ConfirmButton
@@ -24,7 +25,7 @@ from ganban.ui.watcher import NodeWatcherMixin
 def _swatch_text(color: str) -> Text:
     """Build a colored block swatch."""
     result = Text()
-    result.append("\u2588\u2588", style=color)
+    result.append(ICON_COLOR_SWATCH, style=color)
     return result
 
 

@@ -80,7 +80,9 @@ class SearchInput(Container):
 
     def _close_dropdown(self) -> None:
         """Hide the dropdown overlay."""
-        self.query_one(OptionList).remove_class("-visible")
+        options = self.query("OptionList")
+        if options:
+            options.first().remove_class("-visible")
         self._dropdown_open = False
 
     def _submit_highlighted(self) -> bool:

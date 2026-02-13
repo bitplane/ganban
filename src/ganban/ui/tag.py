@@ -5,6 +5,7 @@ from __future__ import annotations
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal
+from textual.css.query import NoMatches
 from textual.events import DescendantBlur
 from textual.message import Message
 from textual.widgets import Input, Static
@@ -74,7 +75,7 @@ class Tag(Static):
         """
         try:
             search = self.query_one(".tag-search", SearchInput)
-        except Exception:
+        except NoMatches:
             self._pending_edit_options = options
             return
         self.add_class("-editing")
@@ -87,6 +88,9 @@ class Tag(Static):
         search = self.query_one(".tag-search", SearchInput)
         search._close_dropdown()
         self.remove_class("-editing")
+        if not self.value:
+            self.post_message(self.Deleted(self))
+            return
         self.screen.focus()
 
     def on_click(self, event) -> None:
@@ -94,10 +98,6 @@ class Tag(Static):
         if target.has_class("tag-delete"):
             event.stop()
             self.post_message(self.Deleted(self))
-            return
-        if target.has_class("tag-label") and not self.has_class("-editing"):
-            event.stop()
-            # parent handles starting edit (it knows the options)
 
     def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
         event.stop()

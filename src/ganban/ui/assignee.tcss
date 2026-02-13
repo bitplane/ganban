@@ -7,10 +7,10 @@ AssigneeWidget {
     width: auto;
     height: 1;
 }
-#assignee-bar:hover {
-    background: $primary-darken-2;
-}
 AssigneeWidget #assignee-picker {
     width: 2;
     height: 1;
+}
+AssigneeWidget #assignee-picker:hover {
+    background: $primary-darken-2;
 }

@@ -12,9 +12,15 @@ Tag {
     width: auto;
     height: 1;
 }
+.tag-label:hover {
+    background: $primary-darken-2;
+}
 .tag-delete {
     width: auto;
     height: 1;
+}
+.tag-delete:hover {
+    background: $error-darken-2;
 }
 
 /* SearchInput hidden by default, shown in edit mode */

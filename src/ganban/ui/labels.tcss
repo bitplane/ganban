@@ -7,14 +7,18 @@ LabelsWidget {
     width: auto;
     height: 1;
 }
-#labels-bar:hover {
-    background: $primary-darken-2;
-}
 LabelsWidget #labels-add {
     width: 2;
     height: 1;
 }
+LabelsWidget #labels-add:hover {
+    background: $primary-darken-2;
+}
 #labels-tags {
     width: auto;
     height: 1;
+}
+/* Keep tag-label visible during editing to show color swatch */
+LabelsWidget Tag.-editing .tag-label {
+    display: block;
 }

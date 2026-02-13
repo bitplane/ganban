@@ -10,6 +10,7 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
+from ganban.ui.constants import ICON_COLOR_SWATCH
 from ganban.ui.palette import get_label_color
 from ganban.ui.tag import Tag
 from ganban.ui.watcher import NodeWatcherMixin
@@ -21,8 +22,8 @@ def _label_display(name: str, board: Node) -> Text:
     """Build a colored block + name Text for a label."""
     color = get_label_color(name, board)
     result = Text()
-    result.append("\u2588\u2588", style=color)
-    result.append_text(Text(f" {name}"))
+    result.append(ICON_COLOR_SWATCH, style=color)
+    result.append_text(Text(name))
     return result
 
 
@@ -87,25 +88,12 @@ class LabelsWidget(NodeWatcherMixin, Container):
                 return labels[:idx] + labels[idx + 1 :]
         return labels
 
-    def _update_indicator(self, text: str) -> None:
-        """Update the icon to show the label colour as user types."""
-        picker = self.query_one("#labels-add", Static)
-        name = text.strip().lower()
-        if name:
-            color = get_label_color(name, self.board)
-            indicator = Text()
-            indicator.append("\u2588\u2588", style=color)
-            picker.update(indicator)
-        else:
-            picker.update(ICON_LABEL)
-
     def on_click(self, event) -> None:
         event.stop()
         target = event.widget
         if target.id == "labels-add":
             self._add_new_tag()
         elif target.has_class("tag-label"):
-            # clicked on a tag's label — start editing it
             tag = target.parent.parent  # tag-label → tag-row → Tag
             if isinstance(tag, Tag) and not tag.has_class("-editing"):
                 options = build_label_options(self.board, self._current_labels_except(tag))
@@ -132,9 +120,7 @@ class LabelsWidget(NodeWatcherMixin, Container):
         elif idx is not None and idx < len(labels):
             labels[idx] = event.new_value
 
-        tag.value = event.new_value
         tag.update_display(_label_display(event.new_value, self.board))
-        self._update_indicator("")
         with self.suppressing():
             self.meta.labels = labels or None
 
@@ -147,21 +133,36 @@ class LabelsWidget(NodeWatcherMixin, Container):
 
         if tag.has_class("-new"):
             tag.remove()
-            self._update_indicator("")
             return
 
         if idx is not None and idx < len(labels):
             del labels[idx]
         tag.remove()
-        self._update_indicator("")
         with self.suppressing():
             self.meta.labels = labels or None
 
+    def _swatch_for(self, text: str) -> Text:
+        """Build a swatch-only Text for the given label name."""
+        name = text.strip().lower()
+        if name:
+            color = get_label_color(name, self.board)
+            result = Text()
+            result.append(ICON_COLOR_SWATCH, style=color)
+            return result
+        return Text()
+
+    def _update_editing_swatch(self, text: str) -> None:
+        """Update the tag-label on whichever tag is currently editing."""
+        for tag in self.query_one("#labels-tags", Horizontal).query(Tag):
+            if tag.has_class("-editing"):
+                tag.query_one(".tag-label", Static).update(self._swatch_for(text))
+                return
+
     def on_input_changed(self, event: Input.Changed) -> None:
         event.stop()
-        self._update_indicator(event.value)
+        self._update_editing_swatch(event.value)
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         event.stop()
         if event.option and event.option.id:
-            self._update_indicator(event.option.id)
+            self._update_editing_swatch(event.option.id)
