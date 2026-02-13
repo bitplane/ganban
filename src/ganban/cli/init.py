@@ -6,7 +6,8 @@ from ganban.cli._common import output_json, save
 from ganban.git import init_repo, is_git_repo
 from ganban.model.column import create_column
 from ganban.model.loader import load_board
-from ganban.model.node import BRANCH_NAME, ListNode, Node
+from ganban.constants import BRANCH_NAME
+from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 
 

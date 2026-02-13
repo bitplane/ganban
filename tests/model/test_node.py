@@ -50,23 +50,6 @@ def test_node_auto_wrap_sets_parent():
     assert node.meta._key == "meta"
 
 
-def test_node_version_increments():
-    node = Node()
-    assert node._version == 0
-    node.name = "Backlog"
-    assert node._version == 1
-    node.name = "Done"
-    assert node._version == 2
-
-
-def test_node_version_no_change():
-    node = Node()
-    node.name = "Backlog"
-    v = node._version
-    node.name = "Backlog"  # equal value, different object
-    assert node._version == v
-
-
 def test_node_keys():
     node = Node(a="1", b="2")
     assert set(node.keys()) == {"a", "b"}
@@ -290,14 +273,6 @@ def test_list_node_no_event_on_equal_value():
     assert len(events) == 0
 
 
-def test_list_node_no_version_bump_on_equal_value():
-    lst = ListNode()
-    lst["a"] = "hello"
-    v = lst._version
-    lst["a"] = "hello"
-    assert lst._version == v
-
-
 def test_list_node_auto_wrap():
     lst = ListNode()
     lst["1"] = {"name": "Backlog"}
@@ -331,15 +306,6 @@ def test_list_node_watch_delete():
     assert len(events) == 1
     assert events[0][0].name == "Backlog"  # old node
     assert events[0][1] is None  # new
-
-
-def test_list_node_version():
-    lst = ListNode()
-    assert lst._version == 0
-    lst["1"] = {"name": "Backlog"}
-    assert lst._version == 1
-    lst["1"] = None
-    assert lst._version == 2
 
 
 def test_list_node_path():

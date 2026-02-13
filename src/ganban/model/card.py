@@ -27,11 +27,7 @@ def create_card(
     board.cards[card_id] = card
 
     # Add to column
-    target_column = column
-    if target_column is None:
-        for col in board.columns:
-            target_column = col
-            break
+    target_column = column if column is not None else next(iter(board.columns), None)
 
     if target_column is not None:
         links = list(target_column.links)

@@ -9,7 +9,8 @@ from pathlib import Path
 
 from ganban.ids import pad_id
 from ganban.model.column import slugify
-from ganban.model.node import BRANCH_NAME, ListNode, Node
+from ganban.constants import BRANCH_NAME
+from ganban.model.node import ListNode, Node
 from ganban.parser import first_title, serialize_sections
 
 
@@ -31,7 +32,7 @@ def _sections_to_text(sections: ListNode, meta) -> str:
     return serialize_sections(sections.items(), meta_dict or None)
 
 
-# --- Git plumbing (copied verbatim from writer.py) ---
+# --- Git plumbing ---
 
 
 def _git(repo_path: Path, args: list[str]) -> str:
@@ -77,14 +78,7 @@ def _mktree(repo_path: Path, entries: list[tuple[str, str, str, str]]) -> str:
 
 def _get_branch_tip(repo_path: Path, branch: str) -> str | None:
     """Get the current commit hash of a branch, or None if it doesn't exist."""
-    result = subprocess.run(
-        ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
-        cwd=repo_path,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout.decode("utf-8").strip()
+    return _get_ref(repo_path, f"refs/heads/{branch}")
 
 
 def _get_ref(repo_path: Path, ref: str) -> str | None:
@@ -298,61 +292,39 @@ def save_board(
     return new_commit
 
 
-def check_for_merge(board: Node, branch: str = BRANCH_NAME) -> MergeRequired | None:
-    """Check if saving would require a merge."""
-    repo_path = Path(board.repo_path)
-    current_tip = _get_branch_tip(repo_path, branch)
-
-    if current_tip is None:
+def _check_divergence(
+    repo_path: Path,
+    our_commit: str,
+    their_commit: str | None,
+    skip_if_ancestor: bool = False,
+) -> MergeRequired | None:
+    """Check if our_commit and their_commit have diverged."""
+    if their_commit is None or their_commit == our_commit:
         return None
-
-    if not board.commit:
-        return None
-
-    if current_tip == board.commit:
-        return None
-
-    merge_base = _get_merge_base(repo_path, board.commit, current_tip)
-
+    merge_base = _get_merge_base(repo_path, our_commit, their_commit)
     if merge_base is None:
         return None
+    if skip_if_ancestor and merge_base == their_commit:
+        return None
+    return MergeRequired(base=merge_base, ours=our_commit, theirs=their_commit)
 
-    return MergeRequired(
-        base=merge_base,
-        ours=board.commit,
-        theirs=current_tip,
-    )
+
+def check_for_merge(board: Node, branch: str = BRANCH_NAME) -> MergeRequired | None:
+    """Check if saving would require a merge."""
+    if not board.commit:
+        return None
+    repo_path = Path(board.repo_path)
+    current_tip = _get_branch_tip(repo_path, branch)
+    return _check_divergence(repo_path, board.commit, current_tip)
 
 
 def check_remote_for_merge(board: Node, remote: str = "origin", branch: str = BRANCH_NAME) -> MergeRequired | None:
     """Check if a remote has changes that need merging."""
-    repo_path = Path(board.repo_path)
-
     if not board.commit:
         return None
-
-    remote_ref = f"refs/remotes/{remote}/{branch}"
-    remote_tip = _get_ref(repo_path, remote_ref)
-
-    if remote_tip is None:
-        return None
-
-    if remote_tip == board.commit:
-        return None
-
-    merge_base = _get_merge_base(repo_path, board.commit, remote_tip)
-
-    if merge_base is None:
-        return None
-
-    if merge_base == remote_tip:
-        return None
-
-    return MergeRequired(
-        base=merge_base,
-        ours=board.commit,
-        theirs=remote_tip,
-    )
+    repo_path = Path(board.repo_path)
+    remote_tip = _get_ref(repo_path, f"refs/remotes/{remote}/{branch}")
+    return _check_divergence(repo_path, board.commit, remote_tip, skip_if_ancestor=True)
 
 
 def try_auto_merge(

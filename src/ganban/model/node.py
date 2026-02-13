@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-BRANCH_NAME = "ganban"
-
 Callback = Callable[["Node | ListNode", str, Any, Any], None]
 
 
@@ -60,7 +58,6 @@ class Node:
         object.__setattr__(self, "_watchers", {})
         object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_key", _key)
-        object.__setattr__(self, "_version", 0)
         for k, v in data.items():
             setattr(self, k, v)
         object.__setattr__(self, "_parent", _parent)
@@ -81,7 +78,6 @@ class Node:
             value = _wrap(value, parent=self, key=name)
             self._children[name] = value
         if old != value:
-            self._version += 1
             _emit(self, name, old, value)
 
     def __contains__(self, key: str) -> bool:
@@ -147,7 +143,6 @@ class Node:
             self._children[k] = val
         if hasattr(value, "_key"):
             object.__setattr__(value, "_key", new_key)
-        self._version += 1
         _emit(self, old_key, value, None)
         _emit(self, new_key, None, value)
 
@@ -176,7 +171,6 @@ class ListNode:
         object.__setattr__(self, "_watchers", {})
         object.__setattr__(self, "_parent", _parent)
         object.__setattr__(self, "_key", _key)
-        object.__setattr__(self, "_version", 0)
 
     def __getitem__(self, key: str) -> Any:
         return self._by_id.get(str(key))
@@ -196,7 +190,6 @@ class ListNode:
                 idx = self._key_index(key)
                 del self._items[idx]
                 del self._by_id[key]
-            self._version += 1
             _emit(self, key, old, None)
         else:
             value = _wrap(value, parent=self, key=key)
@@ -207,7 +200,6 @@ class ListNode:
                 self._items.append(value)
             self._by_id[key] = value
             if old != value:
-                self._version += 1
                 _emit(self, key, old, value)
 
     def __iter__(self):
@@ -272,7 +264,6 @@ class ListNode:
             new_items = [new_by_id[k] for k in new_keys]
             object.__setattr__(self, "_by_id", new_by_id)
             object.__setattr__(self, "_items", new_items)
-            self._version += 1
             _emit(self, "*", old_keys, new_keys)
 
     def add(self, key: str, value: Any) -> str:

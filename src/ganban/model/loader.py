@@ -10,7 +10,8 @@ from git.objects import Blob, Tree
 
 from ganban.git import read_git_config
 from ganban.ids import compare_ids, max_id, next_id, normalize_id
-from ganban.model.node import BRANCH_NAME, ListNode, Node
+from ganban.constants import BRANCH_NAME
+from ganban.model.node import ListNode, Node
 from ganban.parser import parse_sections
 from ganban.palette import color_for_label
 
