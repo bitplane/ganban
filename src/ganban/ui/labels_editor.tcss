@@ -1,0 +1,61 @@
+/* LabelsEditor */
+LabelsEditor {
+    width: 100%;
+    height: 1fr;
+    overflow-y: auto;
+}
+
+/* LabelRow */
+LabelRow {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+    background: $surface;
+}
+LabelRow > .label-title-bar {
+    width: 100%;
+    height: auto;
+    background: $primary;
+    color: $text;
+    padding: 0 1;
+}
+LabelRow .label-color {
+    width: 2;
+    height: 1;
+}
+LabelRow .label-swatch {
+    width: 2;
+    height: 1;
+}
+LabelRow .label-name {
+    width: 1fr;
+    height: auto;
+}
+LabelRow .label-count {
+    width: auto;
+    height: 1;
+    color: $text-muted;
+}
+LabelRow .label-delete {
+    width: 2;
+    height: 1;
+    dock: right;
+}
+
+/* AddLabelRow */
+AddLabelRow {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+    border: dashed $surface-lighten-2;
+}
+AddLabelRow:focus {
+    background: $primary;
+    color: $text;
+}
+AddLabelRow > EditableText > ContentSwitcher > Static {
+    text-align: center;
+    color: $text-muted;
+}

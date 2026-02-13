@@ -3,6 +3,7 @@ Calendar { width: auto; height: auto; background: $background; }
 Calendar .cal-header { width: 100%; height: 1; }
 Calendar .cal-nav { width: 2; }
 Calendar .cal-clear { width: auto; padding: 0 1; }
+Calendar .cal-clear:hover { background: $primary-darken-2; }
 Calendar .cal-title { width: 1fr; text-align: center; }
 Calendar .cal-grid { width: auto; height: auto; }
 Calendar .cal-row { width: auto; height: 1; }

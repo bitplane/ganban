@@ -10,12 +10,13 @@ from textual.widgets import ContentSwitcher, Static
 from ganban.model.node import Node
 from ganban.ui.assignee import AssigneeWidget
 from ganban.ui.color import ColorButton
-from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_USERS, ICON_SETTINGS
+from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_LABELS, ICON_TAB_USERS, ICON_SETTINGS
 from ganban.ui.deps import DepsWidget
 from ganban.ui.labels import LabelsWidget
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
+from ganban.ui.labels_editor import LabelsEditor
 from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.users import UsersEditor
 
@@ -194,9 +195,11 @@ class BoardDetailModal(DetailModal):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_USERS, "tab-users")
+                    yield TabButton(ICON_TAB_LABELS, "tab-labels")
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.board.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
                 )
                 yield MetaEditor(self.board.meta, id="tab-meta")
                 yield UsersEditor(self.board, id="tab-users")
+                yield LabelsEditor(self.board, id="tab-labels")

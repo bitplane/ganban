@@ -94,6 +94,7 @@ class Calendar(Container):
         ("enter", "select", "Select date"),
         ("pageup", "prev_month", "Previous month"),
         ("pagedown", "next_month", "Next month"),
+        ("delete", "clear_date", "Clear date"),
     ]
 
     def __init__(self, selected: date | None = None) -> None:
@@ -232,6 +233,10 @@ class Calendar(Container):
             target = self._viewing.replace(day=min(focused.date.day, max_day))
             self._cursor_date = target
             self.call_after_refresh(self._focus_date, target)
+
+    def action_clear_date(self) -> None:
+        self._selected = None
+        self.post_message(self.DateSelected(None))
 
     def on_nav_button_clicked(self, event: NavButton.Clicked) -> None:
         event.stop()

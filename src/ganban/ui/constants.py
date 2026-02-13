@@ -1,7 +1,7 @@
 """Shared UI icon constants."""
 
 ICON_BACK = "🔙"
-ICON_DELETE = "🚫"
+ICON_DELETE = "メ"
 ICON_CALENDAR = "📅"
 ICON_PALETTE = "🎨"
 ICON_BODY = "📝"
@@ -24,3 +24,4 @@ ICON_SYNC_IDLE = "🟢"
 ICON_SYNC_ACTIVE = "⚡️"
 ICON_SYNC_PAUSED = "🔴"
 ICON_SYNC_CONFLICT = "❌"
+ICON_TAB_LABELS = "🔖"

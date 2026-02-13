@@ -84,6 +84,43 @@ def move_card(
     target_column.links = tuple(links)
 
 
+def rename_label(board: Node, old_name: str, new_name: str) -> None:
+    """Rename a label across all cards and board meta."""
+    old_norm = old_name.strip().lower()
+    new_norm = new_name.strip().lower()
+    if old_norm == new_norm:
+        return
+    for card_id, card in board.cards.items():
+        labels = card.meta.labels if card.meta else None
+        if not isinstance(labels, list):
+            continue
+        changed = False
+        for i, raw in enumerate(labels):
+            if raw.strip().lower() == old_norm:
+                labels[i] = new_norm
+                changed = True
+        if changed:
+            card.meta.labels = labels
+    meta_labels = board.meta.labels
+    if meta_labels and isinstance(meta_labels, Node) and old_norm in meta_labels:
+        meta_labels.rename_key(old_norm, new_norm)
+
+
+def delete_label(board: Node, name: str) -> None:
+    """Delete a label from all cards and board meta."""
+    norm = name.strip().lower()
+    for card_id, card in board.cards.items():
+        labels = card.meta.labels if card.meta else None
+        if not isinstance(labels, list):
+            continue
+        filtered = [raw for raw in labels if raw.strip().lower() != norm]
+        if len(filtered) != len(labels):
+            card.meta.labels = filtered or None
+    meta_labels = board.meta.labels
+    if meta_labels and isinstance(meta_labels, Node) and norm in meta_labels:
+        setattr(meta_labels, norm, None)
+
+
 def archive_card(board: Node, card_id: str) -> None:
     """Archive a card by removing it from its column's links."""
     col = find_card_column(board, card_id)
