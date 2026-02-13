@@ -4,21 +4,22 @@ from datetime import date, timedelta
 
 import pytest
 from textual.app import App, ComposeResult
-from textual.widgets import Rule
 
 from ganban.model.node import ListNode, Node
 from ganban.ui.card import CardWidget
-from ganban.ui.constants import ICON_BODY, ICON_CALENDAR
+from ganban.ui.constants import ICON_BODY, ICON_CALENDAR, ICON_COLOR_SWATCH
 from ganban.ui.static import PlainStatic
 
 
-def _make_board(body="", due=None):
+def _make_board(body="", due=None, labels=None):
     """Create a minimal board with one card."""
     sections = ListNode()
     sections["Test Card"] = body
     meta_dict = {}
     if due is not None:
         meta_dict["due"] = due.isoformat()
+    if labels is not None:
+        meta_dict["labels"] = labels
     card = Node(sections=sections, meta=meta_dict)
 
     cards = ListNode()
@@ -31,7 +32,12 @@ def _make_board(body="", due=None):
     columns = ListNode()
     columns["1"] = col
 
-    return Node(cards=cards, columns=columns, sections=ListNode(), meta={})
+    board_meta = {}
+    board_labels = None
+    if labels:
+        board_labels = Node(**{name: Node(cards=["1"]) for name in labels})
+
+    return Node(cards=cards, columns=columns, sections=ListNode(), meta=board_meta, labels=board_labels)
 
 
 class CardTestApp(App):
@@ -46,12 +52,13 @@ class CardTestApp(App):
 
 
 @pytest.mark.asyncio
-async def test_card_has_three_zones():
-    """Card composes header rule, title, and footer."""
+async def test_card_has_four_zones():
+    """Card composes header, labels, title, and footer."""
     board = _make_board()
     app = CardTestApp(board)
     async with app.run_test():
-        assert app.query_one("#card-header", Rule) is not None
+        assert app.query_one("#card-header", PlainStatic) is not None
+        assert app.query_one("#card-labels", PlainStatic) is not None
         assert app.query_one("#card-title", PlainStatic) is not None
         assert app.query_one("#card-footer", PlainStatic) is not None
 
@@ -142,3 +149,18 @@ async def test_watcher_cleanup():
 
         assert sections_watchers_after == sections_watchers_before - 1
         assert meta_watchers_after == meta_watchers_before - 1
+
+
+@pytest.mark.asyncio
+async def test_labels_in_labels_widget_not_title():
+    """Label swatches appear in #card-labels, not in #card-title."""
+    board = _make_board(labels=["bug", "urgent"])
+    app = CardTestApp(board)
+    async with app.run_test():
+        labels_widget = app.query_one("#card-labels", PlainStatic)
+        title_widget = app.query_one("#card-title", PlainStatic)
+        labels_text = str(labels_widget.render())
+        title_text = str(title_widget.render())
+        assert ICON_COLOR_SWATCH in labels_text
+        assert ICON_COLOR_SWATCH not in title_text
+        assert "Test Card" in title_text

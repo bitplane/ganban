@@ -123,7 +123,7 @@ def test_label_text_shows_colored_blocks():
     meta = Node(labels=["bug", "urgent"])
     board = _make_board_with_label_colors(bug="#800000", urgent="#ff6600")
     result = build_label_text(meta, board)
-    assert result.plain == "\u2588\u2588"
+    assert result.plain == "■■"
 
 
 def test_label_text_empty_without_card_labels():
@@ -143,4 +143,4 @@ def test_label_text_uses_hash_color_without_override():
     board.meta.labels = None
     result = build_label_text(meta, board)
     # Should have one block character with hash-computed color
-    assert result.plain == "\u2588"
+    assert result.plain == "■"

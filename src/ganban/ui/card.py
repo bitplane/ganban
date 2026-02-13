@@ -2,15 +2,14 @@
 
 from datetime import date
 
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.message import Message
-from textual.widgets import Rule, Static
+from textual.widgets import Static
 
 from ganban.model.card import create_card, find_card_column
 from ganban.model.node import Node
 from ganban.parser import first_title
-from ganban.ui.card_indicators import build_footer_text, build_label_text
+from ganban.ui.card_indicators import build_footer_text, build_header_line, build_label_text
 from ganban.ui.constants import (
     ICON_BACK,
     ICON_CARD,
@@ -74,7 +73,8 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self.title = _card_title(board, card_id)
 
     def compose(self) -> ComposeResult:
-        yield Rule(id="card-header")
+        yield PlainStatic(id="card-header")
+        yield PlainStatic(id="card-labels")
         yield PlainStatic(self.title or self.card_id, id="card-title")
         yield PlainStatic(id="card-footer")
 
@@ -97,19 +97,20 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self._refresh_indicators()
 
     def _refresh_indicators(self) -> None:
-        """Update title with label blocks, footer indicators, and blocked state."""
+        """Update header line, title, footer indicators, and blocked state."""
         card = self.board.cards[self.card_id]
-        label_text = build_label_text(card.meta, self.board)
+        header = self.query_one("#card-header", PlainStatic)
+        width = header.size.width or self.size.width or 20
+        header.update(build_header_line(card.meta, self.board, width))
 
-        # Title: label blocks on the left, then card title
-        title_widget = self.query_one("#card-title", PlainStatic)
+        # Labels widget (visible only in compact mode via CSS)
+        label_text = build_label_text(card.meta, self.board)
+        labels_widget = self.query_one("#card-labels", PlainStatic)
         if label_text.plain:
-            title = label_text.copy()
-            title.append_text(Text(" "))
-            title.append_text(Text(self.title or self.card_id))
-            title_widget.update(title)
-        else:
-            title_widget.update(self.title or self.card_id)
+            label_text.append(" ")
+        labels_widget.update(label_text)
+
+        self.query_one("#card-title", PlainStatic).update(self.title or self.card_id)
 
         footer_text = build_footer_text(
             card.sections,
