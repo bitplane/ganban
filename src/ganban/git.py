@@ -148,14 +148,15 @@ def remote_has_branch(repo_path: str | Path, remote_name: str, branch: str = "ga
 # --- Async wrappers ---
 
 
+def has_branch_sync(repo_path: str | Path, branch: str = "ganban") -> bool:
+    """Check if a branch exists in the repository (sync)."""
+    repo = _get_repo(repo_path)
+    return branch in [h.name for h in repo.heads]
+
+
 async def has_branch(repo_path: str | Path, branch: str = "ganban") -> bool:
     """Check if a branch exists in the repository."""
-
-    def _has_branch():
-        repo = _get_repo(repo_path)
-        return branch in [h.name for h in repo.heads]
-
-    return await asyncio.to_thread(_has_branch)
+    return await asyncio.to_thread(has_branch_sync, repo_path, branch)
 
 
 async def get_remotes(repo_path: str | Path) -> list[str]:

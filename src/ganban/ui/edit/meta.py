@@ -11,7 +11,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.node import Node
-from ganban.model.writer import _meta_to_dict
+from ganban.model.writer import meta_to_dict
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import NumberEditor, TextEditor
@@ -155,12 +155,12 @@ class ListItemRow(Vertical):
         """Propagate changes from nested DictEditor."""
         event.stop()
         if self._node is not None:
-            self.post_message(self.ValueChanged(self.index, _meta_to_dict(self._node)))
+            self.post_message(self.ValueChanged(self.index, meta_to_dict(self._node)))
 
     def on_key_value_row_key_renamed(self, event) -> None:
         event.stop()
         if self._node is not None:
-            self.post_message(self.ValueChanged(self.index, _meta_to_dict(self._node)))
+            self.post_message(self.ValueChanged(self.index, meta_to_dict(self._node)))
 
     def on_key_value_row_delete_requested(self, event) -> None:
         # Let it bubble to the DictEditor inside us, don't intercept

@@ -17,11 +17,6 @@ from ganban.cli.init import init_board
 from ganban.cli.sync import sync
 
 
-def _not_implemented(args):
-    print(f"'{args.noun}' is not yet implemented.")
-    return 1
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Build the full CLI argument parser."""
     common = argparse.ArgumentParser(add_help=False)
@@ -76,18 +71,20 @@ def build_parser() -> argparse.ArgumentParser:
     card_add_p.add_argument("title", help="Card title")
     card_add_p.add_argument("--body", default="", help="Card body text")
     card_add_p.add_argument("--column", dest="column", help="Target column ID")
-    card_add_p.add_argument("--position", type=int, help="Position in column (0-indexed)")
     card_add_p.set_defaults(func=card_add)
 
     card_move_p = card_verbs.add_parser("move", help="Move a card", parents=[common])
     card_move_p.add_argument("id", help="Card ID")
     card_move_p.add_argument("--column", dest="column", required=True, help="Target column ID")
-    card_move_p.add_argument("--position", type=int, help="Position in column (0-indexed)")
+    card_move_p.add_argument("--position", type=int, help="Position in column (1-indexed)")
     card_move_p.set_defaults(func=card_move)
 
     card_archive_p = card_verbs.add_parser("archive", help="Archive a card", parents=[common])
     card_archive_p.add_argument("id", help="Card ID")
     card_archive_p.set_defaults(func=card_archive)
+
+    # card with no verb = list
+    card_p.set_defaults(func=card_list, column=None)
 
     # --- column ---
     col_p = nouns.add_parser("column", help="Column operations", parents=[common])
@@ -123,15 +120,13 @@ def build_parser() -> argparse.ArgumentParser:
     col_archive_p.add_argument("id", help="Column ID")
     col_archive_p.set_defaults(func=column_archive)
 
+    # column with no verb = list
+    col_p.set_defaults(func=column_list)
+
     # --- sync ---
     sync_p = nouns.add_parser("sync", help="Sync board with remotes", parents=[common])
     sync_p.add_argument("-d", "--daemon", action="store_true", help="Run as background daemon")
     sync_p.add_argument("--interval", type=int, default=120, help="Daemon sync interval in seconds (default: 120)")
     sync_p.set_defaults(func=sync)
-
-    # --- reserved ---
-    for name in ("web", "serve"):
-        p = nouns.add_parser(name, help=f"{name} (not yet implemented)", parents=[common])
-        p.set_defaults(func=_not_implemented, noun=name)
 
     return parser

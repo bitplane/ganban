@@ -12,7 +12,7 @@ from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
 from ganban.model.writer import (
     MergeRequired,
-    _meta_to_dict,
+    meta_to_dict,
     check_for_merge,
     check_remote_for_merge,
     save_board,
@@ -737,7 +737,7 @@ def test_create_column_saves(repo_with_ganban):
 # --- slugify tests ---
 
 
-def test_meta_to_dict_recursive():
+def testmeta_to_dict_recursive():
     """Nested Node children are serialized to plain dicts."""
 
     meta = Node(
@@ -745,7 +745,7 @@ def test_meta_to_dict_recursive():
         nested={"inner_key": "inner_value", "deep": {"level3": 42}},
         number=99,
     )
-    result = _meta_to_dict(meta)
+    result = meta_to_dict(meta)
     assert result == {
         "simple": "value",
         "nested": {"inner_key": "inner_value", "deep": {"level3": 42}},
@@ -756,20 +756,20 @@ def test_meta_to_dict_recursive():
     assert type(result["nested"]["deep"]) is dict
 
 
-def test_meta_to_dict_preserves_flat():
+def testmeta_to_dict_preserves_flat():
     """Non-nested meta round-trips correctly."""
 
     meta = Node(tags=["a", "b"], priority=1)
-    result = _meta_to_dict(meta)
+    result = meta_to_dict(meta)
     assert result == {"tags": ["a", "b"], "priority": 1}
 
 
-def test_meta_to_dict_empty():
+def testmeta_to_dict_empty():
     """Empty Node returns empty dict."""
 
-    assert _meta_to_dict(Node()) == {}
-    assert _meta_to_dict({}) == {}
-    assert _meta_to_dict(None) == {}
+    assert meta_to_dict(Node()) == {}
+    assert meta_to_dict({}) == {}
+    assert meta_to_dict(None) == {}
 
 
 def test_slugify_basic():

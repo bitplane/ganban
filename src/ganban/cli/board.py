@@ -3,13 +3,15 @@
 import sys
 
 from ganban.cli._common import (
+    build_column_summaries,
+    format_column_line,
     load_board_or_die,
     markdown_to_sections,
-    meta_to_dict,
     output_json,
+    output_result,
     save,
-    sections_to_markdown,
 )
+from ganban.model.writer import meta_to_dict, sections_to_text
 from ganban.parser import first_title
 
 
@@ -18,27 +20,14 @@ def board_summary(args) -> int:
     board = load_board_or_die(args.repo, args.json)
     title = first_title(board.sections)
 
-    columns = []
-    for col in board.columns:
-        name = first_title(col.sections)
-        card_count = len(col.links) if col.links else 0
-        columns.append(
-            {
-                "id": col.order,
-                "name": name,
-                "cards": card_count,
-                "hidden": bool(col.hidden),
-            }
-        )
+    columns = build_column_summaries(board)
 
     if args.json:
         output_json({"title": title, "columns": columns})
     else:
         print(title)
         for c in columns:
-            hidden = "  (hidden)" if c["hidden"] else ""
-            cards = "card" if c["cards"] == 1 else "cards"
-            print(f"  {c['id']}  {c['name']:<16} {c['cards']} {cards}{hidden}")
+            print(format_column_line(c, indent="  "))
 
     return 0
 
@@ -47,7 +36,7 @@ def board_get(args) -> int:
     """Dump board index.md content."""
     board = load_board_or_die(args.repo, args.json)
 
-    markdown = sections_to_markdown(board.sections, board.meta)
+    markdown = sections_to_text(board.sections, board.meta)
 
     if args.json:
         output_json(
@@ -70,15 +59,11 @@ def board_set(args) -> int:
     text = sys.stdin.read()
     new_sections, new_meta = markdown_to_sections(text)
 
-    # Replace board sections and meta
     board.sections = new_sections
     board.meta = new_meta
 
     commit = save(board, "Update board")
 
-    if args.json:
-        output_json({"commit": commit})
-    else:
-        print(f"Updated board ({commit[:7]})")
+    output_result({"commit": commit}, f"Updated board ({commit[:7]})", args.json)
 
     return 0

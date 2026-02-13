@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from ganban.cli._common import load_board_or_die, output_json
+from ganban.cli._common import output_json
 from ganban.git import fetch_sync, get_remotes_sync, get_upstream, push_sync, remote_has_branch
 from ganban.model.loader import load_board
 from ganban.model.writer import check_remote_for_merge, try_auto_merge
@@ -24,7 +24,7 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
     # Load board (verify ganban branch exists)
     try:
         board = load_board(repo_path)
-    except (ValueError, Exception) as e:
+    except Exception as e:
         result["error"] = str(e)
         return 1, result
 
@@ -86,9 +86,6 @@ def sync(args) -> int:
 
     if args.daemon:
         return sync_daemon(args, repo_path)
-
-    # Verify board exists before syncing
-    load_board_or_die(args.repo, args.json)
 
     exit_code, result = _do_sync(repo_path)
 

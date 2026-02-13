@@ -4,10 +4,9 @@ import json
 import sys
 from pathlib import Path
 
-from ganban.ids import normalize_id
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
-from ganban.model.writer import _meta_to_dict, _sections_to_text, save_board
+from ganban.model.writer import save_board
 from ganban.parser import first_title, parse_sections
 
 
@@ -16,7 +15,7 @@ def load_board_or_die(repo: str, json_mode: bool) -> Node:
     repo_path = Path(repo).resolve()
     try:
         return load_board(str(repo_path))
-    except (ValueError, Exception) as e:
+    except Exception as e:
         error(str(e), json_mode)
 
 
@@ -31,8 +30,8 @@ def find_column(board: Node, col_id: str, json_mode: bool) -> Node:
 
 
 def find_card(board: Node, card_id: str, json_mode: bool) -> Node:
-    """Lookup card by ID (normalizes leading zeros). Exit 1 if not found."""
-    card = board.cards[normalize_id(card_id)]
+    """Lookup card by ID. Exit 1 if not found."""
+    card = board.cards[card_id]
     if card is not None:
         return card
     error(f"Card '{card_id}' not found.", json_mode)
@@ -50,6 +49,14 @@ def output_json(data: dict | list) -> None:
     print(json.dumps(data, indent=2))
 
 
+def output_result(data: dict, text: str, json_mode: bool) -> None:
+    """Output mutation result as JSON or plain text."""
+    if json_mode:
+        output_json(data)
+    else:
+        print(text)
+
+
 def error(message: str, json_mode: bool) -> None:
     """Print error to stderr and exit 1."""
     if json_mode:
@@ -59,14 +66,28 @@ def error(message: str, json_mode: bool) -> None:
     sys.exit(1)
 
 
-def sections_to_markdown(sections: ListNode, meta) -> str:
-    """Convert sections ListNode + meta to markdown string."""
-    return _sections_to_text(sections, meta)
+def build_column_summaries(board: Node) -> list[dict]:
+    """Build column summary dicts from board."""
+    items = []
+    for col in board.columns:
+        name = first_title(col.sections)
+        card_count = len(col.links) if col.links else 0
+        items.append(
+            {
+                "id": col.order,
+                "name": name,
+                "cards": card_count,
+                "hidden": bool(col.hidden),
+            }
+        )
+    return items
 
 
-def meta_to_dict(meta) -> dict:
-    """Convert meta Node to plain dict."""
-    return _meta_to_dict(meta)
+def format_column_line(c: dict, indent: str = "") -> str:
+    """Format a column summary dict as a text line."""
+    hidden = "  (hidden)" if c["hidden"] else ""
+    cards = "card" if c["cards"] == 1 else "cards"
+    return f"{indent}{c['id']}  {c['name']:<16} {c['cards']} {cards}{hidden}"
 
 
 def markdown_to_sections(text: str) -> tuple[ListNode, dict]:

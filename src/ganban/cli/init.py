@@ -2,21 +2,11 @@
 
 from pathlib import Path
 
-from ganban.cli._common import output_json, save
-from ganban.git import init_repo, is_git_repo
+from ganban.cli._common import load_board_or_die, output_json, save
+from ganban.git import has_branch_sync, init_repo, is_git_repo
 from ganban.model.column import create_column
-from ganban.model.loader import load_board
-from ganban.constants import BRANCH_NAME
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
-
-
-def _has_branch(repo_path: Path) -> bool:
-    """Synchronous check for ganban branch."""
-    from git import Repo
-
-    repo = Repo(repo_path)
-    return BRANCH_NAME in [h.name for h in repo.heads]
 
 
 def init_board(args) -> int:
@@ -26,8 +16,8 @@ def init_board(args) -> int:
     if not is_git_repo(repo_path):
         init_repo(repo_path)
 
-    if _has_branch(repo_path):
-        board = load_board(str(repo_path))
+    if has_branch_sync(repo_path):
+        board = load_board_or_die(str(repo_path), args.json)
         columns = [first_title(c.sections) for c in board.columns]
         if args.json:
             output_json({"repo_path": str(repo_path), "columns": columns, "created": False})

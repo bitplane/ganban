@@ -96,7 +96,13 @@ def test_card_set_round_trip(initialized_repo, capsys, monkeypatch):
 
 
 def test_card_add(initialized_repo, capsys):
-    args = Namespace(repo=str(initialized_repo), json=False, title="New card", body="Body.", column=None, position=None)
+    args = Namespace(
+        repo=str(initialized_repo),
+        json=False,
+        title="New card",
+        body="Body.",
+        column=None,
+    )
     assert card_add(args) == 0
 
     out = capsys.readouterr().out
@@ -108,7 +114,13 @@ def test_card_add(initialized_repo, capsys):
 
 
 def test_card_add_to_column(initialized_repo, capsys):
-    args = Namespace(repo=str(initialized_repo), json=False, title="In doing", body="", column="2", position=None)
+    args = Namespace(
+        repo=str(initialized_repo),
+        json=False,
+        title="In doing",
+        body="",
+        column="2",
+    )
     assert card_add(args) == 0
 
     board = load_board(str(initialized_repo))
@@ -116,7 +128,13 @@ def test_card_add_to_column(initialized_repo, capsys):
 
 
 def test_card_add_json(initialized_repo, capsys):
-    args = Namespace(repo=str(initialized_repo), json=True, title="JSON card", body="", column=None, position=None)
+    args = Namespace(
+        repo=str(initialized_repo),
+        json=True,
+        title="JSON card",
+        body="",
+        column=None,
+    )
     assert card_add(args) == 0
 
     data = json.loads(capsys.readouterr().out)
