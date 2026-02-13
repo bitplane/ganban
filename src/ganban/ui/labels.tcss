@@ -18,37 +18,3 @@ LabelsWidget #labels-add {
     width: auto;
     height: 1;
 }
-.label-tag {
-    width: auto;
-    height: 1;
-    padding: 0 1 0 0;
-}
-
-/* SearchInput hidden by default, shown in edit mode */
-LabelsWidget #labels-search {
-    display: none;
-    width: 40;
-}
-LabelsWidget.-editing #labels-search {
-    display: block;
-}
-LabelsWidget.-editing #labels-tags {
-    display: none;
-}
-
-/* Compact input styling for labels search */
-LabelsWidget #labels-search Input {
-    height: 1;
-    border: none;
-    padding: 0;
-}
-
-/* Dropdown: no border, no wrap, shifted left to align under icon */
-LabelsWidget #labels-search OptionList {
-    border: none;
-    offset-x: -3;
-    width: 43;
-}
-LabelsWidget #labels-search OptionList > .option-list--option {
-    text-wrap: nowrap;
-}

@@ -14,36 +14,3 @@ AssigneeWidget #assignee-picker {
     width: 2;
     height: 1;
 }
-AssigneeWidget .assignee-name {
-    width: auto;
-    height: 1;
-}
-
-/* SearchInput hidden by default, shown in edit mode */
-AssigneeWidget #assignee-search {
-    display: none;
-    width: 40;
-}
-AssigneeWidget.-editing #assignee-search {
-    display: block;
-}
-AssigneeWidget.-editing .assignee-name {
-    display: none;
-}
-
-/* Compact input styling for assignee search */
-AssigneeWidget #assignee-search Input {
-    height: 1;
-    border: none;
-    padding: 0;
-}
-
-/* Dropdown: no border, no wrap, shifted left to align under emoji */
-AssigneeWidget #assignee-search OptionList {
-    border: none;
-    offset-x: -3;
-    width: 43;
-}
-AssigneeWidget #assignee-search OptionList > .option-list--option {
-    text-wrap: nowrap;
-}

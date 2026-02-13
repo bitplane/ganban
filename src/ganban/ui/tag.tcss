@@ -1,0 +1,47 @@
+/* Tag widget */
+Tag {
+    width: auto;
+    height: 1;
+    padding: 0 1 0 0;
+}
+.tag-row {
+    width: auto;
+    height: 1;
+}
+.tag-label {
+    width: auto;
+    height: 1;
+}
+.tag-delete {
+    width: auto;
+    height: 1;
+}
+
+/* SearchInput hidden by default, shown in edit mode */
+Tag .tag-search {
+    display: none;
+    width: 40;
+}
+Tag.-editing .tag-search {
+    display: block;
+}
+Tag.-editing .tag-label {
+    display: none;
+}
+
+/* Compact input styling */
+Tag .tag-search Input {
+    height: 1;
+    border: none;
+    padding: 0;
+}
+
+/* Dropdown */
+Tag .tag-search OptionList {
+    border: none;
+    offset-x: -3;
+    width: 43;
+}
+Tag .tag-search OptionList > .option-list--option {
+    text-wrap: nowrap;
+}

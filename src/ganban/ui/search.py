@@ -145,6 +145,8 @@ class SearchInput(Container):
 
     def _maybe_close_on_blur(self) -> None:
         """Close dropdown if focus has truly left us."""
+        if not self.is_attached:
+            return
         focused = self.app.focused
         if focused is None or focused not in self.walk_children():
             self._close_dropdown()

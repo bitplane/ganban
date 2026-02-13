@@ -7,6 +7,7 @@ from textual.widgets import Button, Static
 from ganban.model.node import ListNode, Node
 from ganban.ui.deps import DepsWidget, build_dep_options, ICON_DEPS
 from ganban.ui.search import SearchInput
+from ganban.ui.tag import Tag
 
 
 # --- Helpers ---
@@ -75,13 +76,16 @@ class DepsApp(App):
     CSS = """
     DepsWidget { width: auto; height: 1; }
     DepsWidget > Horizontal { width: auto; height: 1; }
-    #deps-ids { width: auto; height: 1; }
-    .dep-id { width: auto; height: 1; padding: 0 1 0 0; }
+    #deps-tags { width: auto; height: 1; }
     #deps-add { width: 2; height: 1; }
-    #deps-search { display: none; width: 40; }
-    DepsWidget.-editing #deps-search { display: block; }
-    DepsWidget.-editing #deps-ids { display: none; }
-    DepsWidget #deps-search Input { height: 1; border: none; padding: 0; }
+    Tag { width: auto; height: 1; padding: 0 1 0 0; }
+    .tag-row { width: auto; height: 1; }
+    .tag-label { width: auto; height: 1; }
+    .tag-delete { width: auto; height: 1; }
+    Tag .tag-search { display: none; width: 40; }
+    Tag.-editing .tag-search { display: block; }
+    Tag.-editing .tag-label { display: none; }
+    Tag .tag-search Input { height: 1; border: none; padding: 0; }
     SearchInput { width: 100%; height: auto; }
     SearchInput > Input { width: 100%; }
     SearchInput > OptionList {
@@ -111,27 +115,32 @@ async def test_shows_empty_when_no_deps():
     async with app.run_test():
         icon = app.query_one("#deps-add", Static)
         assert icon.content == ICON_DEPS
-        ids_container = app.query_one("#deps-ids")
-        assert len(ids_container.children) == 0
+        tags = app.query_one("#deps-tags").query(Tag)
+        assert len(tags) == 0
 
 
 @pytest.mark.asyncio
 async def test_shows_dep_ids():
     app = DepsApp(deps=["2", "3"])
     async with app.run_test():
-        ids_container = app.query_one("#deps-ids")
-        assert len(ids_container.children) == 2
-        assert ids_container.children[0].content == "2"
-        assert ids_container.children[1].content == "3"
+        tags = list(app.query_one("#deps-tags").query(Tag))
+        assert len(tags) == 2
+        assert tags[0].value == "2"
+        assert tags[1].value == "3"
 
 
 @pytest.mark.asyncio
-async def test_add_dep_via_search():
+async def test_add_dep_via_tag():
     app = DepsApp(card_ids=["1", "2", "3"])
     async with app.run_test() as pilot:
         widget = app.query_one(DepsWidget)
-        search = widget.query_one("#deps-search", SearchInput)
+        widget._add_new_tag()
+        await pilot.pause()
 
+        # Find the new tag and simulate search submission
+        tags = list(widget.query(Tag))
+        new_tag = tags[-1]
+        search = new_tag.query_one(SearchInput)
         search.post_message(SearchInput.Submitted("2 Card 2", "2"))
         await pilot.pause()
 
@@ -139,81 +148,36 @@ async def test_add_dep_via_search():
 
 
 @pytest.mark.asyncio
-async def test_replace_dep_via_search():
-    app = DepsApp(deps=["2"], card_ids=["1", "2", "3"])
-    async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        widget._editing_index = 0
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Submitted("3 Card 3", "3"))
-        await pilot.pause()
-
-        assert app.card_meta.deps == ["3"]
-
-
-@pytest.mark.asyncio
 async def test_cancel_leaves_unchanged():
     app = DepsApp(deps=["2"])
     async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Cancelled())
+        tags = list(app.query_one(DepsWidget).query(Tag))
+        tag = tags[0]
+        tag.post_message(SearchInput.Cancelled())
         await pilot.pause()
 
         assert app.card_meta.deps == ["2"]
 
 
 @pytest.mark.asyncio
-async def test_empty_submit_cancels():
-    app = DepsApp(deps=["2"])
-    async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Submitted("", None))
-        await pilot.pause()
-
-        assert app.card_meta.deps == ["2"]
-
-
-@pytest.mark.asyncio
-async def test_invalid_text_cancels():
-    app = DepsApp(deps=["2"])
-    async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Submitted("nonexistent", None))
-        await pilot.pause()
-
-        assert app.card_meta.deps == ["2"]
-
-
-@pytest.mark.asyncio
-async def test_empty_submit_removes_in_replace_mode():
+async def test_delete_dep_via_tag():
     app = DepsApp(deps=["2", "3"], card_ids=["1", "2", "3"])
     async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        widget._editing_index = 0
-        search = widget.query_one("#deps-search", SearchInput)
+        tags = list(app.query_one(DepsWidget).query(Tag))
+        assert len(tags) == 2
 
-        search.post_message(SearchInput.Submitted("", None))
+        tags[0].post_message(Tag.Deleted(tags[0]))
         await pilot.pause()
 
         assert app.card_meta.deps == ["3"]
 
 
 @pytest.mark.asyncio
-async def test_empty_submit_removes_last_dep():
+async def test_delete_last_dep_sets_none():
     app = DepsApp(deps=["2"], card_ids=["1", "2"])
     async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-        widget._editing_index = 0
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Submitted("", None))
+        tags = list(app.query_one(DepsWidget).query(Tag))
+        tags[0].post_message(Tag.Deleted(tags[0]))
         await pilot.pause()
 
         assert app.card_meta.deps is None
@@ -223,42 +187,29 @@ async def test_empty_submit_removes_last_dep():
 async def test_reacts_to_external_change():
     app = DepsApp()
     async with app.run_test() as pilot:
-        ids_container = app.query_one("#deps-ids")
-        assert len(ids_container.children) == 0
+        tags = list(app.query_one("#deps-tags").query(Tag))
+        assert len(tags) == 0
 
         app.card_meta.deps = ["3"]
         await pilot.pause()
 
-        ids_container = app.query_one("#deps-ids")
-        assert len(ids_container.children) == 1
-        assert ids_container.children[0].content == "3"
+        tags = list(app.query_one("#deps-tags").query(Tag))
+        assert len(tags) == 1
+        assert tags[0].value == "3"
 
 
 @pytest.mark.asyncio
-async def test_edit_mode_toggle():
-    app = DepsApp(card_ids=["1", "2"])
-    async with app.run_test() as pilot:
-        widget = app.query_one(DepsWidget)
-
-        assert not widget.has_class("-editing")
-
-        widget._enter_edit_mode()
-        await pilot.pause()
-        assert widget.has_class("-editing")
-
-        widget._exit_edit_mode()
-        await pilot.pause()
-        assert not widget.has_class("-editing")
-
-
-@pytest.mark.asyncio
-async def test_free_text_valid_card_id():
+async def test_add_invalid_card_id_rejected():
     app = DepsApp(card_ids=["1", "2", "3"])
     async with app.run_test() as pilot:
         widget = app.query_one(DepsWidget)
-        search = widget.query_one("#deps-search", SearchInput)
-
-        search.post_message(SearchInput.Submitted("2", None))
+        widget._add_new_tag()
         await pilot.pause()
 
-        assert app.card_meta.deps == ["2"]
+        tags = list(widget.query(Tag))
+        new_tag = tags[-1]
+        search = new_tag.query_one(SearchInput)
+        search.post_message(SearchInput.Submitted("nonexistent", None))
+        await pilot.pause()
+
+        assert app.card_meta.deps is None

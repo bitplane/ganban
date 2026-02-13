@@ -6,12 +6,11 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.events import DescendantBlur
-from textual.widgets import Input, Static
+from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.parser import first_title
-from ganban.ui.search import SearchInput
+from ganban.ui.tag import Tag
 from ganban.ui.watcher import NodeWatcherMixin
 
 ICON_DEPS = "\U0001f517"  # 🔗
@@ -37,7 +36,8 @@ class DepsWidget(NodeWatcherMixin, Container):
     """Inline deps editor for card detail bar.
 
     Displays dep IDs next to a link icon. Click the icon to add a dep,
-    click an ID to replace it. Uses SearchInput for card selection.
+    click a tag to edit it, click × to delete. Uses Tag widgets with
+    SearchInput for card selection.
     """
 
     def __init__(self, meta: Node, board: Node, card_id: str, **kwargs) -> None:
@@ -46,97 +46,96 @@ class DepsWidget(NodeWatcherMixin, Container):
         self.meta = meta
         self.board = board
         self.card_id = card_id
-        self._editing_index: int | None = None  # None = adding, int = replacing
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="deps-bar"):
             yield Static(ICON_DEPS, id="deps-add")
-            yield Horizontal(id="deps-ids")
-            yield SearchInput([], placeholder="card id", id="deps-search")
+            yield Horizontal(id="deps-tags")
 
     def on_mount(self) -> None:
         self.node_watch(self.meta, "deps", self._on_deps_changed)
-        self._rebuild_ids()
+        self._rebuild_tags()
 
     def _on_deps_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
-        self.call_later(self._rebuild_ids)
+        self.call_later(self._rebuild_tags)
 
-    def _rebuild_ids(self) -> None:
-        """Clear and rebuild the dep ID Static widgets."""
-        container = self.query_one("#deps-ids", Horizontal)
+    def _rebuild_tags(self) -> None:
+        """Clear and rebuild the dep tag widgets."""
+        container = self.query_one("#deps-tags", Horizontal)
         for child in list(container.children):
             child.remove()
         deps = self.meta.deps
         if deps and isinstance(deps, list):
             for dep_id in deps:
-                container.mount(Static(str(dep_id), classes="dep-id"))
+                container.mount(Tag(value=str(dep_id)))
 
-    def _enter_edit_mode(self, index: int | None = None) -> None:
-        """Enter edit mode. index=None means adding, int means replacing."""
-        self._editing_index = index
-        self.add_class("-editing")
-        current_deps = list(self.meta.deps or [])
-        if index is not None and index < len(current_deps):
-            filter_deps = current_deps[:index] + current_deps[index + 1 :]
-        else:
-            filter_deps = current_deps
-        search = self.query_one("#deps-search", SearchInput)
-        search.set_options(build_dep_options(self.board, self.card_id, filter_deps))
-        inp = search.query_one(Input)
-        inp.value = ""
-        inp.focus()
-
-    def _exit_edit_mode(self) -> None:
-        self._editing_index = None
-        search = self.query_one("#deps-search", SearchInput)
-        search._close_dropdown()
-        self.remove_class("-editing")
-        self._rebuild_ids()
-        self.screen.focus()
+    def _current_deps_except(self, exclude_tag: Tag | None = None) -> list[str]:
+        """Get current deps, optionally excluding one tag's value."""
+        deps = list(self.meta.deps or [])
+        if exclude_tag is not None:
+            tags = list(self.query_one("#deps-tags", Horizontal).query(Tag))
+            idx = tags.index(exclude_tag) if exclude_tag in tags else None
+            if idx is not None and idx < len(deps):
+                return deps[:idx] + deps[idx + 1 :]
+        return deps
 
     def on_click(self, event) -> None:
         event.stop()
-        if self.has_class("-editing"):
-            return
         target = event.widget
         if target.id == "deps-add":
-            self._enter_edit_mode()
-        elif target.has_class("dep-id"):
-            container = self.query_one("#deps-ids", Horizontal)
-            idx = list(container.children).index(target)
-            self._enter_edit_mode(index=idx)
+            self._add_new_tag()
+        elif target.has_class("tag-label"):
+            tag = target.parent.parent  # tag-label → tag-row → Tag
+            if isinstance(tag, Tag) and not tag.has_class("-editing"):
+                options = build_dep_options(self.board, self.card_id, self._current_deps_except(tag))
+                tag.start_editing(options)
 
-    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
+    def _add_new_tag(self) -> None:
+        """Mount a temporary blank tag for adding a new dep."""
+        container = self.query_one("#deps-tags", Horizontal)
+        tag = Tag(value="", classes="-new")
+        container.mount(tag)
+        options = build_dep_options(self.board, self.card_id, self._current_deps_except())
+        tag.start_editing(options)
+
+    def on_tag_changed(self, event: Tag.Changed) -> None:
         event.stop()
-        dep_id = event.value
-        if not dep_id:
-            text = event.text.strip()
-            if text and text in self.board.cards:
-                dep_id = text
-        deps = list(self.meta.deps or [])
-        if dep_id:
-            if self._editing_index is not None and self._editing_index < len(deps):
-                deps[self._editing_index] = dep_id
-            else:
-                deps.append(dep_id)
-        elif self._editing_index is not None and self._editing_index < len(deps):
-            del deps[self._editing_index]
-        else:
-            self._exit_edit_mode()
+        tag = event.tag
+        new_id = event.new_value
+        # validate that it's actually a card
+        if new_id not in self.board.cards:
+            if tag.has_class("-new"):
+                tag.remove()
             return
+
+        deps = list(self.meta.deps or [])
+        tags = list(self.query_one("#deps-tags", Horizontal).query(Tag))
+        idx = tags.index(tag) if tag in tags else None
+
+        if tag.has_class("-new"):
+            tag.remove_class("-new")
+            deps.append(new_id)
+        elif idx is not None and idx < len(deps):
+            deps[idx] = new_id
+
+        tag.value = new_id
+        tag.update_display(str(new_id))
         with self.suppressing():
             self.meta.deps = deps or None
-        self._exit_edit_mode()
 
-    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
         event.stop()
-        self._exit_edit_mode()
+        tag = event.tag
+        deps = list(self.meta.deps or [])
+        tags = list(self.query_one("#deps-tags", Horizontal).query(Tag))
+        idx = tags.index(tag) if tag in tags else None
 
-    def on_descendant_blur(self, event: DescendantBlur) -> None:
-        if self.has_class("-editing"):
-            self.call_after_refresh(self._maybe_exit_on_blur)
+        if tag.has_class("-new"):
+            tag.remove()
+            return
 
-    def _maybe_exit_on_blur(self) -> None:
-        focused = self.app.focused
-        if focused is None or focused not in self.walk_children():
-            self._exit_edit_mode()
+        if idx is not None and idx < len(deps):
+            del deps[idx]
+        tag.remove()
+        with self.suppressing():
+            self.meta.deps = deps or None

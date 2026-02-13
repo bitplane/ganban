@@ -6,14 +6,13 @@ from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.events import DescendantBlur
 from textual.message import Message
 from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
 from ganban.ui.constants import ICON_PERSON
 from ganban.ui.emoji import emoji_for_email, parse_committer, resolve_email_display
-from ganban.ui.search import SearchInput
+from ganban.ui.tag import Tag
 from ganban.ui.watcher import NodeWatcherMixin
 
 
@@ -69,6 +68,7 @@ class AssigneeWidget(NodeWatcherMixin, Container):
 
     Reads and writes ``meta.assigned`` on the given card meta Node,
     and watches the node so external changes are reflected immediately.
+    Uses a single optional Tag widget for the assigned user.
     """
 
     class AssigneeSelected(Message):
@@ -90,90 +90,88 @@ class AssigneeWidget(NodeWatcherMixin, Container):
             emoji = ICON_PERSON
         with Horizontal(id="assignee-bar"):
             yield Static(emoji, id="assignee-picker")
-            yield Static("", classes="assignee-name")
-            yield SearchInput([], placeholder="email@address", id="assignee-search")
+            if assigned:
+                _, name, _ = resolve_assignee(assigned, self.board)
+                yield Tag(value=assigned, display=name, classes="assignee-tag")
 
     def on_mount(self) -> None:
         self.node_watch(self.meta, "assigned", self._on_assigned_changed)
-        self._update_label()
 
     def _on_assigned_changed(self, source_node: Any, key: str, old: Any, new: Any) -> None:
-        self.call_later(self._update_label)
+        self.call_later(self._rebuild_tag)
 
-    def _update_label(self) -> None:
-        label = self.query_one(".assignee-name", Static)
+    def _rebuild_tag(self) -> None:
+        """Rebuild the assignee tag to match current meta."""
+        bar = self.query_one("#assignee-bar", Horizontal)
+        for tag in list(bar.query(Tag)):
+            tag.remove()
         picker = self.query_one("#assignee-picker", Static)
         assigned = self.meta.assigned
         if assigned:
             emoji, name, _ = resolve_assignee(assigned, self.board)
             picker.update(emoji)
-            label.update(name)
+            bar.mount(Tag(value=assigned, display=name, classes="assignee-tag"))
         else:
             picker.update(ICON_PERSON)
-            label.update("")
 
-    def _set_assigned(self, value: str | None) -> None:
-        with self.suppressing():
-            self.meta.assigned = value
-        self._update_label()
-
-    def _enter_edit_mode(self) -> None:
-        self.add_class("-editing")
-        search = self.query_one("#assignee-search", SearchInput)
-        search.set_options(build_assignee_options(self.board))
-        inp = search.query_one("Input")
-        inp.value = self.meta.assigned or ""
-        inp.focus()
-
-    def _exit_edit_mode(self) -> None:
-        search = self.query_one("#assignee-search", SearchInput)
-        search._close_dropdown()
-        self.remove_class("-editing")
-        self._update_label()
-        self.screen.focus()
-
-    def on_click(self, event) -> None:
-        event.stop()
-        if not self.has_class("-editing"):
-            self._enter_edit_mode()
-
-    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
-        event.stop()
-        if event.value:
-            self._set_assigned(event.value)
-        elif event.text.strip():
-            self._set_assigned(event.text.strip())
-        else:
-            self._set_assigned(None)
-        self._exit_edit_mode()
-
-    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
-        event.stop()
-        self._exit_edit_mode()
-
-    def on_descendant_blur(self, event: DescendantBlur) -> None:
-        if self.has_class("-editing"):
-            self.call_after_refresh(self._maybe_exit_on_blur)
-
-    def _maybe_exit_on_blur(self) -> None:
-        focused = self.app.focused
-        if focused is None or focused not in self.walk_children():
-            self._exit_edit_mode()
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        event.stop()
+    def _update_picker_emoji(self, text: str) -> None:
+        """Update the emoji icon based on text being typed."""
         picker = self.query_one("#assignee-picker", Static)
-        text = event.value.strip()
-        if text:
+        if text.strip():
             emoji, _, _ = resolve_assignee(text, self.board)
             picker.update(emoji)
         else:
             picker.update(ICON_PERSON)
 
+    def on_click(self, event) -> None:
+        event.stop()
+        target = event.widget
+        # clicking the icon or tag label starts editing
+        if target.id == "assignee-picker":
+            self._start_editing()
+        elif target.has_class("tag-label"):
+            tag = target.parent.parent
+            if isinstance(tag, Tag) and not tag.has_class("-editing"):
+                self._start_editing(tag)
+
+    def _start_editing(self, tag: Tag | None = None) -> None:
+        """Start editing — reuse existing tag or create a new one."""
+        options = build_assignee_options(self.board)
+        if tag is None:
+            tags = list(self.query_one("#assignee-bar", Horizontal).query(Tag))
+            tag = tags[0] if tags else None
+        if tag is None:
+            bar = self.query_one("#assignee-bar", Horizontal)
+            tag = Tag(value="", classes="assignee-tag -new")
+            bar.mount(tag)
+        tag.start_editing(options)
+
+    def on_tag_changed(self, event: Tag.Changed) -> None:
+        event.stop()
+        tag = event.tag
+        new_value = event.new_value
+        tag.remove_class("-new")
+        with self.suppressing():
+            self.meta.assigned = new_value
+        emoji, name, _ = resolve_assignee(new_value, self.board)
+        self.query_one("#assignee-picker", Static).update(emoji)
+        tag.value = new_value
+        tag.update_display(name)
+        self._update_picker_emoji("")
+
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
+        event.stop()
+        tag = event.tag
+        tag.remove()
+        with self.suppressing():
+            self.meta.assigned = None
+        self.query_one("#assignee-picker", Static).update(ICON_PERSON)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        event.stop()
+        self._update_picker_emoji(event.value)
+
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         event.stop()
-        picker = self.query_one("#assignee-picker", Static)
         if event.option and event.option.id:
-            _, _, email = parse_committer(event.option.id)
-            emoji, _, _ = resolve_assignee(event.option.id, self.board)
-            picker.update(emoji)
+            self._update_picker_emoji(event.option.id)

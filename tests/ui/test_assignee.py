@@ -13,6 +13,7 @@ from ganban.ui.assignee import (
 )
 from ganban.ui.emoji import emoji_for_email
 from ganban.ui.search import SearchInput
+from ganban.ui.tag import Tag
 
 
 # --- Sync tests for build_assignee_options ---
@@ -102,12 +103,15 @@ class AssigneeApp(App):
     CSS = """
     AssigneeWidget { width: auto; height: 1; }
     AssigneeWidget > Horizontal { width: auto; height: 1; }
-    AssigneeWidget .assignee-name { width: auto; height: 1; }
     AssigneeWidget #assignee-picker { width: 2; height: 1; }
-    AssigneeWidget #assignee-search { display: none; width: 40; }
-    AssigneeWidget.-editing #assignee-search { display: block; }
-    AssigneeWidget.-editing .assignee-name { display: none; }
-    AssigneeWidget #assignee-search Input { height: 1; border: none; padding: 0; }
+    Tag { width: auto; height: 1; padding: 0 1 0 0; }
+    .tag-row { width: auto; height: 1; }
+    .tag-label { width: auto; height: 1; }
+    .tag-delete { width: auto; height: 1; }
+    Tag .tag-search { display: none; width: 40; }
+    Tag.-editing .tag-search { display: block; }
+    Tag.-editing .tag-label { display: none; }
+    Tag .tag-search Input { height: 1; border: none; padding: 0; }
     SearchInput { width: 100%; height: auto; }
     SearchInput > Input { width: 100%; }
     SearchInput > OptionList {
@@ -141,8 +145,8 @@ async def test_shows_emoji_when_assigned():
     async with app.run_test():
         picker = app.query_one("#assignee-picker", Static)
         assert picker.content == "🤖"
-        name_widget = app.query_one(".assignee-name", Static)
-        assert name_widget.content == "Alice"
+        tags = list(app.query_one(AssigneeWidget).query(Tag))
+        assert len(tags) == 1
 
 
 @pytest.mark.asyncio
@@ -151,52 +155,41 @@ async def test_shows_default_when_unassigned():
     async with app.run_test():
         picker = app.query_one("#assignee-picker", Static)
         assert picker.content == ICON_PERSON
-        name_widget = app.query_one(".assignee-name", Static)
-        assert name_widget.content == ""
+        tags = list(app.query_one(AssigneeWidget).query(Tag))
+        assert len(tags) == 0
 
 
 @pytest.mark.asyncio
-async def test_select_assignee_via_search():
+async def test_select_assignee_via_tag():
     app = AssigneeApp(committers=["Alice <alice@example.com>"])
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
-        search = widget.query_one("#assignee-search", SearchInput)
 
-        # Simulate submission
-        search.post_message(SearchInput.Submitted("🤖 Alice <alice@example.com>", "Alice <alice@example.com>"))
+        # Start editing (creates a new tag)
+        widget._start_editing()
+        await pilot.pause()
+
+        tag = list(widget.query(Tag))[0]
+        tag.post_message(Tag.Changed(tag, "", "Alice <alice@example.com>"))
         await pilot.pause()
 
         assert app.card_meta.assigned == "Alice <alice@example.com>"
 
 
 @pytest.mark.asyncio
-async def test_unassign_via_empty_submit():
+async def test_unassign_via_tag_delete():
     app = AssigneeApp(assigned="Alice <alice@example.com>")
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
-        search = widget.query_one("#assignee-search", SearchInput)
+        tags = list(widget.query(Tag))
+        assert len(tags) == 1
 
-        # Empty submit means unassign
-        search.post_message(SearchInput.Submitted("", None))
+        tags[0].post_message(Tag.Deleted(tags[0]))
         await pilot.pause()
 
         assert app.card_meta.assigned is None
-        name_widget = app.query_one(".assignee-name", Static)
-        assert name_widget.content == ""
-
-
-@pytest.mark.asyncio
-async def test_free_text_assignee():
-    app = AssigneeApp()
-    async with app.run_test() as pilot:
-        widget = app.query_one(AssigneeWidget)
-        search = widget.query_one("#assignee-search", SearchInput)
-
-        # Free text (no matching option)
-        search.post_message(SearchInput.Submitted("newuser@example.com", None))
-        await pilot.pause()
-
-        assert app.card_meta.assigned == "newuser@example.com"
+        picker = app.query_one("#assignee-picker", Static)
+        assert picker.content == ICON_PERSON
 
 
 @pytest.mark.asyncio
@@ -204,9 +197,9 @@ async def test_cancel_leaves_unchanged():
     app = AssigneeApp(assigned="Alice <alice@example.com>")
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
-        search = widget.query_one("#assignee-search", SearchInput)
-
-        search.post_message(SearchInput.Cancelled())
+        tags = list(widget.query(Tag))
+        tag = tags[0]
+        tag.post_message(SearchInput.Cancelled())
         await pilot.pause()
 
         assert app.card_meta.assigned == "Alice <alice@example.com>"
@@ -216,56 +209,15 @@ async def test_cancel_leaves_unchanged():
 async def test_reacts_to_external_change():
     app = AssigneeApp()
     async with app.run_test() as pilot:
-        name_widget = app.query_one(".assignee-name", Static)
-        assert name_widget.content == ""
+        widget = app.query_one(AssigneeWidget)
+        tags = list(widget.query(Tag))
+        assert len(tags) == 0
 
         app.card_meta.assigned = "Bob <bob@example.com>"
         await pilot.pause()
 
-        assert name_widget.content == "Bob"
-
-
-@pytest.mark.asyncio
-async def test_edit_mode_toggle():
-    app = AssigneeApp(committers=["Alice <alice@example.com>"])
-    async with app.run_test() as pilot:
-        widget = app.query_one(AssigneeWidget)
-
-        assert not widget.has_class("-editing")
-
-        # Enter edit mode
-        widget._enter_edit_mode()
-        await pilot.pause()
-        assert widget.has_class("-editing")
-
-        # Exit edit mode
-        widget._exit_edit_mode()
-        await pilot.pause()
-        assert not widget.has_class("-editing")
-
-
-@pytest.mark.asyncio
-async def test_edit_mode_prepopulates_current_assignee():
-    app = AssigneeApp(assigned="user@email.whatever")
-    async with app.run_test() as pilot:
-        widget = app.query_one(AssigneeWidget)
-        widget._enter_edit_mode()
-        await pilot.pause()
-
-        inp = widget.query_one("#assignee-search", SearchInput).query_one("Input")
-        assert inp.value == "user@email.whatever"
-
-
-@pytest.mark.asyncio
-async def test_edit_mode_input_empty_when_unassigned():
-    app = AssigneeApp()
-    async with app.run_test() as pilot:
-        widget = app.query_one(AssigneeWidget)
-        widget._enter_edit_mode()
-        await pilot.pause()
-
-        inp = widget.query_one("#assignee-search", SearchInput).query_one("Input")
-        assert inp.value == ""
+        tags = list(widget.query(Tag))
+        assert len(tags) == 1
 
 
 @pytest.mark.asyncio
@@ -282,7 +234,11 @@ async def test_live_emoji_preview():
         from textual.widgets.option_list import Option
 
         option = Option("🤖 Alice <alice@example.com>", id="Alice <alice@example.com>")
-        option_list = widget.query_one("#assignee-search", SearchInput).query_one("OptionList")
+        # We need an OptionList to create the event — get one from any search
+        widget._start_editing()
+        await pilot.pause()
+        tag = list(widget.query(Tag))[0]
+        option_list = tag.query_one(SearchInput).query_one("OptionList")
         event = option_list.OptionHighlighted(option_list, option, 0)
         widget.on_option_list_option_highlighted(event)
         await pilot.pause()
@@ -296,17 +252,21 @@ async def test_emoji_updates_live_while_typing():
     async with app.run_test() as pilot:
         widget = app.query_one(AssigneeWidget)
         picker = widget.query_one("#assignee-picker", Static)
-        inp = widget.query_one("#assignee-search", SearchInput).query_one(Input)
 
         assert picker.content == ICON_PERSON
 
-        # Simulate typing an email
+        # Start editing to get an input
+        widget._start_editing()
+        await pilot.pause()
+
+        tag = list(widget.query(Tag))[0]
+        inp = tag.query_one(SearchInput).query_one(Input)
+
         inp.value = "test@example.com"
         await pilot.pause()
 
         assert picker.content == emoji_for_email("test@example.com")
 
-        # Clearing the input restores the default icon
         inp.value = ""
         await pilot.pause()
 

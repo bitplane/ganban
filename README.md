@@ -4,9 +4,6 @@ git-based Kanban TUI
 
 ## What is this?
 
-Note: this is the plan. half of this isn't working yet. half of it is, and I'm
-not saying which half.
-
 `ganban` is a Kanban board that lives in git. It sits in an orphan branch so web
 UIs don't offer to merge it. In `ganban`, our tasks stay with the code and we
 don't need to rely on external services and API keys. It's just files in a dir.

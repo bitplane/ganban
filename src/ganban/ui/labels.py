@@ -7,12 +7,11 @@ from typing import Any
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
-from textual.events import DescendantBlur
 from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
 from ganban.ui.palette import get_label_color
-from ganban.ui.search import SearchInput
+from ganban.ui.tag import Tag
 from ganban.ui.watcher import NodeWatcherMixin
 
 ICON_LABEL = "\U0001f516"  # 🔖
@@ -45,8 +44,8 @@ class LabelsWidget(NodeWatcherMixin, Container):
     """Inline label editor for card detail bar.
 
     Displays label tags next to a bookmark icon. Click the icon to add a label,
-    click a tag to replace it. Uses SearchInput for label selection with
-    free-text fallback for new labels.
+    click a tag to edit it, click × to delete. Uses Tag widgets with SearchInput
+    for label selection with free-text fallback for new labels.
     """
 
     def __init__(self, meta: Node, board: Node, **kwargs) -> None:
@@ -54,13 +53,11 @@ class LabelsWidget(NodeWatcherMixin, Container):
         super().__init__(**kwargs)
         self.meta = meta
         self.board = board
-        self._editing_index: int | None = None  # None = adding, int = replacing
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="labels-bar"):
             yield Static(ICON_LABEL, id="labels-add")
             yield Horizontal(id="labels-tags")
-            yield SearchInput([], placeholder="label", id="labels-search")
 
     def on_mount(self) -> None:
         self.node_watch(self.meta, "labels", self._on_labels_changed)
@@ -77,35 +74,18 @@ class LabelsWidget(NodeWatcherMixin, Container):
         labels = self.meta.labels
         if labels and isinstance(labels, list):
             for name in labels:
-                tag = Static(classes="label-tag")
-                tag._label_name = name
+                tag = Tag(value=name, display=_label_display(name, self.board))
                 container.mount(tag)
-                tag.update(_label_display(name, self.board))
 
-    def _enter_edit_mode(self, index: int | None = None) -> None:
-        """Enter edit mode. index=None means adding, int means replacing."""
-        self._editing_index = index
-        self.add_class("-editing")
-        current_labels = list(self.meta.labels or [])
-        if index is not None and index < len(current_labels):
-            filter_labels = current_labels[:index] + current_labels[index + 1 :]
-        else:
-            filter_labels = current_labels
-        search = self.query_one("#labels-search", SearchInput)
-        search.set_options(build_label_options(self.board, filter_labels))
-        inp = search.query_one(Input)
-        inp.value = ""
-        self._update_indicator("")
-        inp.focus()
-
-    def _exit_edit_mode(self) -> None:
-        self._editing_index = None
-        search = self.query_one("#labels-search", SearchInput)
-        search._close_dropdown()
-        self.remove_class("-editing")
-        self.query_one("#labels-add", Static).update(ICON_LABEL)
-        self._rebuild_tags()
-        self.screen.focus()
+    def _current_labels_except(self, exclude_tag: Tag | None = None) -> list[str]:
+        """Get current labels, optionally excluding one tag's value."""
+        labels = list(self.meta.labels or [])
+        if exclude_tag is not None:
+            tags = list(self.query_one("#labels-tags", Horizontal).query(Tag))
+            idx = tags.index(exclude_tag) if exclude_tag in tags else None
+            if idx is not None and idx < len(labels):
+                return labels[:idx] + labels[idx + 1 :]
+        return labels
 
     def _update_indicator(self, text: str) -> None:
         """Update the icon to show the label colour as user types."""
@@ -121,53 +101,67 @@ class LabelsWidget(NodeWatcherMixin, Container):
 
     def on_click(self, event) -> None:
         event.stop()
-        if self.has_class("-editing"):
-            return
         target = event.widget
         if target.id == "labels-add":
-            self._enter_edit_mode()
-        elif target.has_class("label-tag"):
-            container = self.query_one("#labels-tags", Horizontal)
-            idx = list(container.children).index(target)
-            self._enter_edit_mode(index=idx)
+            self._add_new_tag()
+        elif target.has_class("tag-label"):
+            # clicked on a tag's label — start editing it
+            tag = target.parent.parent  # tag-label → tag-row → Tag
+            if isinstance(tag, Tag) and not tag.has_class("-editing"):
+                options = build_label_options(self.board, self._current_labels_except(tag))
+                tag.start_editing(options)
 
-    def on_search_input_submitted(self, event: SearchInput.Submitted) -> None:
+    def _add_new_tag(self) -> None:
+        """Mount a temporary blank tag for adding a new label."""
+        container = self.query_one("#labels-tags", Horizontal)
+        tag = Tag(value="", classes="-new")
+        container.mount(tag)
+        options = build_label_options(self.board, self._current_labels_except())
+        tag.start_editing(options)
+
+    def on_tag_changed(self, event: Tag.Changed) -> None:
         event.stop()
-        label_name = event.value or event.text.strip()
+        tag = event.tag
         labels = list(self.meta.labels or [])
-        if label_name:
-            if self._editing_index is not None and self._editing_index < len(labels):
-                labels[self._editing_index] = label_name
-            else:
-                labels.append(label_name)
-        elif self._editing_index is not None and self._editing_index < len(labels):
-            del labels[self._editing_index]
-        else:
-            self._exit_edit_mode()
-            return
+        tags = list(self.query_one("#labels-tags", Horizontal).query(Tag))
+        idx = tags.index(tag) if tag in tags else None
+
+        if tag.has_class("-new"):
+            tag.remove_class("-new")
+            labels.append(event.new_value)
+        elif idx is not None and idx < len(labels):
+            labels[idx] = event.new_value
+
+        tag.value = event.new_value
+        tag.update_display(_label_display(event.new_value, self.board))
+        self._update_indicator("")
         with self.suppressing():
             self.meta.labels = labels or None
-        self._exit_edit_mode()
 
-    def on_search_input_cancelled(self, event: SearchInput.Cancelled) -> None:
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
         event.stop()
-        self._exit_edit_mode()
+        tag = event.tag
+        labels = list(self.meta.labels or [])
+        tags = list(self.query_one("#labels-tags", Horizontal).query(Tag))
+        idx = tags.index(tag) if tag in tags else None
 
-    def on_descendant_blur(self, event: DescendantBlur) -> None:
-        if self.has_class("-editing"):
-            self.call_after_refresh(self._maybe_exit_on_blur)
+        if tag.has_class("-new"):
+            tag.remove()
+            self._update_indicator("")
+            return
 
-    def _maybe_exit_on_blur(self) -> None:
-        focused = self.app.focused
-        if focused is None or focused not in self.walk_children():
-            self._exit_edit_mode()
+        if idx is not None and idx < len(labels):
+            del labels[idx]
+        tag.remove()
+        self._update_indicator("")
+        with self.suppressing():
+            self.meta.labels = labels or None
 
     def on_input_changed(self, event: Input.Changed) -> None:
         event.stop()
-        if self.has_class("-editing"):
-            self._update_indicator(event.value)
+        self._update_indicator(event.value)
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         event.stop()
-        if self.has_class("-editing") and event.option and event.option.id:
+        if event.option and event.option.id:
             self._update_indicator(event.option.id)
