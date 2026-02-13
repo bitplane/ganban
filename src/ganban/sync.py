@@ -66,6 +66,7 @@ async def run_sync_cycle(board):
             board.commit = new_commit
 
         # --- MERGE (local divergence + remote branches) ---
+        merged = False
         if do_local:
             sync.status = "load"
 
@@ -77,6 +78,7 @@ async def run_sync_cycle(board):
                     sync.status = "conflict"
                     return
                 board.commit = new_commit
+                merged = True
 
             # Remote merges
             if do_remote and remotes:
@@ -100,14 +102,18 @@ async def run_sync_cycle(board):
                         sync.status = "conflict"
                         return
                     board.commit = new_commit
+                    merged = True
 
-            # Reload and update the live tree, preserving transient sync state
-            sync_node = board.git.sync
-            config_node = board.git.config
-            new_board = await asyncio.to_thread(load_board, repo_path)
-            board.update(new_board)
-            board.git.sync = sync_node
-            board.git.config = config_node
+            # Only reload if we merged external changes; otherwise our
+            # in-memory state is authoritative and reloading risks
+            # overwriting user edits with a racy save snapshot.
+            if merged:
+                sync_node = board.git.sync
+                config_node = board.git.config
+                new_board = await asyncio.to_thread(load_board, repo_path)
+                board.update(new_board)
+                board.git.sync = sync_node
+                board.git.config = config_node
 
         # --- PUSH ---
         if do_remote and upstream_remote:

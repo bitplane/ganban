@@ -19,6 +19,7 @@ from ganban.ui.constants import (
     ICON_DELETE,
     ICON_EDIT,
     ICON_MOVE_TO,
+    ICON_TAB_LABELS,
     ICON_UNCHECKED,
 )
 from ganban.ui.detail import CardDetailModal
@@ -148,15 +149,27 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         ]
         card = self.board.cards[self.card_id]
         done_label = f"{ICON_CHECKED} Done" if card.meta.done else f"{ICON_UNCHECKED} Done"
+        card_labels = set()
+        if card.meta.labels and isinstance(card.meta.labels, list):
+            card_labels = {raw.strip().lower() for raw in card.meta.labels}
+        label_items = [
+            MenuItem(
+                f"{ICON_CHECKED} {name}" if name in card_labels else f"{ICON_UNCHECKED} {name}",
+                f"label:{name}",
+            )
+            for name in (self.board.labels.keys() if self.board.labels else [])
+        ]
         items = [
             MenuItem(f"{ICON_CARD} {self.title}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),
             MenuItem(done_label, "toggle-done"),
+            MenuItem(f"{ICON_TAB_LABELS} Labels", submenu=label_items) if label_items else None,
             MenuSeparator(),
             MenuItem(f"{ICON_DELETE} Archive", "archive"),
         ]
+        items = [i for i in items if i is not None]
         self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
     def _on_menu_closed(self, item: MenuItem | None) -> None:
@@ -174,6 +187,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             case s if s and s.startswith("move:"):
                 col_name = s[5:]
                 self._move_to_column(col_name)
+            case s if s and s.startswith("label:"):
+                label_name = s[6:]
+                self._toggle_label(label_name)
 
     def action_confirm_archive(self) -> None:
         self._confirm_archive()
@@ -193,6 +209,17 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     def _on_archive_confirmed(self, item: MenuItem | None) -> None:
         if item and item.item_id == "confirm":
             self.post_message(self.ArchiveRequested(self))
+
+    def _toggle_label(self, label_name: str) -> None:
+        """Toggle a label on/off for this card."""
+        card = self.board.cards[self.card_id]
+        labels = list(card.meta.labels) if isinstance(card.meta.labels, list) else []
+        existing = [raw for raw in labels if raw.strip().lower() == label_name]
+        if existing:
+            labels = [raw for raw in labels if raw.strip().lower() != label_name]
+        else:
+            labels.append(label_name)
+        card.meta.labels = labels or None
 
     def _move_to_column(self, col_name: str) -> None:
         """Request move to the named column."""

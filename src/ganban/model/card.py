@@ -73,15 +73,17 @@ def move_card(
         source_column.links = tuple(links)
         return
 
-    if source_column is not None:
-        links = list(source_column.links)
-        links.remove(card_id)
-        source_column.links = tuple(links)
-
+    # Add to target before removing from source to avoid a transient state
+    # where the card is in zero columns, which would trigger archived watchers.
     links = list(target_column.links)
     insert_pos = min(position, len(links)) if position is not None else len(links)
     links.insert(insert_pos, card_id)
     target_column.links = tuple(links)
+
+    if source_column is not None:
+        links = list(source_column.links)
+        links.remove(card_id)
+        source_column.links = tuple(links)
 
 
 def rename_label(board: Node, old_name: str, new_name: str) -> None:
