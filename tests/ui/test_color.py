@@ -3,7 +3,7 @@
 import pytest
 from textual.app import App, ComposeResult
 
-from ganban.palette import LABEL_COLORS
+from ganban.ui.palette import LABEL_COLORS
 from ganban.ui.color import (
     COLORS,
     ColorButton,

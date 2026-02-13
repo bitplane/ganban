@@ -109,27 +109,38 @@ def test_footer_assigned_no_board_meta():
     assert result.plain == ""
 
 
+def _make_board_with_label_colors(**label_colors):
+    """Create a board with label color overrides."""
+    board = Node()
+    board.meta = Node()
+    board.meta.labels = Node(**{name: Node(color=color) for name, color in label_colors.items()})
+    board.labels = Node(**{name: Node(cards=[]) for name in label_colors.keys()})
+    return board
+
+
 def test_label_text_shows_colored_blocks():
     """Cards with labels show colored block characters."""
     meta = Node(labels=["bug", "urgent"])
-    board_labels = Node(
-        bug=Node(color="#800000", cards=["001"]),
-        urgent=Node(color="#ff6600", cards=["001"]),
-    )
-    result = build_label_text(meta, board_labels)
+    board = _make_board_with_label_colors(bug="#800000", urgent="#ff6600")
+    result = build_label_text(meta, board)
     assert result.plain == "\u2588\u2588"
-
-
-def test_label_text_empty_without_board_labels():
-    """No label text when board_labels not provided."""
-    meta = Node(labels=["bug"])
-    result = build_label_text(meta)
-    assert result.plain == ""
 
 
 def test_label_text_empty_without_card_labels():
     """No label text when card has no labels."""
     meta = Node()
-    board_labels = Node(bug=Node(color="#800000", cards=[]))
-    result = build_label_text(meta, board_labels)
+    board = _make_board_with_label_colors(bug="#800000")
+    result = build_label_text(meta, board)
     assert result.plain == ""
+
+
+def test_label_text_uses_hash_color_without_override():
+    """Labels without overrides use hash-computed color."""
+
+    meta = Node(labels=["newlabel"])
+    board = Node()
+    board.meta = Node()
+    board.meta.labels = None
+    result = build_label_text(meta, board)
+    # Should have one block character with hash-computed color
+    assert result.plain == "\u2588"

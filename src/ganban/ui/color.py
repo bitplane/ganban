@@ -6,7 +6,7 @@ from textual.color import Color
 from textual.message import Message
 from textual.widgets import Static
 
-from ganban.palette import COLORS, color_for_label
+from ganban.ui.palette import COLORS, color_for_label
 from ganban.ui.constants import ICON_PALETTE
 from ganban.ui.menu import ContextMenu, MenuItem, MenuRow
 

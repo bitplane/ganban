@@ -9,19 +9,18 @@ from ganban.parser import first_body
 from ganban.ui.cal import date_diff
 from ganban.ui.constants import ICON_BLOCKED, ICON_BODY, ICON_CALENDAR, ICON_CHECKED
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
+from ganban.ui.palette import get_label_color
 
 
-def build_label_text(meta: Node, board_labels: Node | None = None) -> Text:
+def build_label_text(meta: Node, board: Node) -> Text:
     """Build colored block characters for a card's labels."""
     card_labels = meta.labels if meta else None
-    if not card_labels or not isinstance(card_labels, list) or not board_labels:
+    if not card_labels or not isinstance(card_labels, list):
         return Text()
     result = Text()
     for raw in card_labels:
-        name = raw.strip().lower()
-        label_node = getattr(board_labels, name) if board_labels else None
-        if label_node and label_node.color:
-            result.append("\u2588", style=label_node.color)
+        color = get_label_color(raw, board)
+        result.append("\u2588", style=color)
     return result
 
 

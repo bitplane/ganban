@@ -5,42 +5,61 @@ LabelsEditor {
     overflow-y: auto;
 }
 
-/* LabelRow */
-LabelRow {
+LabelsEditor .section-header {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+    color: $text-muted;
+    text-style: bold;
+}
+
+/* SavedLabelRow and UsedLabelRow */
+SavedLabelRow, UsedLabelRow {
     width: 100%;
     height: auto;
     padding: 0 1;
     margin-bottom: 1;
     background: $surface;
 }
-LabelRow > .label-title-bar {
+SavedLabelRow > .label-title-bar,
+UsedLabelRow > .label-title-bar {
     width: 100%;
     height: auto;
     background: $primary;
     color: $text;
     padding: 0 1;
 }
-LabelRow .label-color {
+SavedLabelRow .label-color,
+UsedLabelRow .label-color {
     width: 2;
     height: 1;
 }
-LabelRow .label-swatch {
+SavedLabelRow .label-swatch,
+UsedLabelRow .label-swatch,
+UsedLabelRow .label-swatch-static {
     width: 2;
     height: 1;
 }
-LabelRow .label-name {
+SavedLabelRow .label-name,
+UsedLabelRow .label-name {
     width: 1fr;
     height: auto;
 }
-LabelRow .label-count {
+SavedLabelRow .label-count,
+UsedLabelRow .label-count {
     width: auto;
     height: 1;
     color: $text-muted;
 }
-LabelRow .label-delete {
+SavedLabelRow .label-delete,
+UsedLabelRow .label-delete {
     width: 2;
     height: 1;
     dock: right;
+}
+UsedLabelRow .label-save {
+    width: 2;
+    height: 1;
 }
 
 /* AddLabelRow */

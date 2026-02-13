@@ -11,24 +11,16 @@ from textual.events import DescendantBlur
 from textual.widgets import Input, OptionList, Static
 
 from ganban.model.node import Node
-from ganban.palette import color_for_label
+from ganban.ui.palette import get_label_color
 from ganban.ui.search import SearchInput
 from ganban.ui.watcher import NodeWatcherMixin
 
 ICON_LABEL = "\U0001f516"  # 🔖
 
 
-def _label_color(name: str, board: Node) -> str:
-    """Resolve a label's display color from the board index or hash."""
-    label_node = getattr(board.labels, name.strip().lower()) if board.labels else None
-    if label_node and label_node.color:
-        return label_node.color
-    return color_for_label(name.strip().lower())
-
-
 def _label_display(name: str, board: Node) -> Text:
     """Build a colored block + name Text for a label."""
-    color = _label_color(name, board)
+    color = get_label_color(name, board)
     result = Text()
     result.append("\u2588\u2588", style=color)
     result.append_text(Text(f" {name}"))
@@ -120,7 +112,7 @@ class LabelsWidget(NodeWatcherMixin, Container):
         picker = self.query_one("#labels-add", Static)
         name = text.strip().lower()
         if name:
-            color = _label_color(name, self.board)
+            color = get_label_color(name, self.board)
             indicator = Text()
             indicator.append("\u2588\u2588", style=color)
             picker.update(indicator)

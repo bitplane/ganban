@@ -2,6 +2,8 @@
 
 import hashlib
 
+from ganban.model.node import Node
+
 COLORS: dict[str, str] = {
     "red": "#800000",
     "green": "#008000",
@@ -63,3 +65,18 @@ def color_for_label(label: str) -> str:
     h = hashlib.md5(label.encode()).hexdigest()
     index = sum(int(h[i : i + 2], 16) for i in range(0, 32, 2))
     return LABEL_COLORS[index % len(LABEL_COLORS)]
+
+
+def get_label_color(name: str, board: Node) -> str:
+    """Get label color: explicit override from meta or computed hash.
+
+    Checks board.meta.labels[name].color for an override, otherwise
+    returns a deterministic color based on the label name hash.
+    """
+    norm = name.strip().lower()
+    meta_labels = board.meta.labels if board.meta else None
+    if meta_labels and isinstance(meta_labels, Node):
+        entry = getattr(meta_labels, norm, None)
+        if entry and isinstance(entry, Node) and entry.color:
+            return entry.color
+    return color_for_label(norm)

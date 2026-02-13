@@ -99,7 +99,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
     def _refresh_indicators(self) -> None:
         """Update title with label blocks, footer indicators, and blocked state."""
         card = self.board.cards[self.card_id]
-        label_text = build_label_text(card.meta, self.board.labels)
+        label_text = build_label_text(card.meta, self.board)
 
         # Title: label blocks on the left, then card title
         title_widget = self.query_one("#card-title", PlainStatic)

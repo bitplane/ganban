@@ -13,7 +13,6 @@ from ganban.ids import compare_ids, max_id, next_id, normalize_id
 from ganban.constants import BRANCH_NAME
 from ganban.model.node import ListNode, Node
 from ganban.parser import parse_sections
-from ganban.palette import color_for_label
 
 MAX_COMMITS = 100
 
@@ -302,7 +301,11 @@ def normalise_label(raw: str) -> str:
 
 
 def _build_labels_index(board: Node) -> dict[str, Node]:
-    """Build {label_name: Node(color=..., cards=[...])} from current state."""
+    """Build {label_name: Node(cards=[...])} from current state.
+
+    Colors are NOT computed here - that's a UI concern. The UI reads
+    board.meta.labels[name].color for overrides, else computes a hash color.
+    """
     index: dict[str, list[str]] = {}
 
     # Collect from all cards
@@ -315,25 +318,8 @@ def _build_labels_index(board: Node) -> dict[str, Node]:
             if name:
                 index.setdefault(name, []).append(card_id)
 
-    # Collect from board meta (may add labels with no cards)
-    meta_labels = board.meta.labels if board.meta else None
-    if meta_labels and isinstance(meta_labels, Node):
-        for name in meta_labels.keys():
-            norm = normalise_label(name)
-            if norm:
-                index.setdefault(norm, [])
-
-    # Build nodes with resolved colours
-    result = {}
-    for name, card_ids in index.items():
-        override = None
-        if meta_labels and isinstance(meta_labels, Node):
-            entry = getattr(meta_labels, name, None)
-            if entry and isinstance(entry, Node):
-                override = entry.color
-        color = override or color_for_label(name)
-        result[name] = Node(color=color, cards=card_ids)
-    return result
+    # Build nodes with card lists only
+    return {name: Node(cards=card_ids) for name, card_ids in index.items()}
 
 
 def _recompute_labels(board: Node) -> None:
@@ -352,12 +338,15 @@ def _recompute_labels(board: Node) -> None:
         if old is None:
             setattr(existing, name, node)
         else:
-            old.color = node.color
             old.cards = node.cards
 
 
 def _setup_labels(board: Node) -> None:
-    """Build board.labels index and watch for changes."""
+    """Build board.labels index and watch for changes.
+
+    Note: board.labels only contains labels that are on cards (data).
+    Color overrides live in board.meta.labels (UI watches that separately).
+    """
     board.labels = Node(**_build_labels_index(board))
 
     def on_cards_changed(source_node, key, old, new):
@@ -366,12 +355,7 @@ def _setup_labels(board: Node) -> None:
         elif key == "*" and source_node is board.cards:
             _recompute_labels(board)
 
-    def on_board_meta_labels_changed(source_node, key, old, new):
-        _recompute_labels(board)
-
     board.watch("cards", on_cards_changed)
-    if board.meta:
-        board.meta.watch("labels", on_board_meta_labels_changed)
 
 
 def _activate(board: Node, repo: Repo) -> None:

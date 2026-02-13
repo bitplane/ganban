@@ -1,8 +1,7 @@
 """Tests for the computed board.labels index."""
 
 from ganban.model.loader import _setup_labels, normalise_label
-from ganban.model.node import Node
-from ganban.palette import color_for_label
+from ganban.ui.palette import color_for_label, get_label_color
 
 from tests.model.conftest import _make_board, _make_card, _make_column
 
@@ -35,19 +34,12 @@ def test_board_labels_populated():
     assert board.labels.urgent is not None
 
 
-def test_board_labels_color_from_hash():
-    """Default colour is deterministic via color_for_label."""
+def test_board_labels_has_cards_only():
+    """board.labels only contains card lists, no color (that's a UI concern)."""
     board = _board_with_labels(card_labels={"001": ["bug"]})
-    assert board.labels.bug.color == color_for_label("bug")
-
-
-def test_board_labels_color_override():
-    """Board meta labels color overrides the hash default."""
-    board = _board_with_labels(
-        card_labels={"001": ["bug"]},
-        board_label_overrides={"bug": {"color": "#123456"}},
-    )
-    assert board.labels.bug.color == "#123456"
+    assert board.labels.bug.cards == ["001"]
+    # Color is NOT in the index - it's computed by UI
+    assert board.labels.bug.color is None
 
 
 def test_board_labels_cards_list():
@@ -76,15 +68,20 @@ def test_board_labels_normalised():
     assert getattr(board.labels, "Bug") is None or getattr(board.labels, "Bug") is board.labels.bug
 
 
-def test_board_labels_includes_meta_only():
-    """Board meta labels with no cards still appear in the index."""
+def test_board_labels_meta_only_not_in_index():
+    """Board meta labels without cards do NOT appear in board.labels.
+
+    board.labels only contains labels that are actually on cards.
+    Meta-only labels are just color overrides, not data.
+    """
     board = _board_with_labels(
         card_labels={},
         board_label_overrides={"wontfix": {"color": "#999999"}},
     )
-    assert board.labels.wontfix is not None
-    assert board.labels.wontfix.cards == []
-    assert board.labels.wontfix.color == "#999999"
+    # wontfix has no cards, so it's not in board.labels
+    assert board.labels.wontfix is None
+    # But it IS in board.meta.labels
+    assert board.meta.labels.wontfix.color == "#999999"
 
 
 def test_board_labels_updates_on_card_change():
@@ -101,15 +98,22 @@ def test_board_labels_updates_on_card_change():
     assert "001" in board.labels.feature.cards
 
 
-def test_board_labels_updates_on_meta_change():
-    """Mutating board.meta.labels triggers recompute."""
+def test_get_label_color_uses_override():
+    """get_label_color returns override if present, else computed hash."""
+    board = _board_with_labels(
+        card_labels={"001": ["bug"]},
+        board_label_overrides={"bug": {"color": "#ff0000"}},
+    )
+    # Override takes precedence
+    assert get_label_color("bug", board) == "#ff0000"
+    # No override uses hash
+    assert get_label_color("feature", board) == color_for_label("feature")
+
+
+def test_get_label_color_no_override():
+    """get_label_color returns computed hash when no override."""
     board = _board_with_labels(card_labels={"001": ["bug"]})
-    assert board.labels.bug.color == color_for_label("bug")
-
-    # Add board-level color override
-    board.meta.labels = Node(bug=Node(color="#ff0000"))
-
-    assert board.labels.bug.color == "#ff0000"
+    assert get_label_color("bug", board) == color_for_label("bug")
 
 
 def test_normalise_label():
