@@ -3,6 +3,9 @@ DragGhost {
     layer: overlay;
     height: auto;
 }
+DragGhost CardWidget {
+    margin-bottom: 0;
+}
 
 /* CardPlaceholder */
 CardPlaceholder {
