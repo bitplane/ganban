@@ -13,7 +13,7 @@ labels:
   ui:
     color: '#0000ff'
   data:
-    color: '#00ffff'
+    color: '#008000'
 ---
 
 # ganban - decentralized kanban
