@@ -65,6 +65,7 @@ class GanbanApp(App):
         "edit/document.tcss",
     ]
 
+    theme = "gruvbox"
     TITLE = "ganban"
     BINDINGS = [("ctrl+q", "quit", "Quit")]
 
