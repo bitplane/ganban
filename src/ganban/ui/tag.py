@@ -10,6 +10,7 @@ from textual.events import DescendantBlur
 from textual.message import Message
 from textual.widgets import Input, Static
 
+from ganban.ui.constants import ICON_DELETE
 from ganban.ui.search import SearchInput
 
 
@@ -55,7 +56,7 @@ class Tag(Static):
         with Horizontal(classes="tag-row"):
             yield Static(self._display, classes="tag-label")
             yield SearchInput([], classes="tag-search")
-            yield Static("×", classes="tag-delete")
+            yield Static(ICON_DELETE, classes="tag-delete")
 
     def on_mount(self) -> None:
         if self._pending_edit_options is not None:
@@ -91,6 +92,7 @@ class Tag(Static):
         if not self.value:
             self.post_message(self.Deleted(self))
             return
+        self.query_one(".tag-label", Static).update(self._display)
         self.screen.focus()
 
     def on_click(self, event) -> None:

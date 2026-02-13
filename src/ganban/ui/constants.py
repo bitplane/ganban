@@ -1,7 +1,7 @@
 """Shared UI icon constants."""
 
 ICON_BACK = "🔙"
-ICON_DELETE = "メ"
+ICON_DELETE = "×"
 ICON_CALENDAR = "📅"
 ICON_PALETTE = "🎨"
 ICON_BODY = "📝"
