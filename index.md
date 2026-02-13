@@ -9,7 +9,9 @@ users:
     emails:
     - noreply@anthropic.com
     emoji: "\U0001F916"
-labels: {}
+labels:
+  ui:
+    color: '#bb5500'
 ---
 
 # ganban - decentralized kanban
