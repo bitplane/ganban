@@ -14,6 +14,8 @@ labels:
     color: '#0000ff'
   data:
     color: '#00ffff'
+  tasks:
+    color: '#ffff00'
 ---
 
 # ganban - decentralized kanban
