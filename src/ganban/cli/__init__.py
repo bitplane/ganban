@@ -15,6 +15,7 @@ from ganban.cli.column import (
 )
 from ganban.cli.init import init_board
 from ganban.cli.sync import sync
+from ganban.cli.web import web
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -128,5 +129,11 @@ def build_parser() -> argparse.ArgumentParser:
     sync_p.add_argument("-d", "--daemon", action="store_true", help="Run as background daemon")
     sync_p.add_argument("--interval", type=int, default=120, help="Daemon sync interval in seconds (default: 120)")
     sync_p.set_defaults(func=sync)
+
+    # --- web ---
+    web_p = nouns.add_parser("web", help="Serve board in browser", parents=[common])
+    web_p.add_argument("--host", default="localhost", help="Bind address (default: localhost)")
+    web_p.add_argument("--port", type=int, default=8617, help="Port (default: 8617)")
+    web_p.set_defaults(func=web)
 
     return parser
