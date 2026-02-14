@@ -27,7 +27,7 @@ def init_board(args) -> int:
 
     board = Node(repo_path=str(repo_path))
     board.sections = ListNode()
-    board.sections["ganban"] = ""
+    board.sections[repo_path.name] = ""
     board.meta = {}
     board.cards = ListNode()
     board.columns = ListNode()
