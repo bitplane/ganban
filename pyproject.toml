@@ -19,17 +19,16 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Version Control :: Git",
 ]
+dependencies = [
+    "textual>=7.5",
+    "gitpython>=3.1",
+    "pyyaml>=6.0",
+]
 
 [project.urls]
 Homepage = "https://bitplane.net/dev/python/ganban"
 Repository = "https://github.com/bitplane/ganban"
 Issues = "https://github.com/bitplane/ganban/tree/ganban"
-
-dependencies = [
-    "textual>=7.5",
-    "gitpython>=3.1",
-    "pyyaml>=6.0"
-]
 
 [project.scripts]
 ganban = "ganban.__main__:main"
