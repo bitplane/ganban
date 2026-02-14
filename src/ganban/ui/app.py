@@ -65,12 +65,12 @@ class GanbanApp(App):
         "edit/document.tcss",
     ]
 
-    theme = "gruvbox"
     TITLE = "ganban"
     BINDINGS = [("ctrl+q", "quit", "Quit")]
 
     def __init__(self, repo_path: Path):
         super().__init__()
+        self.theme = "gruvbox"
         self.repo_path = repo_path
         self.board: Node | None = None
 
@@ -92,7 +92,7 @@ class GanbanApp(App):
         if not await has_branch(self.repo_path):
             board = Node(repo_path=str(self.repo_path))
             board.sections = ListNode()
-            board.sections["ganban"] = ""
+            board.sections[self.repo_path.name] = ""
             board.meta = {}
             board.cards = ListNode()
             board.columns = ListNode()
