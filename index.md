@@ -1,6 +1,6 @@
 ---
 users:
-  gaz:
+  Gaz:
     emails:
     - gaz@bitplane.net
     - garethdavidson@gmail.com
