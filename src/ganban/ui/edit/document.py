@@ -208,7 +208,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
 
     def _focus_section_body(self, section: SectionEditor) -> None:
         """Focus the body editor of a section."""
-        section.query_one(".section-body", EditableText).focus()
+        section.focus_body()
 
     def on_section_editor_editor_type_selected(self, event: SectionEditor.EditorTypeSelected) -> None:
         """Swap a subsection editor to a different type."""

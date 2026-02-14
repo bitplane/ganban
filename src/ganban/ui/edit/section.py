@@ -122,6 +122,10 @@ class SectionEditor(Container):
     def body(self) -> str:
         return self._body
 
+    def focus_body(self) -> None:
+        """Focus the body editor."""
+        self.query_one(".section-body", EditableText).focus()
+
     def _match_editor_type(self) -> EditorType | None:
         if self._current_editor_type:
             return self._current_editor_type

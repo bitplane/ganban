@@ -118,6 +118,10 @@ class CommentsEditor(SectionEditor):
             classes="add-comment",
         )
 
+    def focus_body(self) -> None:
+        """Focus the add-comment input."""
+        self.query_one(".add-comment", EditableText).focus()
+
     def _rebuild_body(self) -> None:
         """Reconstruct body from extracted data and emit BodyChanged."""
         old = self._body
