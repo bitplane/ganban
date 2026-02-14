@@ -4,5 +4,5 @@ ConfirmButton {
     height: 1;
 }
 ConfirmButton:hover {
-    background: $primary-darken-2;
+    background: $error;
 }

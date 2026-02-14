@@ -16,10 +16,18 @@ SectionEditor .section-heading {
 SectionEditor .section-heading > ContentSwitcher > Static {
     text-style: bold;
 }
-SectionEditor .section-delete {
-    width: 2;
+SectionEditor .section-editor-select {
+    width: auto;
     height: 1;
-    dock: right;
+    padding: 0 1;
+}
+SectionEditor .section-editor-select:hover {
+    background: $primary-darken-2;
+}
+SectionEditor .section-delete {
+    width: auto;
+    height: 1;
+    padding: 0 0 0 1;
 }
 SectionEditor > .section-body {
     height: auto;

@@ -1,6 +1,6 @@
 """Editable widget components."""
 
-from ganban.ui.edit.document import AddSection, DocHeader, MarkdownDocEditor
+from ganban.ui.edit.document import AddSection, DocHeader, EditorType, MarkdownDocEditor
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import MarkdownEditor, NumberEditor, TextEditor
 from ganban.ui.edit.meta import MetaEditor
@@ -11,6 +11,7 @@ __all__ = [
     "AddSection",
     "DocHeader",
     "EditableText",
+    "EditorType",
     "MarkdownDocEditor",
     "MarkdownEditor",
     "MetaEditor",

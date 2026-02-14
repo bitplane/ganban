@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
+
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
@@ -14,6 +17,19 @@ from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor
 from ganban.ui.edit.viewers import MarkdownViewer
 from ganban.ui.watcher import NodeWatcherMixin
+
+
+@dataclass
+class EditorType:
+    """Describes an available editor for markdown sections."""
+
+    icon: str
+    name: str
+    pattern: re.Pattern
+    editor_class: type = SectionEditor
+
+
+DEFAULT_EDITOR_TYPES = [EditorType("📝", "Markdown", re.compile(r".*"))]
 
 
 class DocHeader(NodeWatcherMixin, Container):
@@ -95,6 +111,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         include_header: bool = True,
         meta: Node | None = None,
         parser_factory=None,
+        editor_types: list[EditorType] | None = None,
         **kwargs,
     ) -> None:
         self._init_watcher()
@@ -103,6 +120,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         self._include_header = include_header
         self._meta = meta
         self._parser_factory = parser_factory
+        self.editor_types = editor_types or DEFAULT_EDITOR_TYPES
 
     def compose(self) -> ComposeResult:
         if self._include_header:
@@ -111,12 +129,13 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         body = items[0][1]
         subsections = items[1:]
         pf = self._parser_factory
+        et = self.editor_types
         with Horizontal(id="doc-editor-container"):
             with Vertical(id="doc-editor-left"):
                 yield SectionEditor(None, body, parser_factory=pf, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
-                    yield SectionEditor(heading, content, parser_factory=pf, classes="subsection")
+                    yield SectionEditor(heading, content, parser_factory=pf, editor_types=et, classes="subsection")
                 yield AddSection()
 
     def on_mount(self) -> None:
@@ -182,7 +201,9 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         event.stop()
         with self.suppressing():
             actual_key = self.sections.add(event.heading, "")
-        editor = SectionEditor(actual_key, "", parser_factory=self._parser_factory, classes="subsection")
+        editor = SectionEditor(
+            actual_key, "", parser_factory=self._parser_factory, editor_types=self.editor_types, classes="subsection"
+        )
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
         self.call_after_refresh(self._focus_section_body, editor)
         self.post_message(self.Changed())
