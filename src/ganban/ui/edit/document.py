@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
@@ -27,9 +27,20 @@ class EditorType:
     name: str
     pattern: re.Pattern
     editor_class: type = SectionEditor
+    editor_kwargs: dict = field(default_factory=dict)
 
 
 DEFAULT_EDITOR_TYPES = [EditorType("📝", "Markdown", re.compile(r".*"))]
+
+
+def match_editor_type(heading: str | None, editor_types: list[EditorType] | None) -> EditorType | None:
+    """Find the first EditorType whose pattern matches the heading."""
+    if not editor_types:
+        return None
+    for et in editor_types:
+        if et.pattern.search(heading or ""):
+            return et
+    return editor_types[0]
 
 
 class DocHeader(NodeWatcherMixin, Container):
@@ -135,7 +146,10 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
                 yield SectionEditor(None, body, parser_factory=pf, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
-                    yield SectionEditor(heading, content, parser_factory=pf, editor_types=et, classes="subsection")
+                    matched = match_editor_type(heading, et)
+                    cls = matched.editor_class if matched else SectionEditor
+                    kwargs = matched.editor_kwargs if matched else {}
+                    yield cls(heading, content, parser_factory=pf, editor_types=et, **kwargs, classes="subsection")
                 yield AddSection()
 
     def on_mount(self) -> None:
@@ -196,13 +210,34 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         """Focus the body editor of a section."""
         section.query_one(".section-body", EditableText).focus()
 
+    def on_section_editor_editor_type_selected(self, event: SectionEditor.EditorTypeSelected) -> None:
+        """Swap a subsection editor to a different type."""
+        event.stop()
+        old = event.control
+        et = event.editor_type
+        new = et.editor_class(
+            old.heading,
+            old.body,
+            parser_factory=self._parser_factory,
+            editor_types=self.editor_types,
+            current_editor_type=et,
+            **et.editor_kwargs,
+            classes="subsection",
+        )
+        old.parent.mount(new, after=old)
+        old.remove()
+
     def on_add_section_section_created(self, event: AddSection.SectionCreated) -> None:
         """Add a new subsection."""
         event.stop()
         with self.suppressing():
             actual_key = self.sections.add(event.heading, "")
-        editor = SectionEditor(
-            actual_key, "", parser_factory=self._parser_factory, editor_types=self.editor_types, classes="subsection"
+        et = self.editor_types
+        matched = match_editor_type(actual_key, et)
+        cls = matched.editor_class if matched else SectionEditor
+        kwargs = matched.editor_kwargs if matched else {}
+        editor = cls(
+            actual_key, "", parser_factory=self._parser_factory, editor_types=et, **kwargs, classes="subsection"
         )
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
         self.call_after_refresh(self._focus_section_body, editor)

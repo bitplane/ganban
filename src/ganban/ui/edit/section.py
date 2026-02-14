@@ -104,6 +104,7 @@ class SectionEditor(Container):
         body: str = "",
         parser_factory=None,
         editor_types: list[EditorType] | None = None,
+        current_editor_type: EditorType | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -111,6 +112,7 @@ class SectionEditor(Container):
         self._body = body
         self._parser_factory = parser_factory
         self._editor_types = editor_types
+        self._current_editor_type = current_editor_type
 
     @property
     def heading(self) -> str | None:
@@ -121,6 +123,8 @@ class SectionEditor(Container):
         return self._body
 
     def _match_editor_type(self) -> EditorType | None:
+        if self._current_editor_type:
+            return self._current_editor_type
         if not self._editor_types:
             return None
         for et in self._editor_types:

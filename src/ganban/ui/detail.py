@@ -1,5 +1,7 @@
 """Detail modals for viewing and editing markdown content."""
 
+import re
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.events import Click
@@ -15,7 +17,8 @@ from ganban.ui.deps import DepsWidget
 from ganban.ui.labels import LabelsWidget
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
-from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
+from ganban.ui.edit import DocHeader, EditorType, MarkdownDocEditor, MetaEditor
+from ganban.ui.edit.comments import CommentsEditor
 from ganban.ui.labels_editor import LabelsEditor
 from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.static import CloseButton
@@ -103,10 +106,28 @@ class CardDetailModal(DetailModal):
     def on_unmount(self) -> None:
         self._unwatch_blocked()
 
+    def _build_editor_types(self) -> list[EditorType]:
+        """Build editor types list with CommentsEditor for comment sections."""
+        user_email = ""
+        user_name = ""
+        if self.board and self.board.git:
+            user_email = self.board.git.config.user.email or ""
+            user_name = self.board.git.config.user.name or ""
+        comment_kwargs = {
+            "user_email": user_email,
+            "user_name": user_name,
+            "board": self.board,
+        }
+        return [
+            EditorType("💬", "Comments", re.compile(r"(?i)comments?"), CommentsEditor, comment_kwargs),
+            EditorType("📝", "Markdown", re.compile(r".*")),
+        ]
+
     def compose(self) -> ComposeResult:
         meta = _board_meta(self.board)
         pf = ganban_parser_factory(self.board)
         card_id = self.card_id
+        editor_types = self._build_editor_types()
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
                 yield Static(f"#{card_id} ", id="detail-id")
@@ -124,7 +145,12 @@ class CardDetailModal(DetailModal):
                     yield LabelsWidget(self.card.meta, self.board)
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
-                    self.card.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"
+                    self.card.sections,
+                    include_header=False,
+                    meta=meta,
+                    parser_factory=pf,
+                    editor_types=editor_types,
+                    id="tab-doc",
                 )
                 yield MetaEditor(self.card.meta, id="tab-meta")
 

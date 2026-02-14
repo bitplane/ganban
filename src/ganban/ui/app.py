@@ -63,6 +63,7 @@ class GanbanApp(App):
         "edit/viewers.tcss",
         "edit/meta.tcss",
         "edit/document.tcss",
+        "edit/comments.tcss",
     ]
 
     TITLE = "ganban"
