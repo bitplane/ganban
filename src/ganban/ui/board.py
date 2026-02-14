@@ -23,6 +23,7 @@ from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import ColumnPlaceholder, DropTarget
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
+from ganban.ui.static import CloseButton
 from ganban.ui.sync_widget import SyncWidget
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -56,6 +57,7 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
             yield EditableText(title, Static(title), TextEditor(), id="board-title")
             yield Static(ICON_SETTINGS, id="board-settings")
             yield SyncWidget(self.board, id="sync-status")
+            yield CloseButton()
 
         visible_columns = [c for c in self.board.columns if not c.hidden]
 
@@ -246,6 +248,10 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
                 widget.show_context_menu(x, y)
                 return
             widget = widget.parent
+
+    async def action_close(self) -> None:
+        """Close the board (quit the app)."""
+        await self.app.run_action("quit")
 
     def action_save(self) -> None:
         """Save the board to git."""

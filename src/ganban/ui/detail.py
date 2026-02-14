@@ -18,6 +18,7 @@ from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, MarkdownDocEditor, MetaEditor
 from ganban.ui.labels_editor import LabelsEditor
 from ganban.ui.markdown import ganban_parser_factory
+from ganban.ui.static import CloseButton
 from ganban.ui.users import UsersEditor
 
 
@@ -113,6 +114,7 @@ class CardDetailModal(DetailModal):
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
+                    yield CloseButton()
             with Horizontal(id="detail-bar"):
                 yield DoneWidget(self.card.meta)
                 yield DueDateWidget(self.card.meta)
@@ -164,6 +166,7 @@ class ColumnDetailModal(DetailModal):
                 with Horizontal(id="detail-tabs"):
                     yield TabButton(ICON_TAB_DOC, "tab-doc", classes="-active")
                     yield TabButton(ICON_SETTINGS, "tab-meta")
+                    yield CloseButton()
             with Horizontal(id="detail-bar"):
                 yield ColorButton(color=color)
                 yield CompactButton(self.column.meta)
@@ -196,6 +199,7 @@ class BoardDetailModal(DetailModal):
                     yield TabButton(ICON_SETTINGS, "tab-meta")
                     yield TabButton(ICON_TAB_USERS, "tab-users")
                     yield TabButton(ICON_TAB_LABELS, "tab-labels")
+                    yield CloseButton()
             with ContentSwitcher(initial="tab-doc", id="detail-content"):
                 yield MarkdownDocEditor(
                     self.board.sections, include_header=False, meta=meta, parser_factory=pf, id="tab-doc"

@@ -10,6 +10,7 @@ from ganban.ui.cal import Calendar, CalendarDay, NavButton
 from ganban.ui.detail import BoardDetailModal, CardDetailModal, ColumnDetailModal, DetailModal
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import EditableText, MarkdownDocEditor, SectionEditor
+from ganban.ui.static import CloseButton
 from tests.ui.conftest import GANBAN_CSS_PATH
 
 
@@ -239,6 +240,20 @@ async def test_editing_main_body_updates_sections(card):
 
         # First key's value should be updated
         assert card.sections[card.sections.keys()[0]] == "Updated body content"
+
+
+@pytest.mark.asyncio
+async def test_close_button_closes_modal(card):
+    """Clicking the close button dismisses the modal."""
+    app = DetailTestApp(CardDetailModal(card))
+    async with app.run_test() as pilot:
+        assert isinstance(app.screen, DetailModal)
+
+        close_btn = app.screen.query_one(CloseButton)
+        await pilot.click(close_btn)
+        await pilot.pause()
+
+        assert not isinstance(app.screen, DetailModal)
 
 
 @pytest.mark.asyncio
