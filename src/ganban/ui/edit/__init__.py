@@ -2,6 +2,7 @@
 
 from ganban.ui.edit.comments import CommentsEditor
 from ganban.ui.edit.document import AddSection, DocHeader, EditorType, MarkdownDocEditor
+from ganban.ui.edit.tasks import TasksEditor
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import MarkdownEditor, NumberEditor, TextEditor
 from ganban.ui.edit.meta import MetaEditor
@@ -20,6 +21,7 @@ __all__ = [
     "NumberEditor",
     "MarkdownViewer",
     "SectionEditor",
+    "TasksEditor",
     "TextEditor",
     "TextViewer",
 ]

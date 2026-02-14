@@ -19,6 +19,7 @@ from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
 from ganban.ui.edit import DocHeader, EditorType, MarkdownDocEditor, MetaEditor
 from ganban.ui.edit.comments import CommentsEditor
+from ganban.ui.edit.tasks import TasksEditor
 from ganban.ui.labels_editor import LabelsEditor
 from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.static import CloseButton
@@ -119,6 +120,7 @@ class CardDetailModal(DetailModal):
         }
         return [
             EditorType("💬", "Comments", re.compile(r"(?i)comments?"), CommentsEditor, comment_kwargs),
+            EditorType("✅", "Tasks", re.compile(r"(?i)tasks?|todo"), TasksEditor),
             EditorType("📝", "Markdown", re.compile(r".*")),
         ]
 
