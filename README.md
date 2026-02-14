@@ -42,7 +42,7 @@ without the need for 3rd party services.
 Ganban doesn't force you to use its TUI, there's a web UI if you prefer that
 sort of thing. If you're a bot or a script or UIs just aren't for you, then you
 can use the CLI instead; see `ganban --help`. If you don't want any kind of
-interface then use your own text editor and commit directly to git.
+interface then bring your own text editor and commit directly to git.
 
 It can sync in the background with `ganban sync -d`, or, if the daemons haunt
 you, just omit the `-d` for a one-time sync.

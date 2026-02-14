@@ -94,4 +94,5 @@ class MarkdownEditor(BaseEditor):
 
     def __init__(self, **kwargs) -> None:
         kwargs.setdefault("compact", True)
+        kwargs.setdefault("language", "markdown")
         super().__init__(**kwargs)
