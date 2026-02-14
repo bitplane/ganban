@@ -3,6 +3,7 @@
 import pytest
 from textual.app import App, ComposeResult
 
+from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.comments import CommentsEditor, CommentRow
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.section import SectionEditor
@@ -98,10 +99,12 @@ async def test_delete_own_comment_emits_body_changed():
     """Deleting own comment emits BodyChanged without that comment."""
     app = CommentsApp(body="- [Alice](mailto:alice@example.com) only comment")
     async with app.run_test() as pilot:
-        editor = app.query_one(CommentsEditor)
-        # Directly modify the extracted data and trigger rebuild
-        editor._extracted.items.clear()
-        editor._rebuild_body()
+        row = app.query_one(CommentRow)
+        delete_btn = row.query_one(".comment-delete", ConfirmButton)
+        msg = ConfirmButton.Confirmed()
+        msg._sender = delete_btn
+        delete_btn.post_message(msg)
+        await pilot.pause()
         await pilot.pause()
 
         assert len(app.body_changes) == 1

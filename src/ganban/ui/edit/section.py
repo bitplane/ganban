@@ -20,6 +20,16 @@ if TYPE_CHECKING:
     from ganban.ui.edit.document import EditorType
 
 
+def match_editor_type(heading: str | None, editor_types: list[EditorType] | None) -> EditorType | None:
+    """Find the first EditorType whose pattern matches the heading."""
+    if not editor_types:
+        return None
+    for et in editor_types:
+        if et.pattern.search(heading or ""):
+            return et
+    return editor_types[0]
+
+
 class EditorSelectButton(Static):
     """Button that shows a context menu of available editor types."""
 
@@ -127,28 +137,25 @@ class SectionEditor(Container):
         self.query_one(".section-body", EditableText).focus()
 
     def _match_editor_type(self) -> EditorType | None:
-        if self._current_editor_type:
-            return self._current_editor_type
-        if not self._editor_types:
-            return None
-        for et in self._editor_types:
-            if et.pattern.search(self._heading or ""):
-                return et
-        return self._editor_types[0]
+        return self._current_editor_type or match_editor_type(self._heading, self._editor_types)
+
+    def _compose_heading(self) -> ComposeResult:
+        """Yield the heading row: editable title, editor selector, delete button."""
+        with Horizontal(classes="section-heading-row"):
+            yield EditableText(
+                self._heading,
+                Static(self._heading),
+                TextEditor(),
+                classes="section-heading",
+            )
+            current = self._match_editor_type()
+            if current and self._editor_types:
+                yield EditorSelectButton(self._editor_types, current, classes="section-editor-select")
+            yield ConfirmButton(classes="section-delete")
 
     def compose(self) -> ComposeResult:
         if self._heading is not None:
-            with Horizontal(classes="section-heading-row"):
-                yield EditableText(
-                    self._heading,
-                    Static(self._heading),
-                    TextEditor(),
-                    classes="section-heading",
-                )
-                current = self._match_editor_type()
-                if current and self._editor_types:
-                    yield EditorSelectButton(self._editor_types, current, classes="section-editor-select")
-                yield ConfirmButton(classes="section-delete")
+            yield from self._compose_heading()
         yield EditableText(
             self._body,
             MarkdownViewer(self._body, parser_factory=self._parser_factory),

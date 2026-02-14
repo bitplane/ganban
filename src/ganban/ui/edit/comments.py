@@ -13,13 +13,12 @@ from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.blocks import extract_bullet_list, reconstruct_body
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.section import EditorSelectButton, SectionEditor
+from ganban.ui.edit.section import SectionEditor
 from ganban.ui.edit.viewers import MarkdownViewer
 
 if TYPE_CHECKING:
     from ganban.ui.edit.document import EditorType
 
-_MAILTO_RE = re.compile(r"\[([^\]]*)\]\(mailto:([^)]+)\)")
 # Matches: "- [Name](mailto:email) comment text"
 # Groups: (1) bullet+author prefix including trailing space, (2) email, (3) comment text
 _COMMENT_RE = re.compile(r"^([\-\*\+]\s+\[[^\]]*\]\(mailto:([^)]+)\)\s*)(.*)", re.DOTALL)
@@ -75,28 +74,16 @@ class CommentsEditor(SectionEditor):
         editor_types: list[EditorType] | None = None,
         user_email: str = "",
         user_name: str = "",
-        board=None,
         **kwargs,
     ) -> None:
         super().__init__(heading, body, parser_factory=parser_factory, editor_types=editor_types, **kwargs)
         self._user_email = user_email
         self._user_name = user_name
-        self._board = board
         self._extracted = extract_bullet_list(body)
 
     def compose(self) -> ComposeResult:
         if self._heading is not None:
-            with Horizontal(classes="section-heading-row"):
-                yield EditableText(
-                    self._heading,
-                    Static(self._heading),
-                    TextEditor(),
-                    classes="section-heading",
-                )
-                current = self._match_editor_type()
-                if current and self._editor_types:
-                    yield EditorSelectButton(self._editor_types, current, classes="section-editor-select")
-                yield ConfirmButton(classes="section-delete")
+            yield from self._compose_heading()
 
         if self._extracted.before.strip():
             yield MarkdownViewer(self._extracted.before, parser_factory=self._parser_factory, classes="comments-before")

@@ -14,7 +14,7 @@ from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.section import SectionEditor
+from ganban.ui.edit.section import SectionEditor, match_editor_type
 from ganban.ui.edit.viewers import MarkdownViewer
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -31,16 +31,6 @@ class EditorType:
 
 
 DEFAULT_EDITOR_TYPES = [EditorType("📝", "Markdown", re.compile(r".*"))]
-
-
-def match_editor_type(heading: str | None, editor_types: list[EditorType] | None) -> EditorType | None:
-    """Find the first EditorType whose pattern matches the heading."""
-    if not editor_types:
-        return None
-    for et in editor_types:
-        if et.pattern.search(heading or ""):
-            return et
-    return editor_types[0]
 
 
 class DocHeader(NodeWatcherMixin, Container):
@@ -147,9 +137,14 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
                     matched = match_editor_type(heading, et)
-                    cls = matched.editor_class if matched else SectionEditor
-                    kwargs = matched.editor_kwargs if matched else {}
-                    yield cls(heading, content, parser_factory=pf, editor_types=et, **kwargs, classes="subsection")
+                    yield matched.editor_class(
+                        heading,
+                        content,
+                        parser_factory=pf,
+                        editor_types=et,
+                        **matched.editor_kwargs,
+                        classes="subsection",
+                    )
                 yield AddSection()
 
     def on_mount(self) -> None:
@@ -206,10 +201,6 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         editor.remove()
         self.post_message(self.Changed())
 
-    def _focus_section_body(self, section: SectionEditor) -> None:
-        """Focus the body editor of a section."""
-        section.focus_body()
-
     def on_section_editor_editor_type_selected(self, event: SectionEditor.EditorTypeSelected) -> None:
         """Swap a subsection editor to a different type."""
         event.stop()
@@ -234,11 +225,14 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
             actual_key = self.sections.add(event.heading, "")
         et = self.editor_types
         matched = match_editor_type(actual_key, et)
-        cls = matched.editor_class if matched else SectionEditor
-        kwargs = matched.editor_kwargs if matched else {}
-        editor = cls(
-            actual_key, "", parser_factory=self._parser_factory, editor_types=et, **kwargs, classes="subsection"
+        editor = matched.editor_class(
+            actual_key,
+            "",
+            parser_factory=self._parser_factory,
+            editor_types=et,
+            **matched.editor_kwargs,
+            classes="subsection",
         )
         self.query_one("#doc-editor-right").mount(editor, before=self.query_one(AddSection))
-        self.call_after_refresh(self._focus_section_body, editor)
+        self.call_after_refresh(editor.focus_body)
         self.post_message(self.Changed())

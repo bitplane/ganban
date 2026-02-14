@@ -3,12 +3,9 @@ CommentsEditor {
     width: 100%;
     height: auto;
 }
-CommentsEditor > .comments-before {
+CommentsEditor > .comments-before,
+CommentsEditor > .comments-after {
     height: auto;
-    padding: 0;
-    margin: 0;
-}
-CommentsEditor > .comments-before Markdown {
     padding: 0;
     margin: 0;
 }
@@ -25,30 +22,21 @@ CommentsEditor .comment-text {
     width: 1fr;
     height: auto;
 }
-CommentsEditor .comment-text MarkdownViewer {
-    padding: 0;
-    margin: 0;
-}
-CommentsEditor .comment-text Markdown {
-    padding: 0;
-    margin: 0;
-}
 CommentsEditor .comment-text Markdown > * {
+    margin: 0;
+}
+CommentsEditor MarkdownViewer {
+    padding: 0;
+    margin: 0;
+}
+CommentsEditor Markdown {
+    padding: 0;
     margin: 0;
 }
 CommentsEditor .comment-delete {
     width: auto;
     height: 1;
     padding: 0 0 0 1;
-}
-CommentsEditor > .comments-after {
-    height: auto;
-    padding: 0;
-    margin: 0;
-}
-CommentsEditor > .comments-after Markdown {
-    padding: 0;
-    margin: 0;
 }
 CommentsEditor > .add-comment {
     height: auto;

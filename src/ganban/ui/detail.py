@@ -116,7 +116,6 @@ class CardDetailModal(DetailModal):
         comment_kwargs = {
             "user_email": user_email,
             "user_name": user_name,
-            "board": self.board,
         }
         return [
             EditorType("💬", "Comments", re.compile(r"(?i)comments?"), CommentsEditor, comment_kwargs),
