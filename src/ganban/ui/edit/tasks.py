@@ -6,21 +6,19 @@ import re
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.widgets import Static
 
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.constants import ICON_CHECKED, ICON_UNCHECKED
-from ganban.ui.edit.blocks import extract_bullet_list, reconstruct_body
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.section import SectionEditor
+from ganban.ui.edit.section import BulletListEditor, ItemRow
 from ganban.ui.edit.viewers import MarkdownViewer
 
 if TYPE_CHECKING:
-    from ganban.ui.edit.document import EditorType
+    pass
 
 # Matches: "- [ ] task text" or "- [x] task text" (also *, +)
 # Groups: (1) bullet prefix "- ", (2) checkbox char " " or "x"/"X", (3) task text
@@ -59,13 +57,12 @@ class TaskCheckbox(Static):
         self.post_message(self.Toggled())
 
 
-class TaskRow(Horizontal):
+class TaskRow(ItemRow):
     """A single task in the task list."""
 
     def __init__(self, item: str, index: int, parser_factory=None, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(index, **kwargs)
         self._item = item
-        self._index = index
         self._parser_factory = parser_factory
 
     def compose(self) -> ComposeResult:
@@ -81,76 +78,25 @@ class TaskRow(Horizontal):
         yield ConfirmButton(classes="task-delete")
 
 
-class TasksEditor(SectionEditor):
+class TasksEditor(BulletListEditor):
     """Editor for task list sections using bullet-list extraction."""
 
-    def __init__(
-        self,
-        heading: str | None,
-        body: str = "",
-        parser_factory=None,
-        editor_types: list[EditorType] | None = None,
-        **kwargs,
-    ) -> None:
-        super().__init__(heading, body, parser_factory=parser_factory, editor_types=editor_types, **kwargs)
-        self._extracted = extract_bullet_list(body)
+    _list_class = "tasks-list"
+    _add_class = "add-task"
+    _add_placeholder = "+ task"
+    _before_class = "tasks-before"
+    _after_class = "tasks-after"
 
-    def compose(self) -> ComposeResult:
-        if self._heading is not None:
-            yield from self._compose_heading()
+    def _make_row(self, item: str, index: int) -> TaskRow:
+        return TaskRow(item, index, parser_factory=self._parser_factory, classes="task-row")
 
-        if self._extracted.before.strip():
-            yield MarkdownViewer(self._extracted.before, parser_factory=self._parser_factory, classes="tasks-before")
+    def _format_new_item(self, text: str) -> str:
+        return f"- [ ] {text}"
 
-        with VerticalScroll(classes="tasks-list"):
-            for i, item in enumerate(self._extracted.items):
-                yield TaskRow(item, i, parser_factory=self._parser_factory, classes="task-row")
-
-        if self._extracted.after.strip():
-            yield MarkdownViewer(self._extracted.after, parser_factory=self._parser_factory, classes="tasks-after")
-
-        yield EditableText(
-            "",
-            Static("+ task"),
-            TextEditor(),
-            placeholder="+ task",
-            classes="add-task",
-        )
-
-    def focus_body(self) -> None:
-        """Focus the add-task input."""
-        self.query_one(".add-task", EditableText).focus()
-
-    def _rebuild_body(self) -> None:
-        """Reconstruct body from extracted data and emit BodyChanged."""
-        old = self._body
-        self._body = reconstruct_body(self._extracted)
-        self.post_message(self.BodyChanged(old, self._body))
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        event.prevent_default()
-        if "section-heading" in event.control.classes:
-            self._heading = event.new_value
-            self.post_message(self.HeadingChanged(event.old_value, event.new_value))
-            return
-
-        if "add-task" in event.control.classes:
-            if event.new_value.strip():
-                self._extracted.items.append(f"- [ ] {event.new_value.strip()}")
-                self._rebuild_body()
-                self.call_after_refresh(self.recompose)
-            return
-
-        if "task-text" in event.control.classes:
-            row = event.control.parent
-            if isinstance(row, TaskRow):
-                checked, bullet_prefix, _ = _parse_task(self._extracted.items[row._index])
-                checkbox = "[x]" if checked else "[ ]"
-                self._extracted.items[row._index] = f"{bullet_prefix}{checkbox} {event.new_value}"
-                self._rebuild_body()
-                self.call_after_refresh(self.recompose)
-            return
+    def _format_edited_item(self, index: int, new_text: str) -> str:
+        checked, bullet_prefix, _ = _parse_task(self._extracted.items[index])
+        checkbox = "[x]" if checked else "[ ]"
+        return f"{bullet_prefix}{checkbox} {new_text}"
 
     def on_task_checkbox_toggled(self, event: TaskCheckbox.Toggled) -> None:
         event.stop()
@@ -160,15 +106,3 @@ class TasksEditor(SectionEditor):
             checkbox = "[x]" if event.control.checked else "[ ]"
             self._extracted.items[row._index] = f"{bullet_prefix}{checkbox} {task_text}"
             self._rebuild_body()
-
-    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
-        event.stop()
-        event.prevent_default()
-        row = event.control.parent
-        if isinstance(row, TaskRow):
-            del self._extracted.items[row._index]
-            self._rebuild_body()
-            self.call_after_refresh(self.recompose)
-            return
-        # Section delete (inherited behavior)
-        self.post_message(self.DeleteRequested())

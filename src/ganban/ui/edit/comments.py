@@ -6,14 +6,11 @@ import re
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import Static
 
 from ganban.ui.confirm import ConfirmButton
-from ganban.ui.edit.blocks import extract_bullet_list, reconstruct_body
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
-from ganban.ui.edit.section import SectionEditor
+from ganban.ui.edit.section import BulletListEditor, ItemRow
 from ganban.ui.edit.viewers import MarkdownViewer
 
 if TYPE_CHECKING:
@@ -35,13 +32,12 @@ def _parse_comment(item: str) -> tuple[str | None, str, str]:
     return None, "", item
 
 
-class CommentRow(Horizontal):
+class CommentRow(ItemRow):
     """A single comment in the comments list."""
 
     def __init__(self, item: str, index: int, editable: bool, parser_factory=None, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(index, **kwargs)
         self._item = item
-        self._index = index
         self._editable = editable
         self._parser_factory = parser_factory
 
@@ -63,8 +59,14 @@ class CommentRow(Horizontal):
             yield MarkdownViewer(display_text, parser_factory=self._parser_factory, classes="comment-text")
 
 
-class CommentsEditor(SectionEditor):
+class CommentsEditor(BulletListEditor):
     """Editor for comment sections using bullet-list extraction."""
+
+    _list_class = "comments-list"
+    _add_class = "add-comment"
+    _add_placeholder = "+ comment"
+    _before_class = "comments-before"
+    _after_class = "comments-after"
 
     def __init__(
         self,
@@ -79,75 +81,16 @@ class CommentsEditor(SectionEditor):
         super().__init__(heading, body, parser_factory=parser_factory, editor_types=editor_types, **kwargs)
         self._user_email = user_email
         self._user_name = user_name
-        self._extracted = extract_bullet_list(body)
 
-    def compose(self) -> ComposeResult:
-        if self._heading is not None:
-            yield from self._compose_heading()
+    def _make_row(self, item: str, index: int) -> CommentRow:
+        email, _, _ = _parse_comment(item)
+        editable = bool(self._user_email and email == self._user_email)
+        return CommentRow(item, index, editable, parser_factory=self._parser_factory, classes="comment-row")
 
-        if self._extracted.before.strip():
-            yield MarkdownViewer(self._extracted.before, parser_factory=self._parser_factory, classes="comments-before")
+    def _format_new_item(self, text: str) -> str:
+        prefix = f"[{self._user_name}](mailto:{self._user_email}) " if self._user_email else ""
+        return f"- {prefix}{text}"
 
-        with VerticalScroll(classes="comments-list"):
-            for i, item in enumerate(self._extracted.items):
-                email, _, _ = _parse_comment(item)
-                editable = bool(self._user_email and email == self._user_email)
-                yield CommentRow(item, i, editable, parser_factory=self._parser_factory, classes="comment-row")
-
-        if self._extracted.after.strip():
-            yield MarkdownViewer(self._extracted.after, parser_factory=self._parser_factory, classes="comments-after")
-
-        yield EditableText(
-            "",
-            Static("+ comment"),
-            TextEditor(),
-            placeholder="+ comment",
-            classes="add-comment",
-        )
-
-    def focus_body(self) -> None:
-        """Focus the add-comment input."""
-        self.query_one(".add-comment", EditableText).focus()
-
-    def _rebuild_body(self) -> None:
-        """Reconstruct body from extracted data and emit BodyChanged."""
-        old = self._body
-        self._body = reconstruct_body(self._extracted)
-        self.post_message(self.BodyChanged(old, self._body))
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        event.prevent_default()
-        if "section-heading" in event.control.classes:
-            self._heading = event.new_value
-            self.post_message(self.HeadingChanged(event.old_value, event.new_value))
-            return
-
-        if "add-comment" in event.control.classes:
-            if event.new_value.strip():
-                prefix = f"[{self._user_name}](mailto:{self._user_email}) " if self._user_email else ""
-                self._extracted.items.append(f"- {prefix}{event.new_value.strip()}")
-                self._rebuild_body()
-                self.call_after_refresh(self.recompose)
-            return
-
-        if "comment-text" in event.control.classes:
-            row = event.control.parent
-            if isinstance(row, CommentRow):
-                _, author_prefix, _ = _parse_comment(self._extracted.items[row._index])
-                self._extracted.items[row._index] = author_prefix + event.new_value
-                self._rebuild_body()
-                self.call_after_refresh(self.recompose)
-            return
-
-    def on_confirm_button_confirmed(self, event: ConfirmButton.Confirmed) -> None:
-        event.stop()
-        event.prevent_default()
-        row = event.control.parent
-        if isinstance(row, CommentRow):
-            del self._extracted.items[row._index]
-            self._rebuild_body()
-            self.call_after_refresh(self.recompose)
-            return
-        # Section delete (inherited behavior)
-        self.post_message(self.DeleteRequested())
+    def _format_edited_item(self, index: int, new_text: str) -> str:
+        _, author_prefix, _ = _parse_comment(self._extracted.items[index])
+        return author_prefix + new_text
