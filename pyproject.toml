@@ -6,7 +6,25 @@ authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
 ]
 readme = "README.md"
+license = "WTFPL"
 requires-python = ">=3.11"
+keywords = ["kanban", "git", "tui", "textual", "board", "project-management"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: Public Domain",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+
+[project.urls]
+Homepage = "https://bitplane.net/dev/python/ganban"
+Repository = "https://github.com/bitplane/ganban"
+Issues = "https://github.com/bitplane/ganban/tree/ganban"
 
 dependencies = [
     "textual>=7.5",
