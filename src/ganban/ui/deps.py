@@ -16,6 +16,21 @@ from ganban.ui.watcher import NodeWatcherMixin
 ICON_DEPS = "\U0001f517"  # 🔗
 
 
+def build_card_options(board: Node, exclude_id: str = "") -> list[tuple[str, str]]:
+    """Build (label, value) options for card references.
+
+    Returns all non-archived cards (optionally excluding one by ID).
+    The label is ``"ID Title"`` and the value is the card ID.
+    """
+    options: list[tuple[str, str]] = []
+    for cid, card in board.cards.items():
+        if cid == exclude_id or card.archived:
+            continue
+        title = first_title(card.sections) if card.sections else cid
+        options.append((f"{cid} {title}", cid))
+    return options
+
+
 def build_dep_options(board: Node, card_id: str, current_deps: list[str]) -> list[tuple[str, str]]:
     """Build (label, value) options for the dep search dropdown.
 

@@ -10,14 +10,14 @@ from textual.screen import ModalScreen
 from textual.widgets import ContentSwitcher, Static
 
 from ganban.model.node import Node
-from ganban.ui.assignee import AssigneeWidget
+from ganban.ui.assignee import AssigneeWidget, build_mention_options
 from ganban.ui.color import ColorButton
 from ganban.ui.constants import ICON_TAB_DOC, ICON_TAB_LABELS, ICON_TAB_USERS, ICON_SETTINGS
-from ganban.ui.deps import DepsWidget
+from ganban.ui.deps import DepsWidget, build_card_options
 from ganban.ui.labels import LabelsWidget
 from ganban.ui.done import DoneWidget
 from ganban.ui.due import DueDateWidget
-from ganban.ui.edit import DocHeader, EditorType, MarkdownDocEditor, MetaEditor
+from ganban.ui.edit import CompletionSource, DocHeader, EditorType, MarkdownDocEditor, MetaEditor
 from ganban.ui.edit.comments import CommentsEditor
 from ganban.ui.edit.tasks import TasksEditor
 from ganban.ui.labels_editor import LabelsEditor
@@ -124,11 +124,23 @@ class CardDetailModal(DetailModal):
             EditorType("📝", "Markdown", re.compile(r".*")),
         ]
 
+    def _build_completion_sources(self) -> list[CompletionSource] | None:
+        """Build inline completion sources for markdown editors."""
+        if not self.board:
+            return None
+        board = self.board
+        card_id = self.card_id
+        return [
+            CompletionSource("@", lambda: build_mention_options(board), replace_trigger=True),
+            CompletionSource("#", lambda: build_card_options(board, card_id)),
+        ]
+
     def compose(self) -> ComposeResult:
         meta = _board_meta(self.board)
         pf = ganban_parser_factory(self.board)
         card_id = self.card_id
         editor_types = self._build_editor_types()
+        completion_sources = self._build_completion_sources()
         with Vertical(id="detail-container"):
             with Horizontal(id="detail-title-bar"):
                 yield Static(f"#{card_id} ", id="detail-id")
@@ -151,6 +163,7 @@ class CardDetailModal(DetailModal):
                     meta=meta,
                     parser_factory=pf,
                     editor_types=editor_types,
+                    completion_sources=completion_sources,
                     id="tab-doc",
                 )
                 yield MetaEditor(self.card.meta, id="tab-meta")

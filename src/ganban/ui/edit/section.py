@@ -12,6 +12,7 @@ from textual.widgets import Static
 
 from ganban.ui.confirm import ConfirmButton
 from ganban.ui.edit.blocks import extract_bullet_list, reconstruct_body
+from ganban.ui.edit.completion import CompletionSource
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import MarkdownEditor, TextEditor
 from ganban.ui.edit.viewers import MarkdownViewer
@@ -116,6 +117,7 @@ class SectionEditor(Container):
         parser_factory=None,
         editor_types: list[EditorType] | None = None,
         current_editor_type: EditorType | None = None,
+        completion_sources: list[CompletionSource] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -124,6 +126,7 @@ class SectionEditor(Container):
         self._parser_factory = parser_factory
         self._editor_types = editor_types
         self._current_editor_type = current_editor_type
+        self._completion_sources = completion_sources
 
     @property
     def heading(self) -> str | None:
@@ -160,7 +163,7 @@ class SectionEditor(Container):
         yield EditableText(
             self._body,
             MarkdownViewer(self._body, parser_factory=self._parser_factory),
-            MarkdownEditor(),
+            MarkdownEditor(completion_sources=self._completion_sources),
             classes="section-body",
             clean=False,
         )
@@ -210,9 +213,17 @@ class BulletListEditor(SectionEditor):
         body: str = "",
         parser_factory=None,
         editor_types: list[EditorType] | None = None,
+        completion_sources: list[CompletionSource] | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(heading, body, parser_factory=parser_factory, editor_types=editor_types, **kwargs)
+        super().__init__(
+            heading,
+            body,
+            parser_factory=parser_factory,
+            editor_types=editor_types,
+            completion_sources=completion_sources,
+            **kwargs,
+        )
         self._extracted = extract_bullet_list(body)
 
     def _make_row(self, item: str, index: int) -> ItemRow:

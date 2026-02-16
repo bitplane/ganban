@@ -62,6 +62,36 @@ def build_assignee_options(board: Node) -> list[tuple[str, str]]:
     return options
 
 
+def build_mention_options(board: Node) -> list[tuple[str, str]]:
+    """Build options for inline @mentions in markdown editors.
+
+    Returns (label, value) tuples where value is ``[Name](mailto:email)``.
+    """
+    options: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    users = board.meta.users if board.meta else None
+    if users is not None:
+        for name, user_node in users.items():
+            emails = user_node.emails
+            if not isinstance(emails, list) or not emails:
+                continue
+            primary = emails[0]
+            emoji = user_node.emoji if user_node.emoji else emoji_for_email(primary)
+            options.append((f"{emoji} {name} <{primary}>", f"[{name}](mailto:{primary})"))
+            seen.update(emails)
+
+    committers = board.git.committers if board.git else None
+    if isinstance(committers, list):
+        for committer_str in committers:
+            emoji, name, email = parse_committer(committer_str)
+            if email not in seen:
+                options.append((f"{emoji} {committer_str}", f"[{name}](mailto:{email})"))
+                seen.add(email)
+
+    return options
+
+
 class AssigneeWidget(NodeWatcherMixin, Container):
     """Inline assignee display with user picker.
 

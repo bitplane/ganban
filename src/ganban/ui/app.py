@@ -65,6 +65,7 @@ class GanbanApp(App):
         "edit/document.tcss",
         "edit/comments.tcss",
         "edit/tasks.tcss",
+        "edit/completion.tcss",
     ]
 
     TITLE = "ganban"

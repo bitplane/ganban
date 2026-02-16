@@ -1,0 +1,15 @@
+CompletionDropdown {
+    display: none;
+    overlay: screen;
+    max-height: 8;
+    width: auto;
+    height: auto;
+    background: $surface;
+    border: none;
+    padding: 0;
+    scrollbar-size: 0 0;
+}
+
+CompletionDropdown.-visible {
+    display: block;
+}

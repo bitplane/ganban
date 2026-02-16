@@ -12,6 +12,7 @@ from textual.widgets import Static
 
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
+from ganban.ui.edit.completion import CompletionSource
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor, match_editor_type
@@ -113,6 +114,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         meta: Node | None = None,
         parser_factory=None,
         editor_types: list[EditorType] | None = None,
+        completion_sources: list[CompletionSource] | None = None,
         **kwargs,
     ) -> None:
         self._init_watcher()
@@ -122,6 +124,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         self._meta = meta
         self._parser_factory = parser_factory
         self.editor_types = editor_types or DEFAULT_EDITOR_TYPES
+        self._completion_sources = completion_sources
 
     def compose(self) -> ComposeResult:
         if self._include_header:
@@ -131,9 +134,10 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         subsections = items[1:]
         pf = self._parser_factory
         et = self.editor_types
+        cs = self._completion_sources
         with Horizontal(id="doc-editor-container"):
             with Vertical(id="doc-editor-left"):
-                yield SectionEditor(None, body, parser_factory=pf, id="main-section")
+                yield SectionEditor(None, body, parser_factory=pf, completion_sources=cs, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
                     matched = match_editor_type(heading, et)
@@ -142,6 +146,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
                         content,
                         parser_factory=pf,
                         editor_types=et,
+                        completion_sources=cs,
                         **matched.editor_kwargs,
                         classes="subsection",
                     )
@@ -212,6 +217,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
             parser_factory=self._parser_factory,
             editor_types=self.editor_types,
             current_editor_type=et,
+            completion_sources=self._completion_sources,
             **et.editor_kwargs,
             classes="subsection",
         )
@@ -230,6 +236,7 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
             "",
             parser_factory=self._parser_factory,
             editor_types=et,
+            completion_sources=self._completion_sources,
             **matched.editor_kwargs,
             classes="subsection",
         )

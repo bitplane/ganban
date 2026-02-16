@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import TextArea
 
+from ganban.ui.edit.completion import CompletionMixin, CompletionSource
 from ganban.ui.edit.messages import Cancel, Save
 
 if TYPE_CHECKING:
@@ -87,12 +88,21 @@ class NumberEditor(TextEditor):
         super()._finish(save)
 
 
-class MarkdownEditor(BaseEditor):
-    """Multi-line editor. Enter inserts newline."""
+class MarkdownEditor(CompletionMixin, BaseEditor):
+    """Multi-line editor with inline autocomplete. Enter inserts newline."""
 
     SAVE_ON_ENTER = False
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(
+        self,
+        completion_sources: list[CompletionSource] | None = None,
+        **kwargs,
+    ) -> None:
         kwargs.setdefault("compact", True)
         kwargs.setdefault("language", "markdown")
         super().__init__(**kwargs)
+        self._init_completion(completion_sources)
+
+    def on_blur(self) -> None:
+        self._deactivate_completion()
+        super().on_blur()
