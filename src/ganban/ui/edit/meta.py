@@ -13,11 +13,45 @@ from textual.widgets import Static
 from ganban.model.node import Node
 from ganban.model.writer import meta_to_dict
 from ganban.ui.confirm import ConfirmButton
+from ganban.ui.constants import (
+    ICON_CONST_FALSE,
+    ICON_CONST_NULL,
+    ICON_CONST_TRUE,
+    ICON_TYPE_DICT,
+    ICON_TYPE_LIST,
+    ICON_TYPE_NUMBER,
+    ICON_TYPE_TEXT,
+)
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import NumberEditor, TextEditor
 from ganban.ui.edit.viewers import TextViewer
-from ganban.ui.menu import ContextMenu, MenuItem
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.watcher import NodeWatcherMixin
+
+
+_TYPE_DEFAULTS: dict[str, Any] = {
+    "text": "",
+    "number": 0,
+    "dict": {},
+    "list": [],
+    "const_true": True,
+    "const_false": False,
+    "const_null": None,
+}
+
+
+def _type_menu_items() -> list[MenuItem | MenuSeparator]:
+    """Fresh copy of type menu items (menus consume their items)."""
+    return [
+        MenuItem(f"{ICON_TYPE_TEXT} Text", item_id="text"),
+        MenuItem(f"{ICON_TYPE_NUMBER} Number", item_id="number"),
+        MenuItem(f"{ICON_TYPE_DICT} Dict", item_id="dict"),
+        MenuItem(f"{ICON_TYPE_LIST} List", item_id="list"),
+        MenuSeparator(),
+        MenuItem(f"{ICON_CONST_TRUE} true", item_id="const_true"),
+        MenuItem(f"{ICON_CONST_FALSE} false", item_id="const_false"),
+        MenuItem(f"{ICON_CONST_NULL} null", item_id="const_null"),
+    ]
 
 
 class BoolToggle(Static):
@@ -184,33 +218,18 @@ class AddListItemRow(Static):
             super().__init__()
             self.value = value
 
-    TYPE_DEFAULTS: dict[str, Any] = {
-        "text": "",
-        "number": 0,
-        "bool": False,
-        "dict": {},
-        "list": [],
-    }
-
     def __init__(self, **kwargs) -> None:
         super().__init__("+", **kwargs)
 
     def on_click(self, event: Click) -> None:
         event.stop()
-        items = [
-            MenuItem("Text", item_id="text"),
-            MenuItem("Number", item_id="number"),
-            MenuItem("True/False", item_id="bool"),
-            MenuItem("Dict", item_id="dict"),
-            MenuItem("List", item_id="list"),
-        ]
         region = self.region
-        menu = ContextMenu(items, region.x, region.y + region.height)
+        menu = ContextMenu(_type_menu_items(), region.x, region.y + region.height)
         self.app.push_screen(menu, self._on_type_selected)
 
     def _on_type_selected(self, item: MenuItem | None) -> None:
         if item:
-            default = self.TYPE_DEFAULTS.get(item.item_id, "")
+            default = _TYPE_DEFAULTS.get(item.item_id, "")
             self.post_message(self.ItemAdded(default))
 
 
@@ -355,14 +374,6 @@ class AddKeyRow(Container):
             self.key = key
             self.value = value
 
-    TYPE_DEFAULTS: dict[str, Any] = {
-        "text": "",
-        "number": 0,
-        "bool": False,
-        "dict": {},
-        "list": [],
-    }
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._pending_key: str = ""
@@ -378,20 +389,13 @@ class AddKeyRow(Container):
             self._show_type_picker()
 
     def _show_type_picker(self) -> None:
-        items = [
-            MenuItem("Text", item_id="text"),
-            MenuItem("Number", item_id="number"),
-            MenuItem("True/False", item_id="bool"),
-            MenuItem("Dict", item_id="dict"),
-            MenuItem("List", item_id="list"),
-        ]
         region = self.region
-        menu = ContextMenu(items, region.x, region.y + region.height)
+        menu = ContextMenu(_type_menu_items(), region.x, region.y + region.height)
         self.app.push_screen(menu, self._on_type_selected)
 
     def _on_type_selected(self, item: MenuItem | None) -> None:
         if item and self._pending_key:
-            default = self.TYPE_DEFAULTS.get(item.item_id, "")
+            default = _TYPE_DEFAULTS.get(item.item_id, "")
             self.post_message(self.KeyAdded(self._pending_key, default))
         self._pending_key = ""
 
