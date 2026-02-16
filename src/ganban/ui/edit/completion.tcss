@@ -7,7 +7,6 @@ CompletionDropdown {
     background: $surface;
     border: none;
     padding: 0;
-    scrollbar-size: 0 0;
 }
 
 CompletionDropdown.-visible {

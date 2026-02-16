@@ -90,6 +90,8 @@ class CompletionMixin:
         self._completion_dropdown: CompletionDropdown | None = None
         self._completion_needs_refilter = False
         self._completion_active_source: CompletionSource | None = None
+        self._completion_trigger_screen_x: int = 0
+        self._completion_trigger_screen_y: int = 0
 
     # -- activation / deactivation -----------------------------------------
 
@@ -107,6 +109,10 @@ class CompletionMixin:
         self._completion_trigger_col = col
         self._completion_trigger_row = row
         self._completion_options = options
+        # Capture screen position of the trigger char (cursor is just after it)
+        offset = self.cursor_screen_offset  # type: ignore[attr-defined]
+        self._completion_trigger_screen_x = offset.x - 1  # back up to the trigger char
+        self._completion_trigger_screen_y = offset.y
         dd = self._ensure_dropdown()
         dd.filter("", options)
         self._position_dropdown(dd)
@@ -142,13 +148,15 @@ class CompletionMixin:
         return dd
 
     def _position_dropdown(self, dd: CompletionDropdown) -> None:
-        cursor = self.cursor_screen_offset  # type: ignore[attr-defined]
         parent = self._find_editable_parent()
         # Dropdown's natural flow position is at the bottom of the parent.
-        # Offset from there to just below the cursor.
+        # Offset from there to just below the trigger character.
         natural_y = parent.region.y + parent.region.height
         natural_x = parent.region.x
-        dd.show_at(cursor.x - natural_x, cursor.y + 1 - natural_y)
+        dd.show_at(
+            self._completion_trigger_screen_x - natural_x,
+            self._completion_trigger_screen_y + 1 - natural_y,
+        )
 
     # -- query helpers -----------------------------------------------------
 
