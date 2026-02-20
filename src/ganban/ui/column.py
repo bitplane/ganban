@@ -103,6 +103,14 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     def draggable_clicked(self) -> None:
         pass  # Click without drag - no action needed
 
+    def find_nearest(self, region):
+        """Find the nearest focusable child by vertical midpoint."""
+        mid_y = region.y + region.height // 2
+        focusable = [c for c in self.children if c.can_focus]
+        if not focusable:
+            return None
+        return min(focusable, key=lambda c: abs((c.region.y + c.region.height // 2) - mid_y))
+
     # -- DropTarget: column accepting card drops --
 
     def drag_over(self, draggable, x: int, y: int) -> bool:
@@ -240,10 +248,9 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
             my_idx = siblings.index(self)
             new_idx = my_idx + direction
             if 0 <= new_idx < len(siblings):
-                target = siblings[new_idx]
-                target_focusable = [c for c in target.children if c.can_focus]
-                if target_focusable:
-                    target_focusable[min(idx, len(target_focusable) - 1)].focus()
+                nearest = siblings[new_idx].find_nearest(focused.region)
+                if nearest:
+                    nearest.focus()
         elif event.key.startswith("shift+") and isinstance(focused, CardWidget):
             self._move_card(focused, event.key)
 
@@ -268,7 +275,12 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
             new_idx = my_idx + direction
             if 0 <= new_idx < len(siblings) and hasattr(siblings[new_idx], "column"):
                 target = siblings[new_idx]
-                move_card(self.board, card_id, target.column, position=min(card_idx, len(target.column.links)))
+                nearest = target.find_nearest(card.region)
+                if nearest and isinstance(nearest, CardWidget):
+                    pos = list(target.column.links).index(nearest.card_id)
+                else:
+                    pos = len(target.column.links)
+                move_card(self.board, card_id, target.column, position=pos)
                 self.call_after_refresh(lambda: self._refocus_card(target, card_id))
 
     @staticmethod

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from textual.geometry import Offset
+from textual.geometry import Offset, Region
 from textual.widgets import Static
 
 if TYPE_CHECKING:
@@ -32,6 +32,10 @@ class DropTarget:
     def try_drop(self, draggable: DraggableMixin, x: int, y: int) -> bool:
         """Called on mouse-up to attempt the drop. Return True if accepted."""
         return False
+
+    def find_nearest(self, region: Region) -> "Widget | None":
+        """Find the nearest child widget to the given region."""
+        return None
 
 
 class DraggableMixin:
