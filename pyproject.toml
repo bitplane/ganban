@@ -41,6 +41,7 @@ dev = [
     "pytest-asyncio",
     "coverage",
     "pytest-cov",
+    "pytest-xdist",
     "build",
     "twine",
     "ruff",
