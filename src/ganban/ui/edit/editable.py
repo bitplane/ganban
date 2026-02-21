@@ -109,10 +109,12 @@ class EditableText(Container):
         """Focus the widget - enters edit mode if not already editing."""
         if self._editing:
             self._editor.focus(scroll_visible)
-        elif not self.children:
-            self.call_after_refresh(self.focus, scroll_visible)
         else:
-            self.query_one("#view", _FocusableView).focus(scroll_visible)
+            view = self.query("#view")
+            if view:
+                view.first().focus(scroll_visible)
+            else:
+                self.call_after_refresh(self.focus, scroll_visible)
 
     def on_mouse_down(self, event) -> None:
         # Stop mouse events from bubbling to parent DraggableMixin
