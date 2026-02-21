@@ -7,7 +7,7 @@ import pytest
 from git import Repo
 
 from ganban.model.card import create_card
-from ganban.model.column import create_column, slugify
+from ganban.model.column import create_column
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
 from ganban.model.writer import (
@@ -770,31 +770,3 @@ def testmeta_to_dict_empty():
     assert meta_to_dict(Node()) == {}
     assert meta_to_dict({}) == {}
     assert meta_to_dict(None) == {}
-
-
-def test_slugify_basic():
-    assert slugify("Hello World") == "hello-world"
-
-
-def test_slugify_special_chars():
-    assert slugify("What: is this?") == "what-is-this"
-    assert slugify("Test!") == "test"
-    assert slugify("{foo}") == "foo"
-    assert slugify("a.b.c") == "a-b-c"
-
-
-def test_slugify_multiple_spaces():
-    assert slugify("hello    world") == "hello-world"
-    assert slugify("a - b - c") == "a-b-c"
-
-
-def test_slugify_leading_trailing():
-    assert slugify("  hello  ") == "hello"
-    assert slugify("---test---") == "test"
-    assert slugify("!hello!") == "hello"
-
-
-def test_slugify_empty():
-    assert slugify("") == "untitled"
-    assert slugify("   ") == "untitled"
-    assert slugify("!!!") == "untitled"

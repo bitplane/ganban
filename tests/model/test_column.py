@@ -114,10 +114,26 @@ def test_slugify_basic():
 
 def test_slugify_special_chars():
     assert slugify("What: is this?") == "what-is-this"
+    assert slugify("Test!") == "test"
+    assert slugify("{foo}") == "foo"
+    assert slugify("a.b.c") == "a-b-c"
+
+
+def test_slugify_multiple_spaces():
+    assert slugify("hello    world") == "hello-world"
+    assert slugify("a - b - c") == "a-b-c"
+
+
+def test_slugify_leading_trailing():
+    assert slugify("  hello  ") == "hello"
+    assert slugify("---test---") == "test"
+    assert slugify("!hello!") == "hello"
 
 
 def test_slugify_empty():
     assert slugify("") == "untitled"
+    assert slugify("   ") == "untitled"
+    assert slugify("!!!") == "untitled"
 
 
 def test_build_column_path_normal():
