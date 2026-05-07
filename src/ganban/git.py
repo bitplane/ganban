@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from git import InvalidGitRepositoryError, Repo
+from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 
 GANBAN_DEFAULTS = {
     "sync-interval": 30,
@@ -86,7 +86,7 @@ def is_git_repo(path: str | Path) -> bool:
     try:
         Repo(path)
         return True
-    except InvalidGitRepositoryError:
+    except (InvalidGitRepositoryError, NoSuchPathError):
         return False
 
 

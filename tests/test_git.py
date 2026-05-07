@@ -125,6 +125,11 @@ def test_is_git_repo_false(tmp_path):
     assert is_git_repo(tmp_path) is False
 
 
+def test_is_git_repo_missing_path(tmp_path):
+    """Returns False for a path that does not exist."""
+    assert is_git_repo(tmp_path / "does-not-exist") is False
+
+
 def test_init_repo(tmp_path):
     """Initialize a new git repository."""
     new_repo_path = tmp_path / "new_repo"
