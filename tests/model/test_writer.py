@@ -890,3 +890,37 @@ def test_auto_merge_modify_delete_conflict_deletion_wins(repo_with_ganban):
     reloaded = load_board(str(repo_with_ganban))
     assert reloaded.columns["1"] is None
     assert len(reloaded.columns) == 0
+
+
+def test_merge_trees_hard_failure_returns_empty(repo_with_ganban):
+    """merge-tree exiting above 1 yields no tree, not garbage."""
+    from ganban.model.writer import _merge_trees
+
+    board = load_board(str(repo_with_ganban))
+    repo = Repo(repo_with_ganban)
+    our_tree = repo.commit(board.commit).tree.hexsha
+
+    tree_hash, conflicts = _merge_trees(Path(repo_with_ganban), board.commit, our_tree, "1" * 40)
+
+    assert tree_hash == ""
+    assert conflicts == []
+
+
+def test_auto_merge_missing_object_returns_none(repo_with_ganban):
+    """A hard merge-tree failure returns None instead of crashing."""
+    board = load_board(str(repo_with_ganban))
+    board.cards["1"].sections["First card"] = "Local change"
+
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    (repo_with_ganban / ".all" / "002.md").write_text("# External card\n")
+    repo.git.add("-A")
+    external = repo.index.commit("External change").hexsha
+
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    # Simulate a pruned/corrupt object store: their commit object vanishes
+    (repo_with_ganban / ".git" / "objects" / external[:2] / external[2:]).unlink()
+
+    assert try_auto_merge(board, merge_info) is None

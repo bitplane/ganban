@@ -133,7 +133,8 @@ def _merge_trees(
 
     Returns:
         Tuple of (merged_tree_hash, conflict_paths).
-        conflict_paths is empty on a clean merge.
+        conflict_paths is empty on a clean merge; merged_tree_hash is ""
+        if merge-tree failed entirely (exit status above 1).
     """
     our_temp_commit = _git(repo_path, ["commit-tree", our_tree, "-p", base_commit, "-m", "temp merge commit"])
 
@@ -142,6 +143,11 @@ def _merge_trees(
         cwd=repo_path,
         capture_output=True,
     )
+
+    # merge-tree exits 0 for clean, 1 for conflicts, higher on hard failure
+    # (missing objects, unsupported git version) where stdout is unusable
+    if result.returncode not in (0, 1):
+        return "", []
 
     output = result.stdout.decode("utf-8")
     lines = output.split("\n")
@@ -424,6 +430,8 @@ def try_auto_merge(
         return merge_info.theirs
 
     merged_tree, conflict_paths = _merge_trees(repo_path, merge_info.base, our_tree, merge_info.theirs)
+    if not merged_tree:
+        return None
 
     if conflict_paths:
         # Most-recent-commit-wins: replace only the conflicted files.
