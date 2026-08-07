@@ -1,7 +1,6 @@
 """Save a ganban board (Node tree) to git without touching the working tree."""
 
 import os
-import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -144,10 +143,20 @@ def _merge_trees(
         capture_output=True,
     )
 
-    output = result.stdout.decode("utf-8").strip()
+    output = result.stdout.decode("utf-8")
     lines = output.split("\n")
-    tree_hash = lines[0] if lines else ""
-    conflict_paths = re.findall(r"CONFLICT \([^)]+\): .+ (\S+)$", output, re.MULTILINE)
+    tree_hash = lines[0].strip() if lines else ""
+
+    # Conflicted file info lines ("<mode> <oid> <stage>\t<path>") follow the
+    # tree line up to a blank line. The informational CONFLICT messages after
+    # it are prose — unparseable for paths with spaces or modify/delete.
+    conflict_paths: list[str] = []
+    for line in lines[1:]:
+        if not line.strip():
+            break
+        _, _, path = line.partition("\t")
+        if path and path not in conflict_paths:
+            conflict_paths.append(path)
 
     return tree_hash, conflict_paths
 

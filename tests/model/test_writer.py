@@ -853,3 +853,40 @@ def test_auto_merge_stale_merge_info_returns_none(repo_with_ganban):
 
     assert try_auto_merge(board, merge_info) is None
     assert repo.commit("ganban").hexsha == newer_tip
+
+
+def test_auto_merge_modify_delete_conflict_deletion_wins(repo_with_ganban):
+    """A newer column archive beats an older edit inside that column.
+
+    merge-tree reports this as a modify/delete CONFLICT; the paths must be
+    taken from the structured conflicted-file-info section, not the prose.
+    """
+    # Normalize first so 1.backlog/index.md exists in the merge base
+    board = load_board(str(repo_with_ganban))
+    save_board(board, message="Normalize")
+    board = load_board(str(repo_with_ganban))
+
+    # External change: edit the column index with an old commit date
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    repo.git.reset("--hard", "ganban")
+    backlog = repo_with_ganban / "1.backlog"
+    (backlog / "index.md").write_text("# Backlog\n\nEdited externally.\n")
+    repo.git.add("-A")
+    with repo.git.custom_environment(GIT_COMMITTER_DATE="2000-01-01T00:00:00"):
+        repo.git.commit("-m", "External edit", date="2000-01-01T00:00:00")
+
+    # Our change: archive the whole column (newer, so we win the conflict)
+    board.columns["1"] = None
+    board.commit = save_board(board, message="Archive backlog")
+
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    result = try_auto_merge(board, merge_info)
+    assert result is not None
+
+    # The archive sticks: the column is not resurrected by the older edit
+    reloaded = load_board(str(repo_with_ganban))
+    assert reloaded.columns["1"] is None
+    assert len(reloaded.columns) == 0
