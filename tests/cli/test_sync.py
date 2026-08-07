@@ -3,6 +3,7 @@
 import json
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -264,7 +265,7 @@ def test_sync_daemon_signal(synced_repos):
     local_path, _ = synced_repos
 
     proc = subprocess.Popen(
-        ["python", "-m", "ganban", "sync", "-d", "--interval", "300", "--repo", str(local_path)],
+        [sys.executable, "-m", "ganban", "sync", "-d", "--interval", "300", "--repo", str(local_path)],
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE,
     )
@@ -286,7 +287,7 @@ def test_sync_json_output(synced_repos):
     local_path, _ = synced_repos
 
     proc = subprocess.Popen(
-        ["python", "-m", "ganban", "sync", "--json", "--repo", str(local_path)],
+        [sys.executable, "-m", "ganban", "sync", "--json", "--repo", str(local_path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
