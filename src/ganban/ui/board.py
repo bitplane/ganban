@@ -293,10 +293,9 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         """Handle card move request."""
         event.stop()
         card = event.card
-        col_name = event.target_column
 
-        target_col = next((c for c in self.board.columns if first_title(c.sections) == col_name), None)
-        if not target_col:
+        target_col = self.board.columns[event.target_column]
+        if target_col is None:
             return
 
         move_card(self.board, card.card_id, target_col)

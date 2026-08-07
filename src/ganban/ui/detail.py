@@ -24,6 +24,7 @@ from ganban.ui.labels_editor import LabelsEditor
 from ganban.ui.markdown import ganban_parser_factory
 from ganban.ui.static import CloseButton
 from ganban.ui.users import UsersEditor
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 def _board_meta(board: Node | None) -> Node | None:
@@ -87,10 +88,11 @@ class DetailModal(ModalScreen[None]):
         await self.app.run_action("quit")
 
 
-class CardDetailModal(DetailModal):
+class CardDetailModal(NodeWatcherMixin, DetailModal):
     """Modal screen showing full card details."""
 
     def __init__(self, card: Node, board: Node | None = None, card_id: str = "") -> None:
+        self._init_watcher()
         super().__init__()
         self.card = card
         self.board = board
@@ -99,13 +101,10 @@ class CardDetailModal(DetailModal):
     def on_mount(self) -> None:
         super().on_mount()
         self.set_class(bool(self.card.blocked), "blocked")
-        self._unwatch_blocked = self.card.watch("blocked", self._on_blocked_changed)
+        self.node_watch(self.card, "blocked", self._on_blocked_changed)
 
     def _on_blocked_changed(self, node, key, old, new) -> None:
         self.set_class(bool(new), "blocked")
-
-    def on_unmount(self) -> None:
-        self._unwatch_blocked()
 
     def _build_editor_types(self) -> list[EditorType]:
         """Build editor types list with CommentsEditor for comment sections."""

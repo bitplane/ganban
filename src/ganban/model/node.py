@@ -53,7 +53,27 @@ def _emit(node: Node | ListNode, key: str, old: Any, new: Any) -> None:
         child = parent
 
 
-class Node:
+class _Watchable:
+    """Shared watcher registry and path computation for Node and ListNode."""
+
+    def watch(self, key: str, callback: Callback) -> Callable[[], None]:
+        """Watch a key for changes. Returns an unwatch callable."""
+        key = str(key)
+        self._watchers.setdefault(key, []).append(callback)
+        return lambda: self._watchers.get(key, []) and self._watchers[key].remove(callback)
+
+    @property
+    def path(self) -> str:
+        """Dotted path from root to this node."""
+        parts: list[str] = []
+        current: Node | ListNode | None = self
+        while current is not None and current._key is not None:
+            parts.append(current._key)
+            current = current._parent
+        return ".".join(reversed(parts))
+
+
+class Node(_Watchable):
     """Reactive dict-like tree node.
 
     Stores data in an internal dict, accessed via attribute syntax.
@@ -97,11 +117,6 @@ class Node:
     def __contains__(self, key: str) -> bool:
         return key in self._children
 
-    def watch(self, key: str, callback: Callback) -> Callable[[], None]:
-        """Watch a key for changes. Returns an unwatch callable."""
-        self._watchers.setdefault(key, []).append(callback)
-        return lambda: self._watchers.get(key, []) and self._watchers[key].remove(callback)
-
     def keys(self):
         """Return children keys."""
         return self._children.keys()
@@ -113,16 +128,6 @@ class Node:
     def values(self):
         """Return children values."""
         return self._children.values()
-
-    @property
-    def path(self) -> str:
-        """Dotted path from root to this node."""
-        parts: list[str] = []
-        current: Node | ListNode | None = self
-        while current is not None and current._key is not None:
-            parts.append(current._key)
-            current = current._parent
-        return ".".join(reversed(parts))
 
     def update(self, other: Node) -> None:
         """Update this node in-place to match other, preserving watchers."""
@@ -182,12 +187,13 @@ class Node:
         return f"<{label} [{keys}]>"
 
 
-class ListNode:
+class ListNode(_Watchable):
     """Ordered, id-keyed collection with change notification.
 
     Items are accessed by string id. Setting to None deletes.
     Dicts are auto-wrapped as Nodes. Changes fire watchers and
-    bubble up through the parent chain.
+    bubble up through the parent chain. Order is the insertion order
+    of _by_id; replacing a value keeps its position.
     """
 
     def __init__(
@@ -195,7 +201,6 @@ class ListNode:
         _parent: Node | None = None,
         _key: str | None = None,
     ) -> None:
-        object.__setattr__(self, "_items", [])
         object.__setattr__(self, "_by_id", {})
         object.__setattr__(self, "_watchers", {})
         object.__setattr__(self, "_parent", _parent)
@@ -204,57 +209,27 @@ class ListNode:
     def __getitem__(self, key: str) -> Any:
         return self._by_id.get(str(key))
 
-    def _key_index(self, key: str) -> int:
-        """Find the index of a key in insertion order."""
-        for i, k in enumerate(self._by_id):
-            if k == key:
-                return i
-        raise KeyError(key)
-
     def __setitem__(self, key: str, value: Any) -> None:
         key = str(key)
         old = self._by_id.get(key)
         if value is None:
             if old is not None:
-                idx = self._key_index(key)
-                del self._items[idx]
                 del self._by_id[key]
             _emit(self, key, old, None)
         else:
             value = _wrap(value, parent=self, key=key)
-            if old is not None:
-                idx = self._key_index(key)
-                self._items[idx] = value
-            else:
-                self._items.append(value)
             self._by_id[key] = value
             if old != value:
                 _emit(self, key, old, value)
 
     def __iter__(self):
-        return iter(self._items)
+        return iter(list(self._by_id.values()))
 
     def __len__(self) -> int:
-        return len(self._items)
+        return len(self._by_id)
 
     def __contains__(self, key: str) -> bool:
         return str(key) in self._by_id
-
-    def watch(self, key: str, callback: Callback) -> Callable[[], None]:
-        """Watch an item id for changes. Returns an unwatch callable."""
-        key = str(key)
-        self._watchers.setdefault(key, []).append(callback)
-        return lambda: self._watchers.get(key, []) and self._watchers[key].remove(callback)
-
-    @property
-    def path(self) -> str:
-        """Dotted path from root to this node."""
-        parts: list[str] = []
-        current: Node | ListNode | None = self
-        while current is not None and current._key is not None:
-            parts.append(current._key)
-            current = current._parent
-        return ".".join(reversed(parts))
 
     def keys(self):
         """Return ordered keys."""
@@ -262,7 +237,7 @@ class ListNode:
 
     def items(self):
         """Return ordered (key, value) pairs."""
-        return list(zip(self._by_id.keys(), self._items))
+        return list(self._by_id.items())
 
     def update(self, other: ListNode) -> None:
         """Update this list in-place to match other, preserving watchers."""
@@ -290,18 +265,14 @@ class ListNode:
         new_keys = list(other._by_id.keys())
         if old_keys != new_keys:
             new_by_id = {k: self._by_id[k] for k in new_keys}
-            new_items = [new_by_id[k] for k in new_keys]
             object.__setattr__(self, "_by_id", new_by_id)
-            object.__setattr__(self, "_items", new_items)
             _emit(self, "*", old_keys, new_keys)
 
     def clone(self) -> "ListNode":
         """Deep-copy this list without watchers or the parent link."""
         ln = ListNode()
-        for key, value in zip(self._by_id.keys(), self._items):
-            cloned = _clone_value(value, ln, key)
-            ln._by_id[key] = cloned
-            ln._items.append(cloned)
+        for key, value in self._by_id.items():
+            ln._by_id[key] = _clone_value(value, ln, key)
         return ln
 
     def add(self, key: str, value: Any) -> str:

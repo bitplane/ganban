@@ -51,7 +51,11 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self.draggable_clicked()
 
     class MoveRequested(Message):
-        """Posted when card should be moved to another column."""
+        """Posted when card should be moved to another column.
+
+        target_column is the column's order id, which is stable and
+        unique where display titles need not be.
+        """
 
         def __init__(self, card: "CardWidget", target_column: str):
             super().__init__()
@@ -145,7 +149,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             y = region.y + region.height // 2
         current_col = self._find_column()
         move_items = [
-            MenuItem(first_title(col.sections), f"move:{first_title(col.sections)}", disabled=(col is current_col))
+            MenuItem(first_title(col.sections), f"move:{col.order}", disabled=(col is current_col))
             for col in self.board.columns
             if not col.hidden
         ]
@@ -187,8 +191,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
                 card = self.board.cards[self.card_id]
                 card.meta.done = None if card.meta.done else date.today().isoformat()
             case s if s and s.startswith("move:"):
-                col_name = s[5:]
-                self._move_to_column(col_name)
+                self._move_to_column(s[5:])
             case s if s and s.startswith("label:"):
                 label_name = s[6:]
                 self._toggle_label(label_name)
@@ -223,9 +226,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             labels.append(label_name)
         card.meta.labels = labels or None
 
-    def _move_to_column(self, col_name: str) -> None:
-        """Request move to the named column."""
-        self.post_message(self.MoveRequested(self, col_name))
+    def _move_to_column(self, col_order: str) -> None:
+        """Request move to the column with the given order id."""
+        self.post_message(self.MoveRequested(self, col_order))
 
 
 class AddCard(AddValueMixin, Static, can_focus=True):
