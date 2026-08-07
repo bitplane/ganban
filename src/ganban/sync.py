@@ -33,6 +33,23 @@ def apply_reload(board, new_board) -> None:
     board.git.config = config_node
 
 
+async def _merge_and_reload(board, merge_info, message) -> bool:
+    """Run one auto-merge, then reload the board from the merge result.
+
+    try_auto_merge builds "our" side from the in-memory board, so every
+    merge must be applied back to the board before another merge runs —
+    otherwise the next merge is computed from a stale tree and discards
+    this one's changes. Returns False if the merge failed.
+    """
+    new_commit = await asyncio.to_thread(try_auto_merge, board, merge_info, message)
+    if new_commit is None:
+        return False
+    board.commit = new_commit
+    new_board = await asyncio.to_thread(load_board, board.repo_path)
+    apply_reload(board, new_board)
+    return True
+
+
 async def run_sync_cycle(board):
     """Run one sync cycle: pull → save → merge → load → push.
 
@@ -75,19 +92,18 @@ async def run_sync_cycle(board):
             board.commit = new_commit
 
         # --- MERGE (local divergence + remote branches) ---
-        merged = False
+        # The board is only reloaded when a merge brought in external
+        # changes; otherwise the in-memory state is authoritative and
+        # reloading risks overwriting user edits with a racy save snapshot.
         if do_local:
             sync.status = "load"
 
             # Local merge (another process may have committed)
             merge_info = await asyncio.to_thread(check_for_merge, board)
             if merge_info is not None:
-                new_commit = await asyncio.to_thread(try_auto_merge, board, merge_info, "Auto-merge local changes")
-                if new_commit is None:
+                if not await _merge_and_reload(board, merge_info, "Auto-merge local changes"):
                     sync.status = "conflict"
                     return
-                board.commit = new_commit
-                merged = True
 
             # Remote merges
             if do_remote and remotes:
@@ -101,24 +117,9 @@ async def run_sync_cycle(board):
                     merge_info = await asyncio.to_thread(check_remote_for_merge, board, remote)
                     if merge_info is None:
                         continue
-                    new_commit = await asyncio.to_thread(
-                        try_auto_merge,
-                        board,
-                        merge_info,
-                        f"Merge {remote}/ganban",
-                    )
-                    if new_commit is None:
+                    if not await _merge_and_reload(board, merge_info, f"Merge {remote}/ganban"):
                         sync.status = "conflict"
                         return
-                    board.commit = new_commit
-                    merged = True
-
-            # Only reload if we merged external changes; otherwise our
-            # in-memory state is authoritative and reloading risks
-            # overwriting user edits with a racy save snapshot.
-            if merged:
-                new_board = await asyncio.to_thread(load_board, repo_path)
-                apply_reload(board, new_board)
 
         # --- PUSH ---
         if do_remote and upstream_remote:

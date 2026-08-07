@@ -203,3 +203,53 @@ async def test_sync_picks_up_external_changes(local_repo):
 
     assert board.git.sync.status == "idle"
     assert len(board.cards) == original_card_count + 1
+
+
+# --- multiple remotes ---
+
+
+@pytest.mark.asyncio
+async def test_sync_two_remotes_preserves_both(tmp_path):
+    """Merging a second remote must not discard the first remote's changes."""
+    remote_a = tmp_path / "a.git"
+    remote_b = tmp_path / "b.git"
+    Repo.init(remote_a, bare=True)
+    Repo.init(remote_b, bare=True)
+
+    local_path = tmp_path / "local"
+    local_path.mkdir()
+    local_repo = Repo.init(local_path)
+    (local_path / ".gitkeep").write_text("")
+    local_repo.index.add([".gitkeep"])
+    local_repo.index.commit("Initial commit")
+    _make_board_and_save(local_path)
+
+    local_repo.create_remote("a", str(remote_a))
+    local_repo.create_remote("b", str(remote_b))
+    local_repo.git.push("a", "ganban")
+    local_repo.git.push("b", "ganban")
+
+    # Each remote gains a distinct card via its own clone
+    for name, remote_path, card_id in (("a", remote_a, "a01"), ("b", remote_b, "b01")):
+        with tempfile.TemporaryDirectory() as other_path:
+            other_repo = Repo.clone_from(str(remote_path), other_path)
+            other_repo.git.checkout("ganban")
+            other_board = load_board(other_path)
+            sections = ListNode()
+            sections[f"Card {name}"] = "Added remotely."
+            other_board.cards[card_id] = Node(sections=sections, meta={})
+            col = list(other_board.columns)[0]
+            col.links = tuple(list(col.links) + [card_id])
+            save_board(other_board, message=f"Add card {name}")
+            other_repo.git.push("origin", "ganban")
+
+    board = load_board(str(local_path))
+    _init_sync_state(board, local=True, remote=True)
+
+    await run_sync_cycle(board)
+
+    assert board.git.sync.status == "idle"
+    # Both remotes' cards survived the double merge
+    reloaded = load_board(str(local_path))
+    assert len(reloaded.cards) == 3
+    assert len(board.cards) == 3
