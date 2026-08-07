@@ -4,7 +4,7 @@ git-based Kanban TUI
 
 ## What is this?
 
-![screenshot](https://bitplane.net/dev/python/ganban/ganban.png)
+![screen](https://bitplane.net/dev/python/ganban/ganban.png)
 
 `ganban` is a Kanban board that lives in git. The data sits in an orphan branch,
 so web UIs shouldn't offer to merge it (but they do). In `ganban`, our tasks
