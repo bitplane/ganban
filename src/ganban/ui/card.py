@@ -23,7 +23,7 @@ from ganban.ui.constants import (
 )
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragGhost
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator, truncate
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
 from ganban.ui.watcher import NodeWatcherMixin
@@ -200,7 +200,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         x = region.x + region.width // 2
         y = region.y + region.height // 2
         items = [
-            MenuItem(f"{ICON_DELETE} Archive {truncate(self.title)}?", disabled=True),
+            MenuItem(f"{ICON_DELETE} Archive card?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
             MenuItem(f"{ICON_BACK} Cancel", "cancel"),

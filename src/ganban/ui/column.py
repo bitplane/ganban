@@ -24,7 +24,7 @@ from ganban.ui.constants import (
 )
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.drag import CardPlaceholder, DraggableMixin, DropTarget
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator, truncate
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -408,12 +408,11 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
                 self._confirm_archive()
 
     def _confirm_archive(self) -> None:
-        name = first_title(self.column.sections)
         region = self.region
         x = region.x + region.width // 2
         y = region.y + region.height // 2
         items = [
-            MenuItem(f"{ICON_DELETE} Archive {truncate(name)}?", disabled=True),
+            MenuItem(f"{ICON_DELETE} Archive column?", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_CONFIRM} Confirm", "confirm"),
             MenuItem(f"{ICON_BACK} Cancel", "cancel"),
