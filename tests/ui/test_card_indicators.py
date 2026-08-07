@@ -144,3 +144,35 @@ def test_label_text_uses_hash_color_without_override():
     result = build_label_text(meta, board)
     # Should have one block character with hash-computed color
     assert result.plain == "■"
+
+
+def test_footer_comments_section():
+    """A comments subsection shows the chat icon."""
+    from ganban.ui.constants import ICON_COMMENTS
+
+    sections, meta = _make_card()
+    sections["Comments"] = "- [Gaz](mailto:g@x) hello"
+    footer = build_footer_text(sections, meta, None)
+    assert ICON_COMMENTS in footer.plain
+
+
+def test_footer_tasks_section():
+    """A tasks subsection shows the checkbox icon."""
+    from ganban.ui.constants import ICON_TASKS
+
+    sections, meta = _make_card()
+    sections["Tasks"] = "- [ ] thing"
+    footer = build_footer_text(sections, meta, None)
+    assert ICON_TASKS in footer.plain
+
+
+def test_footer_title_alone_is_not_a_section_match():
+    """A card merely titled 'Comments' gets no comments icon."""
+    from ganban.ui.constants import ICON_COMMENTS, ICON_TASKS
+
+    sections = ListNode()
+    sections["Comments"] = ""
+    sections["Notes"] = "body"
+    footer = build_footer_text(sections, Node())
+    assert ICON_COMMENTS not in footer.plain
+    assert ICON_TASKS not in footer.plain

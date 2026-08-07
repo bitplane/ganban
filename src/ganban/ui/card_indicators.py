@@ -1,5 +1,6 @@
 """Pure functions for building card indicator text."""
 
+import re
 from datetime import date
 
 from rich.text import Text
@@ -7,9 +8,20 @@ from rich.text import Text
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
 from ganban.ui.cal import date_diff, parse_due
-from ganban.ui.constants import ICON_BLOCKED, ICON_BODY, ICON_CALENDAR, ICON_CHECKED, ICON_COLOR_SWATCH
+from ganban.ui.constants import (
+    ICON_BLOCKED,
+    ICON_BODY,
+    ICON_CALENDAR,
+    ICON_CHECKED,
+    ICON_COLOR_SWATCH,
+    ICON_COMMENTS,
+    ICON_TASKS,
+)
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
 from ganban.ui.palette import get_label_color
+
+_COMMENTS_RE = re.compile(r"(?i)comments?")
+_TASKS_RE = re.compile(r"(?i)tasks?|todo")
 
 
 def build_label_text(meta: Node, board: Node) -> Text:
@@ -70,6 +82,14 @@ def build_footer_text(
     body = first_body(sections)
     if body.strip():
         parts.append(Text(ICON_BODY, style="dim"))
+
+    # Comments / tasks subsection indicators (same patterns the section
+    # editors use to pick their editor type)
+    subsection_titles = sections.keys()[1:] if sections else []
+    if any(_COMMENTS_RE.search(title) for title in subsection_titles):
+        parts.append(Text(ICON_COMMENTS))
+    if any(_TASKS_RE.search(title) for title in subsection_titles):
+        parts.append(Text(ICON_TASKS))
 
     # Due date indicator
     due = parse_due(meta.due if meta else None)
