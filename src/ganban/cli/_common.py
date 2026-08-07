@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
-from ganban.model.writer import save_board
+from ganban.model.writer import save_and_merge
 from ganban.parser import first_title, parse_sections
 
 
@@ -39,8 +39,7 @@ def find_card(board: Node, card_id: str, json_mode: bool) -> Node:
 
 def save(board: Node, message: str) -> str:
     """Save board and return commit hash."""
-    commit = save_board(board, message=message)
-    board.commit = commit
+    commit, _ = save_and_merge(board, message=message)
     return commit
 
 

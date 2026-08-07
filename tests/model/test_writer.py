@@ -15,6 +15,7 @@ from ganban.model.writer import (
     meta_to_dict,
     check_for_merge,
     check_remote_for_merge,
+    save_and_merge,
     save_board,
     try_auto_merge,
 )
@@ -428,20 +429,21 @@ def test_auto_merge_conflict_ours_wins(repo_with_ganban):
     """Conflict resolved by most-recent-commit-wins (ours is newer)."""
     board = load_board(str(repo_with_ganban))
 
-    # External change: edit card 001 with an old timestamp
+    # External change: edit card 001 with an old timestamp (the resolution
+    # policy compares committer dates, so pin that, not just the author date)
     repo = Repo(repo_with_ganban)
     repo.git.checkout("ganban")
     all_dir = repo_with_ganban / ".all"
     (all_dir / "001.md").write_text("# First card\n\nExternal edit.\n")
     repo.git.add("-A")
-    # Commit with a very old date so ours wins
-    repo.git.commit("-m", "External edit", date="2000-01-01T00:00:00")
+    with repo.git.custom_environment(GIT_COMMITTER_DATE="2000-01-01T00:00:00"):
+        repo.git.commit("-m", "External edit", date="2000-01-01T00:00:00")
 
     # Our change: also edit card 001
     board.cards["1"].sections["First card"] = "Our edit."
 
     # Save our board so it gets a fresh (newer) commit
-    save_board(board)
+    board.commit = save_board(board)
 
     merge_info = check_for_merge(board)
     assert merge_info is not None
@@ -770,3 +772,84 @@ def testmeta_to_dict_empty():
     assert meta_to_dict(Node()) == {}
     assert meta_to_dict({}) == {}
     assert meta_to_dict(None) == {}
+
+
+# --- Concurrent save safety tests ---
+
+
+def test_save_stale_board_does_not_move_ref(repo_with_ganban):
+    """A save from a stale board must not orphan a concurrent commit."""
+    board_a = load_board(str(repo_with_ganban))
+    board_b = load_board(str(repo_with_ganban))
+    original = board_a.commit
+
+    board_a.cards["1"].sections["First card"] = "From A"
+    commit_a = save_board(board_a)
+
+    board_b.cards["1"].sections["First card"] = "From B"
+    commit_b = save_board(board_b)
+
+    repo = Repo(repo_with_ganban)
+    # The ref stays on A's commit; B's commit exists but dangles off the original
+    assert repo.commit("ganban").hexsha == commit_a
+    assert [p.hexsha for p in repo.commit(commit_b).parents] == [original]
+
+
+def test_save_and_merge_preserves_concurrent_commit(repo_with_ganban):
+    """save_and_merge merges a concurrent commit instead of orphaning it."""
+    board_a = load_board(str(repo_with_ganban))
+    board_b = load_board(str(repo_with_ganban))
+
+    board_a.cards["1"].sections["First card"] = "From A"
+    commit_a = save_board(board_a)
+
+    create_card(board_b, "From B", column=board_b.columns["1"])
+    commit_b, merged = save_and_merge(board_b)
+
+    assert merged is True
+    assert board_b.commit == commit_b
+
+    repo = Repo(repo_with_ganban)
+    tip = repo.commit("ganban")
+    assert tip.hexsha == commit_b
+    assert len(tip.parents) == 2
+    # Both sides' changes are present in the merged tree
+    assert "From A" in repo.git.show(f"{commit_b}:.all/001.md")
+    assert "From B" in repo.git.show(f"{commit_b}:.all/002.md")
+    assert repo.is_ancestor(commit_a, commit_b)
+
+
+def test_save_and_merge_no_divergence(repo_with_ganban):
+    """save_and_merge without concurrent changes is a plain save."""
+    board = load_board(str(repo_with_ganban))
+    board.cards["1"].sections["First card"] = "Changed"
+
+    commit, merged = save_and_merge(board)
+
+    assert merged is False
+    repo = Repo(repo_with_ganban)
+    assert repo.commit("ganban").hexsha == commit
+
+
+def test_auto_merge_stale_merge_info_returns_none(repo_with_ganban):
+    """try_auto_merge bails out when the branch moved past merge_info."""
+    board = load_board(str(repo_with_ganban))
+    board.cards["1"].sections["First card"] = "Local change"
+
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "002.md").write_text("# External card\n")
+    repo.git.add("-A")
+    repo.index.commit("External change")
+
+    merge_info = check_for_merge(board)
+    assert merge_info is not None
+
+    # Branch moves again after the divergence check
+    (all_dir / "003.md").write_text("# Another external card\n")
+    repo.git.add("-A")
+    newer_tip = repo.index.commit("Second external change").hexsha
+
+    assert try_auto_merge(board, merge_info) is None
+    assert repo.commit("ganban").hexsha == newer_tip

@@ -13,9 +13,10 @@ from ganban.model.card import archive_card, move_card
 from ganban.model.column import archive_column, move_column
 from ganban.model.node import Node
 from ganban.git import write_git_config_key
-from ganban.model.writer import save_board
+from ganban.model.loader import load_board
+from ganban.model.writer import save_and_merge
 from ganban.parser import first_title
-from ganban.sync import run_sync_cycle
+from ganban.sync import apply_reload, run_sync_cycle
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 from ganban.ui.constants import ICON_BOARD, ICON_EDIT, ICON_SETTINGS
@@ -255,8 +256,9 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
 
     def action_save(self) -> None:
         """Save the board to git."""
-        new_commit = save_board(self.board)
-        self.board.commit = new_commit
+        _, merged = save_and_merge(self.board)
+        if merged:
+            apply_reload(self.board, load_board(self.board.repo_path))
         self.notify("Saved")
 
     def on_card_widget_move_requested(self, event: CardWidget.MoveRequested) -> None:
@@ -279,8 +281,9 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
     def on_add_card_card_created(self, event: AddCard.CardCreated) -> None:
         """Handle new card creation — commit immediately for timestamp."""
         event.stop()
-        new_commit = save_board(self.board, message=f"Add card: {event.title}")
-        self.board.commit = new_commit
+        _, merged = save_and_merge(self.board, message=f"Add card: {event.title}")
+        if merged:
+            apply_reload(self.board, load_board(self.board.repo_path))
         self._last_sync = time.monotonic()
 
     def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:

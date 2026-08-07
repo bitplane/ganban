@@ -11,7 +11,7 @@ from ganban.git import has_branch, init_repo, is_git_repo
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
 from ganban.model.column import create_column
-from ganban.model.writer import save_board
+from ganban.model.writer import save_and_merge, save_board
 from ganban.ui.board import BoardScreen
 
 
@@ -113,5 +113,5 @@ class GanbanApp(App):
         if hasattr(screen, "_sync_task") and screen._sync_task is not None:
             screen._sync_task.cancel()
         if self.board:
-            save_board(self.board)
+            save_and_merge(self.board)
         self.exit()

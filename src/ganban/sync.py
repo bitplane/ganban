@@ -24,6 +24,15 @@ from ganban.model.writer import (
 logger = logging.getLogger(__name__)
 
 
+def apply_reload(board, new_board) -> None:
+    """Apply a freshly loaded board in place, preserving live sync/config nodes."""
+    sync_node = board.git.sync
+    config_node = board.git.config
+    board.update(new_board)
+    board.git.sync = sync_node
+    board.git.config = config_node
+
+
 async def run_sync_cycle(board):
     """Run one sync cycle: pull → save → merge → load → push.
 
@@ -108,12 +117,8 @@ async def run_sync_cycle(board):
             # in-memory state is authoritative and reloading risks
             # overwriting user edits with a racy save snapshot.
             if merged:
-                sync_node = board.git.sync
-                config_node = board.git.config
                 new_board = await asyncio.to_thread(load_board, repo_path)
-                board.update(new_board)
-                board.git.sync = sync_node
-                board.git.config = config_node
+                apply_reload(board, new_board)
 
         # --- PUSH ---
         if do_remote and upstream_remote:

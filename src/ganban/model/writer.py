@@ -93,6 +93,20 @@ def _get_ref(repo_path: Path, ref: str) -> str | None:
     return result.stdout.decode("utf-8").strip()
 
 
+def _update_ref_cas(repo_path: Path, branch: str, new_commit: str, expected_old: str | None) -> bool:
+    """Atomically move a branch to new_commit only if it is still at expected_old.
+
+    expected_old of None means the branch must not exist yet.
+    Returns False if the branch moved concurrently.
+    """
+    result = subprocess.run(
+        ["git", "update-ref", f"refs/heads/{branch}", new_commit, expected_old or ""],
+        cwd=repo_path,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
 def _commit_timestamp(repo_path: Path, commit: str) -> int:
     """Get the committer timestamp of a commit as epoch seconds."""
     return int(_git(repo_path, ["log", "-1", "--format=%ct", commit]))
@@ -287,9 +301,50 @@ def save_board(
         ["commit-tree", tree, *parent_args, "-m", message],
     )
 
-    _git(repo_path, ["update-ref", f"refs/heads/{branch}", new_commit])
+    # The ref may only advance from a commit this save builds on. A tip
+    # moved by another process is left in place — the commit still exists
+    # and the caller must merge (see save_and_merge) rather than orphan it.
+    real_parents = [p for p in parents if p]
+    for _ in range(3):
+        tip = _get_branch_tip(repo_path, branch)
+        if tip == new_commit:
+            break
+        if tip is not None and tip not in real_parents:
+            break
+        if _update_ref_cas(repo_path, branch, new_commit, tip):
+            break
 
     return new_commit
+
+
+def save_and_merge(
+    board: Node,
+    message: str = "Update board",
+    branch: str = BRANCH_NAME,
+    max_attempts: int = 5,
+) -> tuple[str, bool]:
+    """Save the board, merging any concurrent movement of the branch tip.
+
+    Returns (commit, merged). merged is True when a concurrent commit was
+    merged in — long-lived callers should reload the board from git, since
+    the in-memory tree does not contain the merged-in changes.
+
+    Raises RuntimeError if the branch diverged and auto-merge kept failing;
+    the local changes are preserved in the returned commit's history.
+    """
+    commit = save_board(board, message, branch)
+    board.commit = commit
+    merged = False
+    for _ in range(max_attempts):
+        merge_info = check_for_merge(board, branch)
+        if merge_info is None:
+            return commit, merged
+        new_commit = try_auto_merge(board, merge_info, branch=branch)
+        if new_commit is not None:
+            commit = new_commit
+            board.commit = new_commit
+            merged = True
+    raise RuntimeError(f"branch {branch} diverged and auto-merge failed; local changes saved as {commit}")
 
 
 def _check_divergence(
@@ -337,16 +392,26 @@ def try_auto_merge(
 
     Returns the new merge commit hash. Conflicts are resolved by replacing
     conflicted files with the version from whichever commit is newer.
-    Returns None only if merge-tree fails entirely.
+    Returns None if merge-tree fails entirely, or if the branch moved
+    concurrently (merge_info is stale — re-check and retry).
     """
     repo_path = Path(board.repo_path)
+
+    # The ref may only move from a commit that ends up an ancestor of the
+    # merge result; any other tip means merge_info is stale.
+    tip = _get_branch_tip(repo_path, branch)
+    if tip is not None and tip not in (merge_info.ours, merge_info.theirs):
+        return None
 
     our_tree = _build_board_tree(repo_path, board)
 
     # Fast-forward: our tree matches the merge base, so we're just behind
     base_tree = _git(repo_path, ["rev-parse", f"{merge_info.base}^{{tree}}"])
     if our_tree == base_tree:
-        _git(repo_path, ["update-ref", f"refs/heads/{branch}", merge_info.theirs])
+        if tip == merge_info.theirs:
+            return merge_info.theirs
+        if not _update_ref_cas(repo_path, branch, merge_info.theirs, tip):
+            return None
         return merge_info.theirs
 
     merged_tree, conflict_paths = _merge_trees(repo_path, merge_info.base, our_tree, merge_info.theirs)
@@ -366,6 +431,7 @@ def try_auto_merge(
         ["commit-tree", merged_tree, *parent_args, "-m", message],
     )
 
-    _git(repo_path, ["update-ref", f"refs/heads/{branch}", new_commit])
+    if not _update_ref_cas(repo_path, branch, new_commit, tip):
+        return None
 
     return new_commit
