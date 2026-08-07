@@ -702,3 +702,48 @@ def test_list_node_update_emits_on_reorder():
     assert root.things.keys() == ["b", "a"]
     assert len(events) == 1
     assert events[0] == "*"
+
+
+# --- clone ---
+
+
+def test_clone_deep_copies_structure():
+    """clone() copies nested Nodes, ListNodes, dicts and lists."""
+    board = Node(repo_path="/tmp/x", commit="abc")
+    board.cards = ListNode()
+    card = Node(meta={"labels": ["bug"]})
+    card.sections = ListNode()
+    card.sections["Title"] = "Body"
+    board.cards["1"] = card
+
+    view = board.clone()
+
+    assert view.repo_path == "/tmp/x"
+    assert view.commit == "abc"
+    assert view.cards.keys() == ["1"]
+    assert view.cards["1"].sections["Title"] == "Body"
+    assert view.cards["1"].meta.labels == ["bug"]
+
+    # Mutating the original does not leak into the clone
+    board.cards["1"].sections["Title"] = "Changed"
+    board.cards["2"] = Node(sections=ListNode())
+    board.cards["1"].meta.labels.append("urgent")
+    assert view.cards["1"].sections["Title"] == "Body"
+    assert view.cards.keys() == ["1"]
+    assert view.cards["1"].meta.labels == ["bug"]
+
+
+def test_clone_has_no_watchers():
+    """Mutating a clone never fires the original's watchers."""
+    node = Node(x=1)
+    node.child = Node(y=2)
+    fired = []
+    node.watch("x", lambda *a: fired.append(a))
+    node.watch("child", lambda *a: fired.append(a))
+
+    view = node.clone()
+    view.x = 99
+    view.child.y = 99
+
+    assert fired == []
+    assert node.x == 1

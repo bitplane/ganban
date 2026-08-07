@@ -27,6 +27,20 @@ def _wrap(value: Any, parent: Node | ListNode, key: str) -> Any:
     return value
 
 
+def _clone_value(value: Any, parent: Node | ListNode, key: str) -> Any:
+    """Deep-copy a value for clone(), reparenting child nodes to the clone."""
+    if isinstance(value, (Node, ListNode)):
+        child = value.clone()
+        object.__setattr__(child, "_parent", parent)
+        object.__setattr__(child, "_key", key)
+        return child
+    if isinstance(value, dict):
+        return {k: _clone_value(v, parent, key) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clone_value(v, parent, key) for v in value]
+    return value
+
+
 def _emit(node: Node | ListNode, key: str, old: Any, new: Any) -> None:
     """Fire local watchers for key, then bubble up the parent chain."""
     for cb in node._watchers.get(key, ()):
@@ -127,6 +141,17 @@ class Node:
                 continue
             else:
                 setattr(self, key, new_value)
+
+    def clone(self) -> "Node":
+        """Deep-copy this subtree without watchers or the parent link.
+
+        Used to snapshot the board on the event-loop thread so background
+        saves never iterate structures the UI is still mutating.
+        """
+        n = Node()
+        for key, value in self._children.items():
+            n._children[key] = _clone_value(value, n, key)
+        return n
 
     def rename_key(self, old_key: str, new_key: str) -> None:
         """Rename a key in _children, preserving insertion order."""
@@ -265,6 +290,15 @@ class ListNode:
             object.__setattr__(self, "_by_id", new_by_id)
             object.__setattr__(self, "_items", new_items)
             _emit(self, "*", old_keys, new_keys)
+
+    def clone(self) -> "ListNode":
+        """Deep-copy this list without watchers or the parent link."""
+        ln = ListNode()
+        for key, value in zip(self._by_id.keys(), self._items):
+            cloned = _clone_value(value, ln, key)
+            ln._by_id[key] = cloned
+            ln._items.append(cloned)
+        return ln
 
     def add(self, key: str, value: Any) -> str:
         """Add a new item, deduplicating the key if it already exists.

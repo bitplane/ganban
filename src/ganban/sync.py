@@ -33,21 +33,22 @@ def apply_reload(board, new_board) -> None:
     board.git.config = config_node
 
 
-async def _merge_and_reload(board, merge_info, message) -> bool:
+async def _merge_and_reload(board, board_view, merge_info, message):
     """Run one auto-merge, then reload the board from the merge result.
 
-    try_auto_merge builds "our" side from the in-memory board, so every
-    merge must be applied back to the board before another merge runs —
-    otherwise the next merge is computed from a stale tree and discards
-    this one's changes. Returns False if the merge failed.
+    The merge runs against board_view — a snapshot the worker thread can
+    iterate safely while the UI keeps mutating the live board — and every
+    merge must be applied back before another runs, otherwise the next
+    one is computed from a stale tree and discards this one's changes.
+    Returns a fresh snapshot of the reloaded board, or None on failure.
     """
-    new_commit = await asyncio.to_thread(try_auto_merge, board, merge_info, message)
+    new_commit = await asyncio.to_thread(try_auto_merge, board_view, merge_info, message)
     if new_commit is None:
-        return False
+        return None
     board.commit = new_commit
     new_board = await asyncio.to_thread(load_board, board.repo_path)
     apply_reload(board, new_board)
-    return True
+    return board.clone()
 
 
 async def run_sync_cycle(board):
@@ -86,10 +87,15 @@ async def run_sync_cycle(board):
                         logger.warning("fetch %s failed: %s", remote, exc)
 
         # --- SAVE (commit in-memory state to git) ---
+        # The worker thread only ever sees a snapshot taken on the event
+        # loop, so it never iterates structures the UI is still mutating;
+        # edits landing mid-save are simply picked up by the next cycle.
         if do_local:
             sync.status = "save"
-            new_commit = await asyncio.to_thread(save_board, board)
+            board_view = board.clone()
+            new_commit = await asyncio.to_thread(save_board, board_view)
             board.commit = new_commit
+            board_view.commit = new_commit
 
         # --- MERGE (local divergence + remote branches) ---
         # The board is only reloaded when a merge brought in external
@@ -99,9 +105,10 @@ async def run_sync_cycle(board):
             sync.status = "load"
 
             # Local merge (another process may have committed)
-            merge_info = await asyncio.to_thread(check_for_merge, board)
+            merge_info = await asyncio.to_thread(check_for_merge, board_view)
             if merge_info is not None:
-                if not await _merge_and_reload(board, merge_info, "Auto-merge local changes"):
+                board_view = await _merge_and_reload(board, board_view, merge_info, "Auto-merge local changes")
+                if board_view is None:
                     sync.status = "conflict"
                     return
 
@@ -114,10 +121,11 @@ async def run_sync_cycle(board):
                     has_branch = await asyncio.to_thread(remote_has_branch, repo_path, remote)
                     if not has_branch:
                         continue
-                    merge_info = await asyncio.to_thread(check_remote_for_merge, board, remote)
+                    merge_info = await asyncio.to_thread(check_remote_for_merge, board_view, remote)
                     if merge_info is None:
                         continue
-                    if not await _merge_and_reload(board, merge_info, f"Merge {remote}/ganban"):
+                    board_view = await _merge_and_reload(board, board_view, merge_info, f"Merge {remote}/ganban")
+                    if board_view is None:
                         sync.status = "conflict"
                         return
 
