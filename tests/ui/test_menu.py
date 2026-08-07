@@ -632,3 +632,17 @@ async def test_column_clamped_when_target_shorter(menu_with_rows):
         # Row 2 only has 2 items, so index 2 clamps to 1 = "y"
         await pilot.press("down")
         assert app.focused.item_id == "y"
+
+
+def test_truncate_short_text_unchanged():
+    from ganban.ui.menu import truncate
+
+    assert truncate("Backlog") == "Backlog"
+
+
+def test_truncate_long_text_capped_with_ellipsis():
+    from ganban.ui.menu import truncate
+
+    result = truncate("duplicate column order prefixes lose a column")
+    assert result == "duplicate column or…"
+    assert len(result) == 20

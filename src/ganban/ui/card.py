@@ -25,7 +25,7 @@ from ganban.ui.constants import (
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragGhost
 from ganban.ui.edit.add import AddValueMixin
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator, truncate
 from ganban.ui.static import PlainStatic
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -149,7 +149,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             y = region.y + region.height // 2
         current_col = self._find_column()
         move_items = [
-            MenuItem(first_title(col.sections), f"move:{col.order}", disabled=(col is current_col))
+            MenuItem(truncate(first_title(col.sections)), f"move:{col.order}", disabled=(col is current_col))
             for col in self.board.columns
             if not col.hidden
         ]
@@ -166,7 +166,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
             for name in (self.board.labels.keys() if self.board.labels else [])
         ]
         items = [
-            MenuItem(f"{ICON_CARD} {self.title}", disabled=True),
+            MenuItem(f"{ICON_CARD} {truncate(self.title)}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_MOVE_TO} Move to", submenu=move_items),

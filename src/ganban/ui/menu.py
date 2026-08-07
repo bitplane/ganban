@@ -11,6 +11,17 @@ from textual.screen import ModalScreen
 from textual.widgets import Static
 
 
+def truncate(text: str, width: int = 20) -> str:
+    """Shorten text to at most width characters, ending in an ellipsis.
+
+    Card, column and board titles are unbounded; anything embedding them
+    in a menu label should cap them so the menu keeps a sane width.
+    """
+    if len(text) <= width:
+        return text
+    return text[: width - 1].rstrip() + "…"
+
+
 class MenuItem(Static, can_focus=True):
     """A focusable menu item."""
 

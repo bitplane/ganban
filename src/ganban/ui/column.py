@@ -25,7 +25,7 @@ from ganban.ui.constants import (
 from ganban.ui.detail import ColumnDetailModal
 from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.drag import CardPlaceholder, DraggableMixin, DropTarget
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator, truncate
 from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -205,7 +205,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         visible_count = sum(1 for c in self.board.columns if not c.hidden)
         view_label = "\u2261\u2261 Compact" if not self.has_class("compact") else "\u2fbf Card"
         items = [
-            MenuItem(f"{ICON_COLUMN} {name}", disabled=True),
+            MenuItem(f"{ICON_COLUMN} {truncate(name)}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
             MenuItem(f"{ICON_PALETTE} Color", "color", submenu=build_color_menu()),

@@ -23,7 +23,7 @@ from ganban.ui.constants import ICON_BOARD, ICON_EDIT, ICON_SETTINGS
 from ganban.ui.detail import BoardDetailModal
 from ganban.ui.drag import ColumnPlaceholder, DropTarget
 from ganban.ui.edit import EditableText, TextEditor
-from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
+from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator, truncate
 from ganban.ui.static import CloseButton
 from ganban.ui.sync_widget import SyncWidget
 from ganban.ui.watcher import NodeWatcherMixin
@@ -252,7 +252,7 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
             y = region.y + region.height // 2
         title = first_title(self.board.sections)
         items = [
-            MenuItem(f"{ICON_BOARD} {title}", disabled=True),
+            MenuItem(f"{ICON_BOARD} {truncate(title)}", disabled=True),
             MenuSeparator(),
             MenuItem(f"{ICON_EDIT} Edit", "edit"),
         ]
