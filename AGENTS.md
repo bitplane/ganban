@@ -16,10 +16,11 @@ flit.
 src/ganban/
 ├── __main__.py          # Entry: no args → TUI, subcommand → CLI
 ├── model/               # Core data model (reactive Node tree)
-│   ├── node.py          # Node (dict-like) and ListNode (ordered, id-keyed)
+│   ├── node.py          # Node (dict-like) and ListNode (ordered, id-keyed), clone()
 │   ├── loader.py        # Load board from git branch into Node tree
-│   ├── writer.py        # Save Node tree back to git (plumbing, no checkout)
-│   ├── card.py          # Card mutations: create, move, archive
+│   ├── writer.py        # Save Node tree back to git; CAS ref updates, save_and_merge
+│   ├── board.py         # Board-level helpers (default board scaffold)
+│   ├── card.py          # Card mutations: create, move, archive; label ops
 │   └── column.py        # Column mutations: create, move, rename, archive
 ├── cli/                 # Argparse CLI
 │   ├── __init__.py      # Parser & dispatch (noun-verb pattern)
@@ -27,18 +28,23 @@ src/ganban/
 │   ├── board.py         # board summary/get/set
 │   ├── card.py          # card list/get/set/add/move/archive
 │   ├── column.py        # column list/get/set/add/move/rename/archive
-│   └── init.py          # ganban init
+│   ├── init.py          # ganban init
+│   ├── sync.py          # ganban sync (one-shot or -d daemon)
+│   └── web.py           # ganban web (serve the TUI in a browser)
 ├── ui/                  # Textual TUI
 │   ├── app.py           # GanbanApp, screen routing
-│   ├── board.py         # BoardScreen (main screen)
+│   ├── board.py         # BoardScreen (main screen, column reconciliation)
 │   ├── column.py        # ColumnWidget
 │   ├── card.py          # CardWidget
+│   ├── card_indicators.py  # Pure footer/header indicator builders
 │   ├── watcher.py       # NodeWatcherMixin (reactive watch + suppression)
 │   ├── drag.py          # DraggableMixin + DropTarget
 │   ├── detail.py        # Modal detail screens
-│   ├── menu.py          # Context menus
-│   └── edit/            # Editable widgets, section editors
+│   ├── menu.py          # Context menus (+ truncate helper for titles)
+│   ├── tag.py           # Tag widget + TagListWidget base (labels/deps editors)
+│   └── edit/            # Editable widgets, section editors, AddValueMixin
 ├── git.py               # Async git wrappers (GitPython + asyncio.to_thread)
+├── sync.py              # Background sync engine for the TUI (save/merge/reload)
 ├── ids.py               # ID comparison & generation (zero-padded, extensible)
 └── parser.py            # Markdown ↔ sections + YAML front-matter
 ```
@@ -72,10 +78,16 @@ this — mutate the tree, watchers fire, UI updates.
 
 All paths follow: **load → mutate → save**
 
-- `loader.load_board()` reads the git branch into a Node tree
+- `loader.load_board()` reads the git branch into a Node tree (pass
+  `committers=False` for one-shot CLI use)
 - Mutation helpers in `model/card.py` and `model/column.py` operate on the tree
-- `writer.save_board()` writes back using git plumbing (hash-object, mktree,
-  commit-tree) — never touches the working tree
+- `writer.save_board()` writes back using git plumbing — never touches the
+  working tree. Blobs are written in-process via gitdb; the branch ref only
+  advances by compare-and-swap, so concurrent writers are merged, never
+  clobbered. Callers without their own merge step use `save_and_merge()`.
+- The TUI's background sync (`sync.py`) snapshots the board with
+  `board.clone()` before handing it to a worker thread, and reloads the board
+  after every merge.
 
 ## UI architecture
 
@@ -93,8 +105,9 @@ containers). The screen delegates mouse events to the active draggable.
 make          # install venv, run coverage
 ```
 
-This is slow (~80s, 480+ tests). Don't run the full suite repeatedly — let the
-user do it. Run specific test files when working on a focused area:
+This is slow (~90s, ~700 tests). Don't run the full suite repeatedly — save it
+for just before a commit that touches shared code. Run specific test files when
+working on a focused area:
 
 ```
 .venv/bin/pytest tests/model/test_card.py -x
@@ -102,20 +115,33 @@ user do it. Run specific test files when working on a focused area:
 
 Tests are **functional pytest style** (no unittest classes, no mocks). Fixtures
 in `tests/model/conftest.py` create real temporary git repos. If something is
-hard to test without mocks, the code needs refactoring.
+hard to test without mocks, the code needs refactoring. When fixing a bug,
+verify the regression test fails on the pre-fix code (`git stash` the fix and
+re-run) before committing.
 
 ## Task management
 
-We are dogfooding ganban to manage this project's tasks. Use the CLI:
+We are dogfooding ganban to manage this project's tasks, and the agent drives
+the board. Use the CLI:
 
 ```
 ganban board                      # board summary
 ganban card list                  # list all cards
 ganban card get 001               # read a card
-ganban card move 001 --column 3   # move card to column 3
+ganban card move 001 --column 2   # move card to Now
+ganban card add "title" --body …  # file a new card
 ```
 
-When asked to work on the next thing, the user will have put a card in the Doing
-column. So pick it up for discussion and/or planning, we work on the feature
-and the user will manage the card status. Once we have auto-update and merging
-working then you can move the cards around using the CLI too.
+The workflow, per card:
+
+1. Move the card from Backlog into Now (column 2) when you start it.
+2. Do the work: fix + regression test + focused test runs.
+3. Commit — one code commit per card, message explains the why.
+4. Move the card to Done (column 3) and pick up the next one.
+
+Findings (bug reports, review results) become cards too — one card per
+finding, labelled `bug`/`cleanup`/`ui`/etc., with file:line references and a
+failure scenario in the body. The user may drop new cards into Backlog at any
+time; when asked to pick up work, take what's in Now first, then pull from
+Backlog. Concurrent use is safe: the CLI and a running TUI can both write to
+the board (saves merge rather than clobber).
