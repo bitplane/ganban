@@ -7,7 +7,7 @@ from ganban.model.column import create_column
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 from ganban.ui.board import BoardScreen
-from ganban.ui.column import ColumnWidget
+from ganban.ui.column import AddColumn, ColumnWidget
 
 from .conftest import GANBAN_CSS_PATH
 
@@ -61,6 +61,33 @@ async def test_externally_removed_column_disappears():
         assert len(app.screen.query(ColumnWidget)) == 2
 
         board.columns["2"] = None
+        await pilot.pause()
+
+        widgets = list(app.screen.query(ColumnWidget))
+        assert [first_title(w.column.sections) for w in widgets] == ["Backlog"]
+
+
+@pytest.mark.asyncio
+async def test_add_column_widget_mounts_new_column():
+    """Creating a column via AddColumn mounts a widget through the watcher."""
+    board = _make_board()
+    app = BoardApp(board)
+    async with app.run_test() as pilot:
+        app.screen.query_one(AddColumn).value_entered("Review")
+        await pilot.pause()
+
+        widgets = list(app.screen.query(ColumnWidget))
+        assert [first_title(w.column.sections) for w in widgets] == ["Backlog", "Done", "Review"]
+
+
+@pytest.mark.asyncio
+async def test_archive_request_unmounts_column_widget():
+    """The archive handler mutates the model; reconciliation unmounts."""
+    board = _make_board()
+    app = BoardApp(board)
+    async with app.run_test() as pilot:
+        widget = next(w for w in app.screen.query(ColumnWidget) if w.column.order == "2")
+        app.screen.on_column_widget_archive_requested(ColumnWidget.ArchiveRequested(widget))
         await pilot.pause()
 
         widgets = list(app.screen.query(ColumnWidget))

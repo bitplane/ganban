@@ -438,17 +438,9 @@ class AddColumn(AddValueMixin, Vertical):
 
     editable_classes = "column-header"
 
-    class ColumnCreated(Message):
-        """Posted when a new column is created."""
-
-        def __init__(self, column: Node):
-            super().__init__()
-            self.column = column
-
     def __init__(self, board: Node):
         super().__init__()
         self.board = board
 
     def value_entered(self, value: str) -> None:
-        new_column = create_column(self.board, value)
-        self.post_message(self.ColumnCreated(new_column))
+        create_column(self.board, value)

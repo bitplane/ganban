@@ -313,11 +313,6 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
             apply_reload(self.board, load_board(self.board.repo_path))
         self._last_sync = time.monotonic()
 
-    def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
-        """Handle new column creation."""
-        event.stop()
-        self._reconcile_columns()
-
     def _move_column_to_index(self, col_widget: ColumnWidget, new_index: int) -> None:
         """Move column to new position in both model and UI."""
         with self.suppressing():
@@ -354,9 +349,6 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         self._move_column_to_index(col_widget, new_index)
 
     def on_column_widget_archive_requested(self, event: ColumnWidget.ArchiveRequested) -> None:
-        """Handle column archive request."""
+        """Handle column archive request; reconciliation unmounts the widget."""
         event.stop()
-        col_widget = event.column_widget
-        with self.suppressing():
-            archive_column(self.board, col_widget.column.order)
-        col_widget.remove()
+        archive_column(self.board, event.column_widget.column.order)
