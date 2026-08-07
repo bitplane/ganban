@@ -524,3 +524,25 @@ def test_duplicate_column_orders_both_survive(repo_with_ganban):
     reloaded = load_board(str(repo_with_ganban))
     assert [c.dir_path for c in reloaded.columns] == ["1.backlog", "2.doing", "3.done"]
     assert reloaded.columns["3"].links == ("3",)
+
+
+def test_preamble_card_round_trips_without_retitle(repo_with_ganban):
+    """A card with text above its H1 keeps its title through load/save."""
+    from ganban.model.writer import save_board
+
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    text = "Intro paragraph.\n\n# Fix login bug\n\nBody text.\n"
+    (repo_with_ganban / ".all" / "001.md").write_text(text)
+    repo.git.add("-A")
+    repo.index.commit("Hand-edited card")
+
+    board = load_board(str(repo_with_ganban))
+    card = board.cards["1"]
+    assert card.sections.keys() == ["", "Fix login bug"]
+
+    board.commit = save_board(board, message="Round trip")
+    assert repo.git.show("ganban:.all/001.md") + "\n" == text
+
+    reloaded = load_board(str(repo_with_ganban))
+    assert reloaded.cards["1"].sections.keys() == ["", "Fix login bug"]

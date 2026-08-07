@@ -84,9 +84,11 @@ def serialize_sections(sections: list[tuple[str, str]], meta: dict | None = None
         parts.append("---")
         parts.append("")
 
-    for i, (title, body) in enumerate(sections):
+    h1_emitted = False
+    for title, body in sections:
         if title:
-            prefix = "#" if i == 0 else "##"
+            prefix = "##" if h1_emitted else "#"
+            h1_emitted = True
             parts.append(f"{prefix} {title}")
             parts.append("")
         if body:
@@ -97,9 +99,14 @@ def serialize_sections(sections: list[tuple[str, str]], meta: dict | None = None
 
 
 def first_title(sections) -> str:
-    """Get the title (first key) of a sections ListNode, or empty string."""
-    keys = sections.keys()
-    return keys[0] if keys else ""
+    """Get the title of a sections ListNode: its first non-empty key.
+
+    An empty first key holds preamble text that sits above the H1.
+    """
+    for key in sections.keys():
+        if key:
+            return key
+    return ""
 
 
 def first_body(sections) -> str:

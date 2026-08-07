@@ -1,6 +1,7 @@
 """Tests for markdown parser."""
 
-from ganban.parser import parse_sections, serialize_sections
+from ganban.model.node import ListNode
+from ganban.parser import first_title, parse_sections, serialize_sections
 
 
 def test_parse_sections_title_and_body():
@@ -109,3 +110,19 @@ def test_sections_roundtrip():
     sections2, meta2 = parse_sections(text)
     assert sections == sections2
     assert meta == meta2
+
+
+def test_preamble_above_h1_round_trips():
+    """Text above the H1 keeps its place and the H1 stays an H1."""
+    text = "Intro paragraph.\n\n# Real Title\n\nBody text.\n"
+    sections, meta = parse_sections(text)
+    assert sections == [("", "Intro paragraph."), ("Real Title", "Body text.")]
+    assert serialize_sections(sections, meta or None) == text
+
+
+def test_first_title_skips_preamble():
+    """first_title returns the H1, not the empty preamble key."""
+    ln = ListNode()
+    ln.add("", "Intro paragraph.")
+    ln.add("Real Title", "Body text.")
+    assert first_title(ln) == "Real Title"

@@ -75,12 +75,15 @@ def _parse_link_name(name: str) -> tuple[str | None, str]:
 def _build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[ListNode, dict]:
     """Parse markdown text into a ListNode of sections plus meta dict.
 
-    If the first section has no title, fallback_title is used.
+    fallback_title is used only when no section has a title at all. An
+    untitled first section alongside titled ones is preamble text above
+    the H1 and must keep its empty key to round-trip cleanly.
     """
     sections, meta = parse_sections(text)
     ln = ListNode()
-    for i, (title, body) in enumerate(sections):
-        if not title and i == 0:
+    has_title = any(title for title, _ in sections)
+    for title, body in sections:
+        if not title and not has_title:
             title = fallback_title
         ln.add(title, body)
     return ln, meta
