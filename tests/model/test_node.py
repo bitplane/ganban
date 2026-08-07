@@ -747,3 +747,15 @@ def test_clone_has_no_watchers():
 
     assert fired == []
     assert node.x == 1
+
+
+def test_update_matches_other_key_order():
+    """update() leaves keys in other's insertion order, deterministically."""
+    node = Node(gamma=1, epsilon=2)
+    other = Node()
+    for key in ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa"]:
+        setattr(other, key, key.upper())
+
+    node.update(other)
+
+    assert list(node.keys()) == list(other.keys())

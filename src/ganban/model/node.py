@@ -126,11 +126,10 @@ class Node:
 
     def update(self, other: Node) -> None:
         """Update this node in-place to match other, preserving watchers."""
-        existing_keys = set(self.keys())
         other_keys = set(other.keys())
-        for key in existing_keys - other_keys:
+        for key in set(self.keys()) - other_keys:
             setattr(self, key, None)
-        for key in other_keys:
+        for key in other.keys():
             old_value = self._children.get(key)
             new_value = other._children.get(key)
             if isinstance(old_value, Node) and isinstance(new_value, Node):
@@ -141,6 +140,11 @@ class Node:
                 continue
             else:
                 setattr(self, key, new_value)
+        # Match other's key order so serialization (e.g. YAML front-matter)
+        # is deterministic and identical across replicas
+        order = list(other.keys())
+        if list(self._children.keys()) != order:
+            self._children = {key: self._children[key] for key in order}
 
     def clone(self) -> "Node":
         """Deep-copy this subtree without watchers or the parent link.
