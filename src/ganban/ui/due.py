@@ -9,7 +9,7 @@ from textual.containers import Container, Horizontal
 from textual.widgets import Static
 
 from ganban.model.node import Node
-from ganban.ui.cal import DateButton, date_diff
+from ganban.ui.cal import DateButton, date_diff, parse_due
 from ganban.ui.constants import ICON_CALENDAR
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -29,13 +29,7 @@ class DueDateWidget(NodeWatcherMixin, Container):
 
     @property
     def due(self) -> date | None:
-        due_str = self.meta.due
-        if due_str:
-            try:
-                return date.fromisoformat(due_str)
-            except (ValueError, TypeError):
-                return None
-        return None
+        return parse_due(self.meta.due)
 
     def compose(self) -> ComposeResult:
         with Horizontal():

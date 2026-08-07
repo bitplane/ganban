@@ -9,6 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.widgets import Input, OptionList, Static
 
+from ganban.model.loader import normalise_label
 from ganban.model.node import Node
 from ganban.ui.constants import ICON_COLOR_SWATCH
 from ganban.ui.palette import get_label_color
@@ -32,7 +33,7 @@ def build_label_options(board: Node, current_labels: list[str]) -> list[tuple[st
 
     Shows all known labels from board.labels, excluding those already on the card.
     """
-    exclude = {raw.strip().lower() for raw in current_labels}
+    exclude = {normalise_label(raw) for raw in current_labels}
     options: list[tuple[str, str]] = []
     if board.labels:
         for name in board.labels.keys():
@@ -143,7 +144,7 @@ class LabelsWidget(NodeWatcherMixin, Container):
 
     def _swatch_for(self, text: str) -> Text:
         """Build a swatch-only Text for the given label name."""
-        name = text.strip().lower()
+        name = normalise_label(text)
         if name:
             color = get_label_color(name, self.board)
             result = Text()

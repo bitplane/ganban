@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from ganban.cli._common import output_json
-from ganban.git import fetch_sync, get_remotes_sync, get_upstream, push_sync, remote_has_branch
+from ganban.git import fetch_sync, get_remotes_sync, merge_order, push_sync, remote_has_branch, resolve_upstream
 from ganban.model.loader import load_board
 from ganban.model.writer import check_remote_for_merge, try_auto_merge
 
@@ -33,14 +33,7 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
     if not remotes:
         return 0, result
 
-    # Determine upstream
-    upstream_info = get_upstream(repo_path)
-    if upstream_info:
-        upstream_remote = upstream_info[0]
-    elif "origin" in remotes:
-        upstream_remote = "origin"
-    else:
-        upstream_remote = remotes[0]
+    upstream_remote = resolve_upstream(repo_path, remotes)
 
     # Fetch from ALL remotes
     for remote in remotes:
@@ -50,10 +43,7 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
         except Exception as e:
             logger.warning("fetch %s failed: %s", remote, e)
 
-    # Merge order: non-upstream first, then upstream last
-    merge_order = [r for r in remotes if r != upstream_remote] + [upstream_remote]
-
-    for remote in merge_order:
+    for remote in merge_order(remotes, upstream_remote):
         if not remote_has_branch(repo_path, remote):
             continue
 

@@ -9,9 +9,10 @@ import logging
 from ganban.git import (
     fetch_sync,
     get_remotes_sync,
-    get_upstream,
+    merge_order,
     push_sync,
     remote_has_branch,
+    resolve_upstream,
 )
 from ganban.model.loader import load_board
 from ganban.model.writer import (
@@ -72,13 +73,7 @@ async def run_sync_cycle(board):
             sync.status = "pull"
             remotes = await asyncio.to_thread(get_remotes_sync, repo_path)
             if remotes:
-                upstream_info = await asyncio.to_thread(get_upstream, repo_path)
-                if upstream_info:
-                    upstream_remote = upstream_info[0]
-                elif "origin" in remotes:
-                    upstream_remote = "origin"
-                else:
-                    upstream_remote = remotes[0]
+                upstream_remote = await asyncio.to_thread(resolve_upstream, repo_path, remotes)
 
                 for remote in remotes:
                     try:
@@ -114,10 +109,7 @@ async def run_sync_cycle(board):
 
             # Remote merges
             if do_remote and remotes:
-                merge_order = [r for r in remotes if r != upstream_remote] + (
-                    [upstream_remote] if upstream_remote else []
-                )
-                for remote in merge_order:
+                for remote in merge_order(remotes, upstream_remote):
                     has_branch = await asyncio.to_thread(remote_has_branch, repo_path, remote)
                     if not has_branch:
                         continue

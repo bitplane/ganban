@@ -1,6 +1,7 @@
 """Card mutation operations for ganban boards."""
 
 from ganban.ids import max_id, next_id
+from ganban.model.loader import normalise_label
 from ganban.model.node import ListNode, Node
 
 
@@ -84,8 +85,8 @@ def move_card(
 
 def rename_label(board: Node, old_name: str, new_name: str) -> None:
     """Rename a label across all cards and board meta."""
-    old_norm = old_name.strip().lower()
-    new_norm = new_name.strip().lower()
+    old_norm = normalise_label(old_name)
+    new_norm = normalise_label(new_name)
     if old_norm == new_norm:
         return
     for card_id, card in board.cards.items():
@@ -94,7 +95,7 @@ def rename_label(board: Node, old_name: str, new_name: str) -> None:
             continue
         changed = False
         for i, raw in enumerate(labels):
-            if raw.strip().lower() == old_norm:
+            if normalise_label(raw) == old_norm:
                 labels[i] = new_norm
                 changed = True
         if changed:
@@ -106,12 +107,12 @@ def rename_label(board: Node, old_name: str, new_name: str) -> None:
 
 def delete_label(board: Node, name: str) -> None:
     """Delete a label from all cards and board meta."""
-    norm = name.strip().lower()
+    norm = normalise_label(name)
     for card_id, card in board.cards.items():
         labels = card.meta.labels if card.meta else None
         if not isinstance(labels, list):
             continue
-        filtered = [raw for raw in labels if raw.strip().lower() != norm]
+        filtered = [raw for raw in labels if normalise_label(raw) != norm]
         if len(filtered) != len(labels):
             card.meta.labels = filtered or None
     meta_labels = board.meta.labels

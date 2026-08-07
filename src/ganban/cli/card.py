@@ -6,12 +6,12 @@ from ganban.cli._common import (
     find_card,
     find_column,
     load_board_or_die,
-    markdown_to_sections,
     output_json,
     output_result,
     save,
 )
 from ganban.ids import normalize_id
+from ganban.model.loader import build_sections_list
 from ganban.model.card import archive_card, create_card, find_card_column, move_card
 from ganban.model.writer import meta_to_dict, sections_to_text
 from ganban.parser import first_title
@@ -81,7 +81,7 @@ def card_set(args) -> int:
     card = find_card(board, args.id, args.json)
 
     text = sys.stdin.read()
-    new_sections, new_meta = markdown_to_sections(text)
+    new_sections, new_meta = build_sections_list(text, fallback_title=args.id)
 
     card.sections = new_sections
     card.meta = new_meta

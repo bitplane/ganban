@@ -7,11 +7,11 @@ from ganban.cli._common import (
     find_column,
     format_column_line,
     load_board_or_die,
-    markdown_to_sections,
     output_json,
     output_result,
     save,
 )
+from ganban.model.loader import build_sections_list
 from ganban.model.column import (
     archive_column,
     create_column,
@@ -65,7 +65,7 @@ def column_set(args) -> int:
     col = find_column(board, args.id, args.json)
 
     text = sys.stdin.read()
-    new_sections, new_meta = markdown_to_sections(text)
+    new_sections, new_meta = build_sections_list(text, fallback_title=first_title(col.sections))
 
     col.sections = new_sections
     col.meta = new_meta

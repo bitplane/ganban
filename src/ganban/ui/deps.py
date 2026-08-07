@@ -16,15 +16,16 @@ from ganban.ui.watcher import NodeWatcherMixin
 ICON_DEPS = "\U0001f517"  # 🔗
 
 
-def build_card_options(board: Node, exclude_id: str = "") -> list[tuple[str, str]]:
+def build_card_options(board: Node, exclude: str | set[str] = "") -> list[tuple[str, str]]:
     """Build (label, value) options for card references.
 
-    Returns all non-archived cards (optionally excluding one by ID).
+    Returns all non-archived cards, excluding the given id(s).
     The label is ``"ID Title"`` and the value is the card ID.
     """
+    excluded = {exclude} if isinstance(exclude, str) else set(exclude)
     options: list[tuple[str, str]] = []
     for cid, card in board.cards.items():
-        if cid == exclude_id or card.archived:
+        if cid in excluded or card.archived:
             continue
         title = first_title(card.sections) if card.sections else cid
         options.append((f"{cid} {title}", cid))
@@ -32,19 +33,9 @@ def build_card_options(board: Node, exclude_id: str = "") -> list[tuple[str, str
 
 
 def build_dep_options(board: Node, card_id: str, current_deps: list[str]) -> list[tuple[str, str]]:
-    """Build (label, value) options for the dep search dropdown.
-
-    Returns non-archived cards excluding the current card and cards already
-    in the deps list.
-    """
-    exclude = {card_id} | set(current_deps)
-    options: list[tuple[str, str]] = []
-    for cid, card in board.cards.items():
-        if cid in exclude or card.archived:
-            continue
-        title = first_title(card.sections) if card.sections else cid
-        options.append((f"{cid} {title}", cid))
-    return options
+    """Build options for the dep search dropdown: non-archived cards minus
+    the current card and existing deps."""
+    return build_card_options(board, {card_id, *current_deps})
 
 
 class DepsWidget(NodeWatcherMixin, Container):

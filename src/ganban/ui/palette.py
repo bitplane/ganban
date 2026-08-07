@@ -2,6 +2,7 @@
 
 import hashlib
 
+from ganban.model.loader import normalise_label
 from ganban.model.node import Node
 
 COLORS: dict[str, str] = {
@@ -73,7 +74,7 @@ def get_label_color(name: str, board: Node) -> str:
     Checks board.meta.labels[name].color for an override, otherwise
     returns a deterministic color based on the label name hash.
     """
-    norm = name.strip().lower()
+    norm = normalise_label(name)
     meta_labels = board.meta.labels if board.meta else None
     if meta_labels and isinstance(meta_labels, Node):
         entry = getattr(meta_labels, norm, None)

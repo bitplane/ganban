@@ -70,7 +70,7 @@ def _parse_link_name(name: str) -> tuple[str | None, str]:
     return parts
 
 
-def _build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[ListNode, dict]:
+def build_sections_list(text: str, fallback_title: str = "Untitled") -> tuple[ListNode, dict]:
     """Parse markdown text into a ListNode of sections plus meta dict.
 
     fallback_title is used only when no section has a title at all. An
@@ -109,7 +109,7 @@ def _load_tree(tree: Tree) -> Node:
     index_blob = _tree_get(tree, "index.md")
     if index_blob is not None:
         text = index_blob.data_stream.read().decode("utf-8")
-        sections_ln, meta = _build_sections_list(text, fallback_title="ganban")
+        sections_ln, meta = build_sections_list(text, fallback_title="ganban")
         board.sections = sections_ln
         board.meta = meta
     else:
@@ -130,7 +130,7 @@ def _load_tree(tree: Tree) -> Node:
             card_id = normalize_id(item.name[:-3])
             card_ids.add(card_id)
             text = item.data_stream.read().decode("utf-8")
-            sections_ln, meta = _build_sections_list(text, fallback_title=card_id)
+            sections_ln, meta = build_sections_list(text, fallback_title=card_id)
             card = Node(
                 sections=sections_ln,
                 meta=meta,
@@ -166,7 +166,7 @@ def _load_tree(tree: Tree) -> Node:
         index_blob = _tree_get(col_tree, "index.md")
         if index_blob is not None:
             text = index_blob.data_stream.read().decode("utf-8")
-            col_sections, col_meta = _build_sections_list(text, fallback_title=name)
+            col_sections, col_meta = build_sections_list(text, fallback_title=name)
         else:
             col_sections = ListNode()
             col_sections[name] = ""
@@ -195,7 +195,7 @@ def _load_tree(tree: Tree) -> Node:
                 card_id = next_id(max_id(list(card_ids)))
                 card_ids.add(card_id)
                 text = link_item.data_stream.read().decode("utf-8")
-                sections_ln, meta = _build_sections_list(text, fallback_title=slug)
+                sections_ln, meta = build_sections_list(text, fallback_title=slug)
                 card = Node(
                     sections=sections_ln,
                     meta=meta,

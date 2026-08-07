@@ -6,11 +6,11 @@ from ganban.cli._common import (
     build_column_summaries,
     format_column_line,
     load_board_or_die,
-    markdown_to_sections,
     output_json,
     output_result,
     save,
 )
+from ganban.model.loader import build_sections_list
 from ganban.model.writer import meta_to_dict, sections_to_text
 from ganban.parser import first_title
 
@@ -57,7 +57,7 @@ def board_set(args) -> int:
     board = load_board_or_die(args.repo, args.json)
 
     text = sys.stdin.read()
-    new_sections, new_meta = markdown_to_sections(text)
+    new_sections, new_meta = build_sections_list(text, fallback_title="ganban")
 
     board.sections = new_sections
     board.meta = new_meta

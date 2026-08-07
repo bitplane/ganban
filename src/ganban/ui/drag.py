@@ -191,23 +191,8 @@ class DraggableMixin:
 
     def _find_drop_target(self, x: int, y: int) -> DropTarget | None:
         """Find the innermost DropTarget at screen position, skipping the ghost."""
-        try:
-            widgets = self.screen.get_widgets_at(x, y)
-        except Exception:
-            return None
-
-        for widget, _region in widgets:
-            # Skip ghost and its children
-            if self._ghost is not None and self._ghost is not self:
-                if widget is self._ghost or self._ghost in widget.ancestors:
-                    continue
-            # Walk ancestors for DropTarget
-            candidate = widget
-            while candidate is not None:
-                if isinstance(candidate, DropTarget) and candidate is not self:
-                    return candidate
-                candidate = candidate.parent
-        return None
+        targets = self._iter_drop_targets(x, y)
+        return targets[0] if targets else None
 
     def _iter_drop_targets(self, x: int, y: int) -> list[DropTarget]:
         """Yield all DropTargets at position, innermost-out."""

@@ -30,11 +30,11 @@ def resolve_assignee(assigned: str, board: Node) -> tuple[str, str, str]:
     return emoji_for_email(email), parsed_name, email
 
 
-def build_assignee_options(board: Node) -> list[tuple[str, str]]:
-    """Build options for the assignee SearchInput from board users and git committers.
+def _build_user_options(board: Node, make_value) -> list[tuple[str, str]]:
+    """Build (label, value) options from board users then git committers.
 
-    Returns (label, value) tuples where label includes emoji and value is the
-    committer string.
+    Labels include the user's emoji; make_value(name, email) formats the
+    option value. Emails already covered by a board user are deduplicated.
     """
     options: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -46,9 +46,8 @@ def build_assignee_options(board: Node) -> list[tuple[str, str]]:
             if not isinstance(emails, list) or not emails:
                 continue
             primary = emails[0]
-            committer = f"{name} <{primary}>"
             emoji = user_node.emoji if user_node.emoji else emoji_for_email(primary)
-            options.append((f"{emoji} {committer}", committer))
+            options.append((f"{emoji} {name} <{primary}>", make_value(name, primary)))
             seen.update(emails)
 
     committers = board.git.committers if board.git else None
@@ -56,40 +55,20 @@ def build_assignee_options(board: Node) -> list[tuple[str, str]]:
         for committer_str in committers:
             emoji, name, email = parse_committer(committer_str)
             if email not in seen:
-                options.append((f"{emoji} {committer_str}", committer_str))
+                options.append((f"{emoji} {committer_str}", make_value(name, email)))
                 seen.add(email)
 
     return options
+
+
+def build_assignee_options(board: Node) -> list[tuple[str, str]]:
+    """Build assignee options; the value is the committer string."""
+    return _build_user_options(board, lambda name, email: f"{name} <{email}>")
 
 
 def build_mention_options(board: Node) -> list[tuple[str, str]]:
-    """Build options for inline @mentions in markdown editors.
-
-    Returns (label, value) tuples where value is ``[Name](mailto:email)``.
-    """
-    options: list[tuple[str, str]] = []
-    seen: set[str] = set()
-
-    users = board.meta.users if board.meta else None
-    if users is not None:
-        for name, user_node in users.items():
-            emails = user_node.emails
-            if not isinstance(emails, list) or not emails:
-                continue
-            primary = emails[0]
-            emoji = user_node.emoji if user_node.emoji else emoji_for_email(primary)
-            options.append((f"{emoji} {name} <{primary}>", f"[{name}](mailto:{primary})"))
-            seen.update(emails)
-
-    committers = board.git.committers if board.git else None
-    if isinstance(committers, list):
-        for committer_str in committers:
-            emoji, name, email = parse_committer(committer_str)
-            if email not in seen:
-                options.append((f"{emoji} {committer_str}", f"[{name}](mailto:{email})"))
-                seen.add(email)
-
-    return options
+    """Build @mention options; the value is ``[Name](mailto:email)``."""
+    return _build_user_options(board, lambda name, email: f"[{name}](mailto:{email})")
 
 
 class AssigneeWidget(NodeWatcherMixin, Container):

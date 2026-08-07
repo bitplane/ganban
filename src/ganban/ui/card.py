@@ -7,6 +7,7 @@ from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.card import create_card, find_card_column
+from ganban.model.loader import normalise_label
 from ganban.model.node import Node
 from ganban.parser import first_title
 from ganban.ui.card_indicators import build_footer_text, build_header_line, build_label_text
@@ -152,7 +153,7 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         done_label = f"{ICON_CHECKED} Done" if card.meta.done else f"{ICON_UNCHECKED} Done"
         card_labels = set()
         if card.meta.labels and isinstance(card.meta.labels, list):
-            card_labels = {raw.strip().lower() for raw in card.meta.labels}
+            card_labels = {normalise_label(raw) for raw in card.meta.labels}
         label_items = [
             MenuItem(
                 f"{ICON_CHECKED} {name}" if name in card_labels else f"{ICON_UNCHECKED} {name}",
@@ -215,9 +216,9 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         """Toggle a label on/off for this card."""
         card = self.board.cards[self.card_id]
         labels = list(card.meta.labels) if isinstance(card.meta.labels, list) else []
-        existing = [raw for raw in labels if raw.strip().lower() == label_name]
+        existing = [raw for raw in labels if normalise_label(raw) == label_name]
         if existing:
-            labels = [raw for raw in labels if raw.strip().lower() != label_name]
+            labels = [raw for raw in labels if normalise_label(raw) != label_name]
         else:
             labels.append(label_name)
         card.meta.labels = labels or None

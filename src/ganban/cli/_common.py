@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 from ganban.model.loader import load_board
-from ganban.model.node import ListNode, Node
+from ganban.model.node import Node
 from ganban.model.writer import save_and_merge
-from ganban.parser import first_title, parse_sections
+from ganban.parser import first_title
 
 
 def load_board_or_die(repo: str, json_mode: bool) -> Node:
@@ -87,12 +87,3 @@ def format_column_line(c: dict, indent: str = "") -> str:
     hidden = "  (hidden)" if c["hidden"] else ""
     cards = "card" if c["cards"] == 1 else "cards"
     return f"{indent}{c['id']}  {c['name']:<16} {c['cards']} {cards}{hidden}"
-
-
-def markdown_to_sections(text: str) -> tuple[ListNode, dict]:
-    """Parse markdown text into (ListNode, meta_dict)."""
-    sections_list, meta = parse_sections(text)
-    sections = ListNode()
-    for title, body in sections_list:
-        sections.add(title, body)
-    return sections, meta

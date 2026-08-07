@@ -134,6 +134,23 @@ def get_upstream(repo_path: str | Path, branch: str = "ganban") -> tuple[str, st
     return tracking.remote_name, tracking.name.split("/", 1)[1]
 
 
+def resolve_upstream(repo_path: str | Path, remotes: list[str]) -> str | None:
+    """Pick the upstream remote: configured tracking, else origin, else first."""
+    if not remotes:
+        return None
+    upstream_info = get_upstream(repo_path)
+    if upstream_info:
+        return upstream_info[0]
+    if "origin" in remotes:
+        return "origin"
+    return remotes[0]
+
+
+def merge_order(remotes: list[str], upstream: str | None) -> list[str]:
+    """Order remotes for merging: non-upstream first, upstream last."""
+    return [r for r in remotes if r != upstream] + ([upstream] if upstream else [])
+
+
 def remote_has_branch(repo_path: str | Path, remote_name: str, branch: str = "ganban") -> bool:
     """Check if refs/remotes/{remote}/{branch} exists."""
     repo = _get_repo(repo_path)

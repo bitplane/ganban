@@ -6,7 +6,7 @@ from rich.text import Text
 
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_body
-from ganban.ui.cal import date_diff
+from ganban.ui.cal import date_diff, parse_due
 from ganban.ui.constants import ICON_BLOCKED, ICON_BODY, ICON_CALENDAR, ICON_CHECKED, ICON_COLOR_SWATCH
 from ganban.ui.emoji import parse_committer, resolve_email_emoji
 from ganban.ui.palette import get_label_color
@@ -72,17 +72,12 @@ def build_footer_text(
         parts.append(Text(ICON_BODY, style="dim"))
 
     # Due date indicator
-    due_str = meta.due if meta else None
-    if due_str:
-        try:
-            due = date.fromisoformat(due_str)
-        except (ValueError, TypeError):
-            due = None
-        if due:
-            today = date.today()
-            diff = date_diff(due, today)
-            style = "red" if due <= today else ""
-            parts.append(Text(f"{ICON_CALENDAR}{diff}", style=style))
+    due = parse_due(meta.due if meta else None)
+    if due:
+        today = date.today()
+        diff = date_diff(due, today)
+        style = "red" if due <= today else ""
+        parts.append(Text(f"{ICON_CALENDAR}{diff}", style=style))
 
     # Blocked indicator
     if blocked:

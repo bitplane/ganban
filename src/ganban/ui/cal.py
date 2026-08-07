@@ -12,6 +12,16 @@ from ganban.ui.constants import ICON_DELETE
 from ganban.ui.menu import ContextMenu
 
 
+def parse_due(due_str) -> date | None:
+    """Parse an ISO due-date string, returning None when absent or invalid."""
+    if not due_str:
+        return None
+    try:
+        return date.fromisoformat(due_str)
+    except (ValueError, TypeError):
+        return None
+
+
 def date_diff(target: date, reference: date) -> str:
     """Return compact string showing difference between dates.
 
@@ -215,24 +225,21 @@ class Calendar(Container):
         self._refresh()
         self.call_after_refresh(self._focus_date, focused.date)
 
-    def action_prev_month(self) -> None:
+    def _change_month(self, go) -> None:
+        """Move a month via go(), keeping the focused day-of-month, clamped."""
         focused = self._focused_day
-        self._go_prev_month()
+        go()
         if focused:
-            # Try same day-of-month in new month, clamped
             max_day = calendar.monthrange(self._viewing.year, self._viewing.month)[1]
             target = self._viewing.replace(day=min(focused.date.day, max_day))
             self._cursor_date = target
             self.call_after_refresh(self._focus_date, target)
 
+    def action_prev_month(self) -> None:
+        self._change_month(self._go_prev_month)
+
     def action_next_month(self) -> None:
-        focused = self._focused_day
-        self._go_next_month()
-        if focused:
-            max_day = calendar.monthrange(self._viewing.year, self._viewing.month)[1]
-            target = self._viewing.replace(day=min(focused.date.day, max_day))
-            self._cursor_date = target
-            self.call_after_refresh(self._focus_date, target)
+        self._change_month(self._go_next_month)
 
     def action_clear_date(self) -> None:
         self._selected = None

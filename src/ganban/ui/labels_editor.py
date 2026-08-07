@@ -4,30 +4,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Static
 
 from ganban.model.card import delete_label, rename_label
+from ganban.model.loader import normalise_label
 from ganban.model.node import Node
-from ganban.ui.constants import ICON_COLOR_SWATCH
 from ganban.ui.palette import color_for_label, get_label_color
 from ganban.ui.color import ColorButton
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.tag import Tag
+from ganban.ui.labels import _label_display
 from ganban.ui.watcher import NodeWatcherMixin
-
-
-def _label_display(name: str, board: Node) -> Text:
-    """Build a colored block + name Text for a label."""
-    color = get_label_color(name, board)
-    result = Text()
-    result.append(ICON_COLOR_SWATCH, style=color)
-    result.append_text(Text(name))
-    return result
 
 
 class SavedLabelRow(Horizontal):
@@ -299,7 +290,7 @@ class LabelsEditor(NodeWatcherMixin, Container):
 
     def on_add_label_row_label_created(self, event: AddLabelRow.LabelCreated) -> None:
         event.stop()
-        name = event.name.strip().lower()
+        name = normalise_label(event.name)
         if not name:
             return
         meta_labels = self._ensure_labels()
