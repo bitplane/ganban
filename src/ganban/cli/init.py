@@ -4,8 +4,7 @@ from pathlib import Path
 
 from ganban.cli._common import load_board_or_die, output_json, save
 from ganban.git import has_branch_sync, init_repo, is_git_repo
-from ganban.model.column import create_column
-from ganban.model.node import ListNode, Node
+from ganban.model.board import create_default_board
 from ganban.parser import first_title
 
 
@@ -25,16 +24,7 @@ def init_board(args) -> int:
             print(f"Board already initialized at {repo_path}")
         return 0
 
-    board = Node(repo_path=str(repo_path))
-    board.sections = ListNode()
-    board.sections[repo_path.name] = ""
-    board.meta = {}
-    board.cards = ListNode()
-    board.columns = ListNode()
-    backlog = create_column(board, "Backlog", order="1")
-    backlog.meta.compact = True
-    create_column(board, "Doing", order="2")
-    create_column(board, "Done", order="3")
+    board = create_default_board(repo_path)
     save(board, "Initialize ganban board")
 
     columns = [first_title(c.sections) for c in board.columns]

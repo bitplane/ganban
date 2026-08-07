@@ -8,9 +8,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
 from ganban.git import has_branch, init_repo, is_git_repo
+from ganban.model.board import create_default_board
 from ganban.model.loader import load_board
-from ganban.model.node import ListNode, Node
-from ganban.model.column import create_column
+from ganban.model.node import Node
 from ganban.model.writer import save_and_merge, save_board
 from ganban.ui.board import BoardScreen
 
@@ -93,15 +93,7 @@ class GanbanApp(App):
     async def _load_board(self) -> None:
         """Load or create the board and show it."""
         if not await has_branch(self.repo_path):
-            board = Node(repo_path=str(self.repo_path))
-            board.sections = ListNode()
-            board.sections[self.repo_path.name] = ""
-            board.meta = {}
-            board.cards = ListNode()
-            board.columns = ListNode()
-            create_column(board, "Backlog", order="1")
-            create_column(board, "Doing", order="2")
-            create_column(board, "Done", order="3")
+            board = create_default_board(self.repo_path)
             save_board(board, message="Initialize ganban board")
 
         self.board = load_board(str(self.repo_path))
