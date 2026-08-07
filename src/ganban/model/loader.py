@@ -11,6 +11,7 @@ from git.objects import Blob, Tree
 from ganban.git import read_git_config
 from ganban.ids import compare_ids, max_id, next_id, normalize_id
 from ganban.constants import BRANCH_NAME
+from ganban.model.column import build_column_path
 from ganban.model.node import ListNode, Node
 from ganban.parser import parse_sections
 
@@ -177,6 +178,15 @@ def _load_tree(tree: Tree) -> Node:
     col_entries.sort(key=cmp_to_key(lambda a, b: compare_ids(a[0], b[0])))
 
     for order, name, dirname, hidden, col_tree in col_entries:
+        # Duplicate order prefixes (e.g. two replicas each created a
+        # column "2.x" and a merge combined the directories) must not
+        # overwrite each other: bump later ones to the next free order,
+        # cascading so relative order is preserved. The rebuilt dir_path
+        # materializes the renumbering on the next save.
+        while order in columns_ln:
+            order = next_id(order)
+            dirname = build_column_path(order, name, hidden)
+
         col_meta: dict = {}
 
         index_blob = _tree_get(col_tree, "index.md")

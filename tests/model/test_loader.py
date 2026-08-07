@@ -488,3 +488,39 @@ def test_card_blocked_missing_dep_ignored(sample_board):
     board = load_board(str(sample_board))
     board.cards["1"].meta.deps = ["999"]
     assert board.cards["1"].blocked is None
+
+
+def test_duplicate_column_orders_both_survive(repo_with_ganban):
+    """Columns with colliding order prefixes are renumbered, not dropped."""
+    from ganban.model.writer import save_board
+
+    repo = Repo(repo_with_ganban)
+    repo.git.checkout("ganban")
+    all_dir = repo_with_ganban / ".all"
+    (all_dir / "002.md").write_text("# Second card\n")
+    (all_dir / "003.md").write_text("# Third card\n")
+
+    # Two replicas both created a "2" column; a merge combined the dirs
+    doing = repo_with_ganban / "1.doing"
+    doing.mkdir()
+    (doing / "01.second-card.md").symlink_to("../.all/002.md")
+    done = repo_with_ganban / "2.done"
+    done.mkdir()
+    (done / "01.third-card.md").symlink_to("../.all/003.md")
+    repo.git.add("-A")
+    repo.index.commit("Introduce duplicate order")
+
+    board = load_board(str(repo_with_ganban))
+
+    # Collision cascades: 1.backlog keeps 1, 1.doing bumps to 2, 2.done to 3
+    assert [c.order for c in board.columns] == ["1", "2", "3"]
+    assert [c.dir_path for c in board.columns] == ["1.backlog", "2.doing", "3.done"]
+    assert board.columns["1"].links == ("1",)
+    assert board.columns["2"].links == ("2",)
+    assert board.columns["3"].links == ("3",)
+
+    # The renumbering materializes on save and survives a round trip
+    board.commit = save_board(board, message="Normalize")
+    reloaded = load_board(str(repo_with_ganban))
+    assert [c.dir_path for c in reloaded.columns] == ["1.backlog", "2.doing", "3.done"]
+    assert reloaded.columns["3"].links == ("3",)
