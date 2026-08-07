@@ -171,13 +171,6 @@ class MenuList(VerticalScroll):
 class ContextMenu(ModalScreen[MenuItem | None]):
     """Context menu with keyboard navigation."""
 
-    class ItemSelected(Message):
-        """Posted when an item is selected."""
-
-        def __init__(self, item: MenuItem) -> None:
-            super().__init__()
-            self.item = item
-
     BINDINGS = [
         ("up", "focus_prev", "Up"),
         ("down", "focus_next", "Down"),
@@ -347,7 +340,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if focused.has_submenu:
             self._open_submenu(focused)._focus_first_enabled()
         else:
-            self.post_message(self.ItemSelected(focused))
             self.dismiss(focused)
 
     def action_navigate_right(self) -> None:
@@ -395,7 +387,6 @@ class ContextMenu(ModalScreen[MenuItem | None]):
         if item.has_submenu:
             self._open_submenu(item)._focus_first_enabled()
         else:
-            self.post_message(self.ItemSelected(item))
             self.dismiss(item)
 
     def on_click(self, event: Click) -> None:

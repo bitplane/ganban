@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Callable
 
 from ganban.model.node import Callback, ListNode, Node
 
@@ -19,7 +19,7 @@ class NodeWatcherMixin:
     """
 
     def _init_watcher(self) -> None:
-        self._watches: list[tuple[Node | ListNode, str, Callback]] = []
+        self._watches: list[Callable[[], None]] = []
         self._suppressing = False
 
     def node_watch(self, node: Node | ListNode, key: str, callback: Callback) -> None:

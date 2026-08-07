@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-NOUNS = {"init", "board", "card", "column", "sync", "web", "serve"}
+NOUNS = {"init", "board", "card", "column", "sync", "web"}
 
 
 def main():
