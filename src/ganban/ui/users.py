@@ -11,6 +11,7 @@ from textual.widgets import Static
 
 from ganban.model.node import Node
 from ganban.ui.confirm import ConfirmButton
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.viewers import TextViewer
@@ -253,34 +254,18 @@ class UserRow(Vertical):
         self.post_message(self.EmailsChanged(self.user_name, list(self._emails)))
 
 
-class AddUserRow(Static, can_focus=True):
+class AddUserRow(AddValueMixin, Static, can_focus=True):
     """EditableText with '+' to add a new user."""
 
-    BINDINGS = [
-        ("space", "start_editing"),
-        ("enter", "start_editing"),
-    ]
+    refocus_after_submit = True
 
     class UserCreated(Message):
         def __init__(self, name: str) -> None:
             super().__init__()
             self.name = name
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-
-    def action_start_editing(self) -> None:
-        self.query_one(EditableText)._start_edit()
-
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            self.post_message(self.UserCreated(event.new_value))
-        self.query_one(EditableText).value = ""
-        self.focus()
+    def value_entered(self, value: str) -> None:
+        self.post_message(self.UserCreated(value))
 
 
 class UsersEditor(NodeWatcherMixin, Container):

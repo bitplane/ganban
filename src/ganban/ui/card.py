@@ -24,8 +24,8 @@ from ganban.ui.constants import (
 )
 from ganban.ui.detail import CardDetailModal
 from ganban.ui.drag import DraggableMixin, DragGhost
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
-from ganban.ui.edit import EditableText, TextEditor
 from ganban.ui.static import PlainStatic
 from ganban.ui.watcher import NodeWatcherMixin
 
@@ -228,16 +228,10 @@ class CardWidget(NodeWatcherMixin, DraggableMixin, Static, can_focus=True):
         self.post_message(self.MoveRequested(self, col_name))
 
 
-class AddCard(Static, can_focus=True):
+class AddCard(AddValueMixin, Static, can_focus=True):
     """Widget to add a new card to a column."""
 
-    BINDINGS = [
-        ("space", "start_editing"),
-        ("enter", "start_editing"),
-    ]
-
-    def action_start_editing(self) -> None:
-        self.query_one(EditableText)._start_edit()
+    refocus_after_submit = True
 
     class CardCreated(Message):
         """Posted when a new card is created."""
@@ -253,17 +247,10 @@ class AddCard(Static, can_focus=True):
         self.column = column
         self.board = board
 
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
     def on_click(self, event) -> None:
         if event.button == 3:
             event.stop()
 
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            card_id, card = create_card(self.board, event.new_value, column=self.column)
-            self.post_message(self.CardCreated(self.column, card_id, event.new_value))
-        self.query_one(EditableText).value = ""
-        self.focus()
+    def value_entered(self, value: str) -> None:
+        card_id, _ = create_card(self.board, value, column=self.column)
+        self.post_message(self.CardCreated(self.column, card_id, value))

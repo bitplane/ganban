@@ -13,6 +13,7 @@ from textual.widgets import Static
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 from ganban.ui.edit.completion import CompletionSource
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import TextEditor
 from ganban.ui.edit.section import SectionEditor, match_editor_type
@@ -81,7 +82,7 @@ class DocHeader(NodeWatcherMixin, Container):
         self.post_message(self.TitleChanged(event.new_value))
 
 
-class AddSection(Static):
+class AddSection(AddValueMixin, Static):
     """Widget to add a new subsection."""
 
     class SectionCreated(Message):
@@ -91,14 +92,8 @@ class AddSection(Static):
             super().__init__()
             self.heading = heading
 
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            self.post_message(self.SectionCreated(event.new_value))
-        self.query_one(EditableText).value = ""
+    def value_entered(self, value: str) -> None:
+        self.post_message(self.SectionCreated(value))
 
 
 class MarkdownDocEditor(NodeWatcherMixin, Container):

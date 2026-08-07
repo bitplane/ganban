@@ -23,6 +23,7 @@ from ganban.ui.constants import (
     ICON_PALETTE,
 )
 from ganban.ui.detail import ColumnDetailModal
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.drag import CardPlaceholder, DraggableMixin, DropTarget
 from ganban.ui.menu import ContextMenu, MenuItem, MenuSeparator
 from ganban.ui.edit import EditableText, TextEditor
@@ -432,8 +433,10 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         return -1
 
 
-class AddColumn(Vertical):
+class AddColumn(AddValueMixin, Vertical):
     """Widget to add a new column."""
+
+    editable_classes = "column-header"
 
     class ColumnCreated(Message):
         """Posted when a new column is created."""
@@ -446,12 +449,6 @@ class AddColumn(Vertical):
         super().__init__()
         self.board = board
 
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+", classes="column-header")
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            new_column = create_column(self.board, event.new_value)
-            self.post_message(self.ColumnCreated(new_column))
-        self.query_one(EditableText).value = ""
+    def value_entered(self, value: str) -> None:
+        new_column = create_column(self.board, value)
+        self.post_message(self.ColumnCreated(new_column))

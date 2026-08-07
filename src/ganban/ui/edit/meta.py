@@ -22,6 +22,7 @@ from ganban.ui.constants import (
     ICON_TYPE_NUMBER,
     ICON_TYPE_TEXT,
 )
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.edit.editable import EditableText
 from ganban.ui.edit.editors import NumberEditor, TextEditor
 from ganban.ui.edit.viewers import TextViewer
@@ -365,7 +366,7 @@ class KeyValueRow(Vertical):
 # --- Add key row ---
 
 
-class AddKeyRow(Container):
+class AddKeyRow(AddValueMixin, Container):
     """Row to add a new key to the metadata."""
 
     class KeyAdded(Message):
@@ -378,15 +379,9 @@ class AddKeyRow(Container):
         super().__init__(**kwargs)
         self._pending_key: str = ""
 
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            self._pending_key = event.new_value
-            self.query_one(EditableText).value = ""
-            self._show_type_picker()
+    def value_entered(self, value: str) -> None:
+        self._pending_key = value
+        self._show_type_picker()
 
     def _show_type_picker(self) -> None:
         region = self.region

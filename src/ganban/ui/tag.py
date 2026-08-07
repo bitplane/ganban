@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Container, Horizontal
 from textual.css.query import NoMatches
 from textual.events import DescendantBlur
 from textual.message import Message
 from textual.widgets import Input, Static
 
+from ganban.model.node import Node
 from ganban.ui.constants import ICON_DELETE
 from ganban.ui.search import SearchInput
+from ganban.ui.watcher import NodeWatcherMixin
 
 
 class Tag(Static):
@@ -124,3 +126,131 @@ class Tag(Static):
         focused = self.app.focused
         if focused is None or focused not in self.walk_children():
             self._exit_edit_mode()
+
+
+class TagListWidget(NodeWatcherMixin, Container):
+    """Base for inline tag-list editors bound to a list on a meta Node.
+
+    Renders an add icon plus one Tag per value. Subclasses set meta_key,
+    icon and the element ids, implement options_for(), and may override
+    display_for() and validate().
+    """
+
+    meta_key: str = ""
+    icon: str = ""
+    bar_id: str = ""
+    add_id: str = ""
+    tags_id: str = ""
+
+    def __init__(self, meta: Node, board: Node, **kwargs) -> None:
+        self._init_watcher()
+        super().__init__(**kwargs)
+        self.meta = meta
+        self.board = board
+
+    def display_for(self, value: str):
+        """Renderable shown for a value in view mode."""
+        return str(value)
+
+    def options_for(self, current: list[str]) -> list[tuple[str, str]]:
+        """Dropdown options offered while editing, given the other values."""
+        raise NotImplementedError
+
+    def validate(self, value: str) -> bool:
+        """Whether a submitted value may be stored."""
+        return True
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id=self.bar_id):
+            yield Static(self.icon, id=self.add_id)
+            yield Horizontal(id=self.tags_id)
+
+    def on_mount(self) -> None:
+        self.node_watch(self.meta, self.meta_key, self._on_values_changed)
+        self._rebuild_tags()
+
+    def _on_values_changed(self, source_node, key, old, new) -> None:
+        self.call_later(self._rebuild_tags)
+
+    def _values(self) -> list:
+        values = getattr(self.meta, self.meta_key)
+        return list(values) if isinstance(values, list) else []
+
+    def _set_values(self, values: list) -> None:
+        with self.suppressing():
+            setattr(self.meta, self.meta_key, values or None)
+
+    def _tags(self) -> list[Tag]:
+        return list(self.query_one(f"#{self.tags_id}", Horizontal).query(Tag))
+
+    def _rebuild_tags(self) -> None:
+        """Clear and rebuild the tag widgets from the meta list."""
+        container = self.query_one(f"#{self.tags_id}", Horizontal)
+        for child in list(container.children):
+            child.remove()
+        for value in self._values():
+            container.mount(Tag(value=str(value), display=self.display_for(value)))
+
+    def _current_except(self, exclude_tag: Tag | None = None) -> list:
+        """Get current values, optionally excluding one tag's value."""
+        values = self._values()
+        if exclude_tag is not None:
+            tags = self._tags()
+            idx = tags.index(exclude_tag) if exclude_tag in tags else None
+            if idx is not None and idx < len(values):
+                return values[:idx] + values[idx + 1 :]
+        return values
+
+    def on_click(self, event) -> None:
+        event.stop()
+        target = event.widget
+        if target.id == self.add_id:
+            self._add_new_tag()
+        elif target.has_class("tag-label"):
+            tag = target.parent.parent  # tag-label → tag-row → Tag
+            if isinstance(tag, Tag) and not tag.has_class("-editing"):
+                tag.start_editing(self.options_for(self._current_except(tag)))
+
+    def _add_new_tag(self) -> None:
+        """Mount a temporary blank tag for adding a new value."""
+        container = self.query_one(f"#{self.tags_id}", Horizontal)
+        tag = Tag(value="", classes="-new")
+        container.mount(tag)
+        tag.start_editing(self.options_for(self._current_except()))
+
+    def on_tag_changed(self, event: Tag.Changed) -> None:
+        event.stop()
+        tag = event.tag
+        value = event.new_value
+        if not self.validate(value):
+            if tag.has_class("-new"):
+                tag.remove()
+            return
+
+        values = self._values()
+        tags = self._tags()
+        idx = tags.index(tag) if tag in tags else None
+
+        if tag.has_class("-new"):
+            tag.remove_class("-new")
+            values.append(value)
+        elif idx is not None and idx < len(values):
+            values[idx] = value
+
+        tag.update_display(self.display_for(value))
+        self._set_values(values)
+
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
+        event.stop()
+        tag = event.tag
+        if tag.has_class("-new"):
+            tag.remove()
+            return
+
+        values = self._values()
+        tags = self._tags()
+        idx = tags.index(tag) if tag in tags else None
+        if idx is not None and idx < len(values):
+            del values[idx]
+        tag.remove()
+        self._set_values(values)

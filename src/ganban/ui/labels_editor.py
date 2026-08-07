@@ -14,14 +14,53 @@ from ganban.model.loader import normalise_label
 from ganban.model.node import Node
 from ganban.ui.palette import color_for_label, get_label_color
 from ganban.ui.color import ColorButton
-from ganban.ui.edit.editable import EditableText
-from ganban.ui.edit.editors import TextEditor
+from ganban.ui.edit.add import AddValueMixin
 from ganban.ui.tag import Tag
 from ganban.ui.labels import _label_display
 from ganban.ui.watcher import NodeWatcherMixin
 
 
-class SavedLabelRow(Horizontal):
+class _LabelRow(Horizontal):
+    """Shared skeleton for label rows: a renamable tag with a card count.
+
+    Subclasses declare their own NameRenamed/DeleteRequested message
+    classes (handler names derive from the concrete class) and add their
+    extra controls around the shared tag + count.
+    """
+
+    def __init__(self, name: str, board: Node, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.label_name = name
+        self.board = board
+
+    def _label_count(self) -> int:
+        label_node = getattr(self.board.labels, self.label_name) if self.board.labels else None
+        cards = label_node.cards if label_node else []
+        return len(cards) if isinstance(cards, list) else 0
+
+    def _compose_tag_and_count(self) -> ComposeResult:
+        yield Tag(value=self.label_name, display=_label_display(self.label_name, self.board))
+        yield Static(f"({self._label_count()})", classes="label-count")
+
+    def on_click(self, event) -> None:
+        if event.widget.has_class("tag-label"):
+            tag = self.query_one(Tag)
+            if not tag.has_class("-editing"):
+                tag.start_editing([])
+
+    def on_tag_changed(self, event: Tag.Changed) -> None:
+        event.stop()
+        old = event.old_value
+        self.label_name = event.new_value
+        event.tag.update_display(_label_display(event.new_value, self.board))
+        self.post_message(self.NameRenamed(old, event.new_value))
+
+    def on_tag_deleted(self, event: Tag.Deleted) -> None:
+        event.stop()
+        self.post_message(self.DeleteRequested(self.label_name))
+
+
+class SavedLabelRow(_LabelRow):
     """A saved label (from board.meta.labels) shown as a tag with count.
 
     Delete removes the override only - label stays on cards with computed color.
@@ -46,43 +85,16 @@ class SavedLabelRow(Horizontal):
             super().__init__()
             self.name = name
 
-    def __init__(self, name: str, board: Node, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.label_name = name
-        self.board = board
-
     def compose(self) -> ComposeResult:
-        color = get_label_color(self.label_name, self.board)
-        label_node = getattr(self.board.labels, self.label_name) if self.board.labels else None
-        cards = label_node.cards if label_node else []
-        count = len(cards) if isinstance(cards, list) else 0
-        yield ColorButton(color=color, classes="label-color")
-        yield Tag(value=self.label_name, display=_label_display(self.label_name, self.board))
-        yield Static(f"({count})", classes="label-count")
-
-    def on_click(self, event) -> None:
-        if event.widget.has_class("tag-label"):
-            tag = self.query_one(Tag)
-            if not tag.has_class("-editing"):
-                tag.start_editing([])
+        yield ColorButton(color=get_label_color(self.label_name, self.board), classes="label-color")
+        yield from self._compose_tag_and_count()
 
     def on_color_button_color_selected(self, event: ColorButton.ColorSelected) -> None:
         event.stop()
         self.post_message(self.ColorChanged(self.label_name, event.color))
 
-    def on_tag_changed(self, event: Tag.Changed) -> None:
-        event.stop()
-        old = event.old_value
-        self.label_name = event.new_value
-        event.tag.update_display(_label_display(event.new_value, self.board))
-        self.post_message(self.NameRenamed(old, event.new_value))
 
-    def on_tag_deleted(self, event: Tag.Deleted) -> None:
-        event.stop()
-        self.post_message(self.DeleteRequested(self.label_name))
-
-
-class UsedLabelRow(Horizontal):
+class UsedLabelRow(_LabelRow):
     """A used label (on cards, no override) shown as a tag with count and save.
 
     Delete removes from all cards. Save creates an override.
@@ -108,65 +120,28 @@ class UsedLabelRow(Horizontal):
             super().__init__()
             self.name = name
 
-    def __init__(self, name: str, board: Node, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.label_name = name
-        self.board = board
-
     def compose(self) -> ComposeResult:
-        label_node = getattr(self.board.labels, self.label_name) if self.board.labels else None
-        cards = label_node.cards if label_node else []
-        count = len(cards) if isinstance(cards, list) else 0
-        yield Tag(value=self.label_name, display=_label_display(self.label_name, self.board))
-        yield Static(f"({count})", classes="label-count")
+        yield from self._compose_tag_and_count()
         yield Static("💾", classes="label-save")
 
     def on_click(self, event) -> None:
-        target = event.widget
-        if target.has_class("label-save"):
+        if event.widget.has_class("label-save"):
             event.stop()
             self.post_message(self.SaveRequested(self.label_name))
-        elif target.has_class("tag-label"):
-            tag = self.query_one(Tag)
-            if not tag.has_class("-editing"):
-                tag.start_editing([])
-
-    def on_tag_changed(self, event: Tag.Changed) -> None:
-        event.stop()
-        old = event.old_value
-        self.label_name = event.new_value
-        event.tag.update_display(_label_display(event.new_value, self.board))
-        self.post_message(self.NameRenamed(old, event.new_value))
-
-    def on_tag_deleted(self, event: Tag.Deleted) -> None:
-        event.stop()
-        self.post_message(self.DeleteRequested(self.label_name))
+        else:
+            super().on_click(event)
 
 
-class AddLabelRow(Static, can_focus=True):
+class AddLabelRow(AddValueMixin, Static, can_focus=True):
     """EditableText with '+' to add a new label."""
-
-    BINDINGS = [
-        ("space", "start_editing"),
-        ("enter", "start_editing"),
-    ]
 
     class LabelCreated(Message):
         def __init__(self, name: str) -> None:
             super().__init__()
             self.name = name
 
-    def action_start_editing(self) -> None:
-        self.query_one(EditableText)._start_edit()
-
-    def compose(self) -> ComposeResult:
-        yield EditableText("", Static("+"), TextEditor(), placeholder="+")
-
-    def on_editable_text_changed(self, event: EditableText.Changed) -> None:
-        event.stop()
-        if event.new_value:
-            self.post_message(self.LabelCreated(event.new_value))
-        self.query_one(EditableText).value = ""
+    def value_entered(self, value: str) -> None:
+        self.post_message(self.LabelCreated(value))
         self.focus()
 
 
