@@ -71,9 +71,37 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
 
     def on_mount(self) -> None:
         self.node_watch(self.board, "sections", self._on_board_sections_changed)
+        self.node_watch(self.board, "columns", self._on_columns_changed)
         self.node_watch(self.board.git, "config", self._on_config_changed)
         self.call_after_refresh(self._focus_first_card)
         self.set_interval(1.0, self._sync_tick)
+
+    def _on_columns_changed(self, node, key, old, new) -> None:
+        """React to column membership/order changes (e.g. from a sync merge).
+
+        Nested column mutations bubble here too; only reconcile when the
+        columns ListNode itself changed.
+        """
+        if node is self.board.columns:
+            self._reconcile_columns()
+
+    def _reconcile_columns(self) -> None:
+        """Mount/unmount/reorder column widgets to match board.columns."""
+        columns_container = self.query_one("#columns", Horizontal)
+        add_column = columns_container.query_one(AddColumn)
+        visible = [c for c in self.board.columns if not c.hidden]
+        visible_ids = {id(c) for c in visible}
+        widgets_by_column = {id(cw.column): cw for cw in self.query(ColumnWidget)}
+
+        for col_id, widget in widgets_by_column.items():
+            if col_id not in visible_ids:
+                widget.remove()
+
+        for column in visible:
+            if id(column) not in widgets_by_column:
+                columns_container.mount(ColumnWidget(column, self.board), before=add_column)
+
+        self._sync_column_order()
 
     def _focus_first_card(self) -> None:
         columns = list(self.query(ColumnWidget))
@@ -289,14 +317,12 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
     def on_add_column_column_created(self, event: AddColumn.ColumnCreated) -> None:
         """Handle new column creation."""
         event.stop()
-        columns_container = self.query_one("#columns", Horizontal)
-        add_widget = columns_container.query_one(AddColumn)
-        new_widget = ColumnWidget(event.column, self.board)
-        columns_container.mount(new_widget, before=add_widget)
+        self._reconcile_columns()
 
     def _move_column_to_index(self, col_widget: ColumnWidget, new_index: int) -> None:
         """Move column to new position in both model and UI."""
-        move_column(self.board, col_widget.column, new_index)
+        with self.suppressing():
+            move_column(self.board, col_widget.column, new_index)
         self._sync_column_order()
 
     def _sync_column_order(self) -> None:
@@ -332,5 +358,6 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         """Handle column archive request."""
         event.stop()
         col_widget = event.column_widget
-        archive_column(self.board, col_widget.column.order)
+        with self.suppressing():
+            archive_column(self.board, col_widget.column.order)
         col_widget.remove()
