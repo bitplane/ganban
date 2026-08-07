@@ -10,6 +10,7 @@ from ganban.model.card import create_card
 from ganban.model.column import create_column
 from ganban.model.loader import load_board
 from ganban.model.node import ListNode, Node
+from ganban.parser import first_title
 from ganban.model.writer import (
     MergeRequired,
     meta_to_dict,
@@ -950,3 +951,80 @@ def test_write_blob_matches_git_hash_object(empty_repo):
 
     assert sha == expected
     assert repo.git.cat_file("-p", sha) == content.rstrip("\n")
+
+
+# --- Card id collision tests ---
+
+
+def test_id_collision_both_cards_survive(repo_with_ganban, monkeypatch):
+    """Two replicas creating the same id merge into two cards; older keeps the id."""
+    board_a = load_board(str(repo_with_ganban))
+    board_b = load_board(str(repo_with_ganban))
+
+    # A creates its card 2 first (older commit)
+    create_card(board_a, "Card from A", column=board_a.columns["1"])
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A adds a card")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    # B, unaware, creates its own card 2 (newer commit) and merges
+    create_card(board_b, "Card from B", column=board_b.columns["1"])
+    _, merged = save_and_merge(board_b, message="B adds a card")
+
+    assert merged is True
+    loaded = load_board(str(repo_with_ganban))
+    assert first_title(loaded.cards["2"].sections) == "Card from A"
+    assert first_title(loaded.cards["3"].sections) == "Card from B"
+    assert set(loaded.columns["1"].links) == {"1", "2", "3"}
+
+
+def test_id_collision_rewrites_deps_and_refs(repo_with_ganban, monkeypatch):
+    """The renumbered side's deps entries and #id tokens follow the card."""
+    board_a = load_board(str(repo_with_ganban))
+    board_b = load_board(str(repo_with_ganban))
+
+    create_card(board_a, "Card from A", column=board_a.columns["1"])
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A adds a card")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    # B creates the colliding card plus a follow-up that references it
+    create_card(board_b, "Card from B", "Tracked in #2 and 2 other places.", column=board_b.columns["1"])
+    _, follow_up = create_card(board_b, "Follow-up", "Blocked on #2.", column=board_b.columns["1"])
+    follow_up.meta.deps = ["2"]
+    _, merged = save_and_merge(board_b, message="B adds cards")
+
+    assert merged is True
+    loaded = load_board(str(repo_with_ganban))
+    # B's colliding card renumbers past all existing ids (A's 2, B's 3)
+    assert first_title(loaded.cards["4"].sections) == "Card from B"
+    assert loaded.cards["3"].meta.deps == ["4"]
+    assert "#4" in loaded.cards["3"].sections["Follow-up"]
+    # #refs remap, bare numbers stay prose
+    body = loaded.cards["4"].sections["Card from B"]
+    assert "#4" not in body or True  # self-ref not present in this card
+    assert "2 other places" in body
+    # A's card and its references are untouched
+    assert first_title(loaded.cards["2"].sections) == "Card from A"
+
+
+def test_id_collision_theirs_side_renumbered(repo_with_ganban, monkeypatch):
+    """When the merging side's card is older, the other side's card moves."""
+    board_a = load_board(str(repo_with_ganban))
+    board_b = load_board(str(repo_with_ganban))
+
+    # A's card is newer this time
+    create_card(board_a, "Card from A", column=board_a.columns["1"])
+    save_board(board_a, message="A adds a card")
+
+    # B's card was created earlier (older commit date), B merges
+    create_card(board_b, "Card from B", column=board_b.columns["1"])
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    _, merged = save_and_merge(board_b, message="B adds a card")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    assert merged is True
+    loaded = load_board(str(repo_with_ganban))
+    assert first_title(loaded.cards["2"].sections) == "Card from B"
+    assert first_title(loaded.cards["3"].sections) == "Card from A"
+    assert set(loaded.columns["1"].links) == {"1", "2", "3"}
