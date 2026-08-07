@@ -23,7 +23,7 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
 
     # Load board (verify ganban branch exists)
     try:
-        board = load_board(repo_path)
+        board = load_board(repo_path, committers=False)
     except Exception as e:
         result["error"] = str(e)
         return 1, result
@@ -43,12 +43,15 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
         except Exception as e:
             logger.warning("fetch %s failed: %s", remote, e)
 
+    board_stale = False
     for remote in merge_order(remotes, upstream_remote):
         if not remote_has_branch(repo_path, remote):
             continue
 
-        # Reload board for fresh commit after previous merge
-        board = load_board(repo_path)
+        # Reload only when a previous merge moved the branch
+        if board_stale:
+            board = load_board(repo_path, committers=False)
+            board_stale = False
 
         merge_info = check_remote_for_merge(board, remote=remote)
         if merge_info is None:
@@ -59,6 +62,7 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
             result["error"] = f"conflict merging {remote}/ganban"
             return 1, result
         result["merged"].append(remote)
+        board_stale = True
 
     # Push to upstream
     try:

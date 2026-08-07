@@ -527,3 +527,11 @@ def test_cards_archived_when_column_removed(sample_board):
 
     assert board.cards["2"].archived is True
     assert board.cards["3"].archived is True
+
+
+def test_load_board_without_committers(repo_with_ganban):
+    """committers=False skips the history scan but keeps the git node."""
+    board = load_board(str(repo_with_ganban), committers=False)
+    assert board.git.committers == []
+    assert board.git.config is not None
+    assert board.cards["1"] is not None

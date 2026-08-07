@@ -14,7 +14,7 @@ def load_board_or_die(repo: str, json_mode: bool) -> Node:
     """Load board from repo path. Exit 1 with message if not found."""
     repo_path = Path(repo).resolve()
     try:
-        return load_board(str(repo_path))
+        return load_board(str(repo_path), committers=False)
     except Exception as e:
         error(str(e), json_mode)
 

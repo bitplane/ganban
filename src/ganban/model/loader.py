@@ -353,18 +353,22 @@ def _setup_labels(board: Node) -> None:
     board.watch("cards", on_cards_changed)
 
 
-def _activate(board: Node, repo: Repo) -> None:
+def _activate(board: Node, repo: Repo, committers: bool = True) -> None:
     """Attach computed/derived properties to a loaded board."""
     config_dict = read_git_config(board.repo_path)
     config_node = Node(**{section: Node(**keys) for section, keys in config_dict.items()})
-    board.git = Node(committers=_get_committers(repo), config=config_node)
+    board.git = Node(committers=_get_committers(repo) if committers else [], config=config_node)
     _setup_archived(board)
     _setup_blocked(board)
     _setup_labels(board)
 
 
-def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
-    """Load a complete board from a git branch as a Node tree."""
+def load_board(repo_path: str, branch: str = BRANCH_NAME, committers: bool = True) -> Node:
+    """Load a complete board from a git branch as a Node tree.
+
+    committers=False skips the git-history scan that feeds assignee
+    suggestions — one-shot CLI commands never use it.
+    """
     repo = Repo(repo_path)
 
     try:
@@ -375,5 +379,5 @@ def load_board(repo_path: str, branch: str = BRANCH_NAME) -> Node:
     board = _load_tree(commit.tree)
     board.repo_path = str(repo_path)
     board.commit = commit.hexsha
-    _activate(board, repo)
+    _activate(board, repo, committers=committers)
     return board
