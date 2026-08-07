@@ -759,3 +759,79 @@ def test_update_matches_other_key_order():
     node.update(other)
 
     assert list(node.keys()) == list(other.keys())
+
+
+# --- adoption semantics ---
+
+
+def test_assigning_foreign_node_clones_it():
+    """A node parented elsewhere is cloned, not silently reparented."""
+    tree = Node()
+    tree.child = Node(x=1)
+    original_child = tree.child
+
+    fired = []
+    tree.watch("child", lambda *a: fired.append(a))
+
+    scratch = Node()
+    scratch.stolen = tree.child
+
+    # The original stays in its tree with bubbling intact
+    assert tree.child is original_child
+    assert original_child._parent is tree
+    original_child.x = 2
+    assert len(fired) == 1
+
+    # The scratch tree got an independent copy
+    assert scratch.stolen is not original_child
+    scratch.stolen.x = 99
+    assert tree.child.x == 2
+    assert len(fired) == 1
+
+
+def test_temp_listnode_from_live_nodes_is_safe():
+    """Building a scratch collection from live nodes leaves them intact."""
+    board = Node()
+    board.columns = ListNode()
+    board.columns["1"] = Node(order="1")
+    board.columns["2"] = Node(order="2")
+
+    fired = []
+    board.watch("columns", lambda *a: fired.append(a))
+
+    scratch = ListNode()
+    scratch["2"] = board.columns["2"]
+    scratch["1"] = board.columns["1"]
+
+    # Live columns still bubble to the board
+    board.columns["1"].order = "9"
+    assert len(fired) == 1
+
+
+def test_same_parent_reassignment_keeps_identity():
+    """Reassigning a node within its own container does not clone it."""
+    ln = ListNode()
+    node = Node(x=1)
+    ln["1"] = node
+    fired = []
+    node.watch("x", lambda *a: fired.append(a))
+
+    ln["1"] = node
+
+    assert ln["1"] is node
+    node.x = 2
+    assert len(fired) == 1
+
+
+def test_update_clones_adopted_foreign_nodes():
+    """update() copies new-key nodes from the other tree instead of sharing."""
+    board = Node(cards=ListNode())
+    other = Node(cards=ListNode())
+    other.cards["1"] = Node(title="new card")
+
+    board.update(other)
+
+    assert board.cards["1"] is not other.cards["1"]
+    assert board.cards["1"].title == "new card"
+    other.cards["1"].title = "mutated"
+    assert board.cards["1"].title == "new card"

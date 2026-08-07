@@ -18,10 +18,18 @@ def _unique_key(desired: str, existing: set[str]) -> str:
 
 
 def _wrap(value: Any, parent: Node | ListNode, key: str) -> Any:
-    """Auto-wrap dicts as Nodes. Reparent existing Nodes/ListNodes."""
+    """Auto-wrap dicts as Nodes; adopt or clone existing Nodes/ListNodes.
+
+    Parentless nodes and same-parent reassignments are adopted in place,
+    preserving identity and watchers. A node that already lives in a
+    different container is cloned instead of silently reparented, so the
+    original tree keeps its watcher bubbling intact.
+    """
     if isinstance(value, dict) and not isinstance(value, Node):
         return Node(_parent=parent, _key=key, **value)
     if isinstance(value, (Node, ListNode)):
+        if value._parent is not None and value._parent is not parent:
+            value = value.clone()
         object.__setattr__(value, "_parent", parent)
         object.__setattr__(value, "_key", key)
     return value
