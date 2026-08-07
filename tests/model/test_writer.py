@@ -1028,3 +1028,107 @@ def test_id_collision_theirs_side_renumbered(repo_with_ganban, monkeypatch):
     assert first_title(loaded.cards["2"].sections) == "Card from B"
     assert first_title(loaded.cards["3"].sections) == "Card from A"
     assert set(loaded.columns["1"].links) == {"1", "2", "3"}
+
+
+# --- Section-level merge tests ---
+
+
+def _prepare_card(repo_path, sections):
+    """Set up card 1 with extra sections, then return two board copies."""
+    board = load_board(str(repo_path))
+    for title, body in sections.items():
+        board.cards["1"].sections[title] = body
+    save_board(board, message="Set up card")
+    return load_board(str(repo_path)), load_board(str(repo_path))
+
+
+def test_section_merge_comments_append_both_sides(repo_with_ganban, monkeypatch):
+    """Comments appended on both replicas merge chronologically."""
+    board_a, board_b = _prepare_card(repo_with_ganban, {"Comments": "- [A](mailto:a@x) first"})
+
+    board_a.cards["1"].sections["Comments"] = "- [A](mailto:a@x) first\n- [A](mailto:a@x) from A"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A comments")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    board_b.cards["1"].sections["Comments"] = "- [A](mailto:a@x) first\n- [B](mailto:b@x) from B"
+    _, merged = save_and_merge(board_b, message="B comments")
+
+    assert merged is True
+    comments = load_board(str(repo_with_ganban)).cards["1"].sections["Comments"]
+    assert comments.split("\n") == [
+        "- [A](mailto:a@x) first",
+        "- [A](mailto:a@x) from A",
+        "- [B](mailto:b@x) from B",
+    ]
+
+
+def test_section_merge_meta_both_sides(repo_with_ganban, monkeypatch):
+    """Different meta keys set on each replica both survive."""
+    board_a, board_b = _prepare_card(repo_with_ganban, {})
+
+    board_a.cards["1"].meta.due = "2030-01-01"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A sets due")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    board_b.cards["1"].meta.labels = ["bug"]
+    _, merged = save_and_merge(board_b, message="B labels")
+
+    assert merged is True
+    card = load_board(str(repo_with_ganban)).cards["1"]
+    assert card.meta.due == "2030-01-01"
+    assert card.meta.labels == ["bug"]
+
+
+def test_section_merge_overlap_newer_wins_others_survive(repo_with_ganban, monkeypatch):
+    """Overlapping section edits take the newer side; other sections keep both."""
+    board_a, board_b = _prepare_card(repo_with_ganban, {"Details": "Original text."})
+
+    board_a.cards["1"].sections["Details"] = "Text from A."
+    board_a.cards["1"].sections["From A only"] = "kept"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A edits")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    board_b.cards["1"].sections["Details"] = "Text from B."
+    _, merged = save_and_merge(board_b, message="B edits")
+
+    assert merged is True
+    card = load_board(str(repo_with_ganban)).cards["1"]
+    assert card.sections["Details"] == "Text from B."
+    assert card.sections["From A only"] == "kept"
+
+
+def test_section_merge_checkbox_toggles_both_sides(repo_with_ganban, monkeypatch):
+    """Each replica ticking a different task merges both ticks."""
+    board_a, board_b = _prepare_card(repo_with_ganban, {"Tasks": "- [ ] alpha\n- [ ] beta"})
+
+    board_a.cards["1"].sections["Tasks"] = "- [x] alpha\n- [ ] beta"
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A ticks alpha")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    board_b.cards["1"].sections["Tasks"] = "- [ ] alpha\n- [x] beta"
+    _, merged = save_and_merge(board_b, message="B ticks beta")
+
+    assert merged is True
+    tasks = load_board(str(repo_with_ganban)).cards["1"].sections["Tasks"]
+    assert tasks == "- [x] alpha\n- [x] beta"
+
+
+def test_section_merge_delete_vs_edit_newer_wins(repo_with_ganban, monkeypatch):
+    """A section deleted on the newer side stays deleted despite an older edit."""
+    board_a, board_b = _prepare_card(repo_with_ganban, {"Notes": "Some notes."})
+
+    board_a.cards["1"].sections["Notes"] = "Edited notes from A."
+    monkeypatch.setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00")
+    save_board(board_a, message="A edits notes")
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    board_b.cards["1"].sections["Notes"] = None
+    _, merged = save_and_merge(board_b, message="B deletes notes")
+
+    assert merged is True
+    card = load_board(str(repo_with_ganban)).cards["1"]
+    assert "Notes" not in card.sections.keys()

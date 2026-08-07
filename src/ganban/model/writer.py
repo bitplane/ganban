@@ -419,14 +419,19 @@ def _resolve_id_collisions(
             if new_content != content:
                 updates[path] = (mode, _write_blob(repo, new_content))
 
+    return _update_tree(repo_path, merged_tree, updates)
+
+
+def _update_tree(repo_path: Path, tree: str, updates: dict[str, tuple[str, str]]) -> str:
+    """Apply blob updates to a tree via a temporary index; return the new tree."""
     if not updates:
-        return merged_tree
+        return tree
 
     fd, idx = tempfile.mkstemp(prefix="ganban_idx_")
     os.close(fd)
     try:
         env = {**os.environ, "GIT_INDEX_FILE": idx}
-        subprocess.run(["git", "read-tree", merged_tree], cwd=repo_path, env=env, check=True)
+        subprocess.run(["git", "read-tree", tree], cwd=repo_path, env=env, check=True)
         for path, (mode, sha) in updates.items():
             subprocess.run(
                 ["git", "update-index", "--add", "--cacheinfo", f"{mode},{sha},{path}"],
@@ -444,6 +449,161 @@ def _resolve_id_collisions(
         return result.stdout.decode("utf-8").strip()
     finally:
         os.unlink(idx)
+
+
+# --- Section-level card merging ---
+
+_TASK_STATE_RE = re.compile(r"^(\s*- \[)([ xX])(\] .*)$")
+
+
+def _merge_meta(base: dict, older: dict, newer: dict) -> dict:
+    """Per-key 3-way merge; a key changed on both sides takes the newer value."""
+    merged: dict = {}
+    keys = list(newer.keys()) + [k for k in older.keys() if k not in newer]
+    for key in keys:
+        base_val = base.get(key)
+        older_val = older.get(key)
+        newer_val = newer.get(key)
+        if older_val == base_val:
+            value = newer_val
+        elif newer_val == base_val:
+            value = older_val
+        else:
+            value = newer_val
+        if value is not None:
+            merged[key] = value
+    return merged
+
+
+def _merge_task_states(base: str, older: str, newer: str) -> str | None:
+    """Merge checkbox toggles when both sides only flipped states.
+
+    Returns None unless both sides have the same lines as base modulo
+    [ ]/[x] markers — structural edits fall through to the other tiers.
+    """
+    base_lines = base.split("\n")
+    older_lines = older.split("\n")
+    newer_lines = newer.split("\n")
+
+    def shape(lines: list[str]) -> list[str]:
+        return [_TASK_STATE_RE.sub(r"\1_\3", line) for line in lines]
+
+    if shape(older_lines) != shape(base_lines) or shape(newer_lines) != shape(base_lines):
+        return None
+
+    merged = []
+    for base_line, older_line, newer_line in zip(base_lines, older_lines, newer_lines):
+        if older_line == base_line:
+            merged.append(newer_line)
+        elif newer_line == base_line:
+            merged.append(older_line)
+        else:
+            merged.append(newer_line)
+    return "\n".join(merged)
+
+
+def _merge_bodies(base: str, older: str, newer: str) -> str:
+    """Merge one section body that both sides changed.
+
+    Tiers: checkbox-state merge, then append-concatenation (both sides
+    grew the same base — comments and additive edits; the older side's
+    suffix comes first so e.g. comment threads stay chronological), then
+    newer-wins for genuinely overlapping edits.
+    """
+    task_merged = _merge_task_states(base, older, newer)
+    if task_merged is not None:
+        return task_merged
+
+    if older.startswith(base) and newer.startswith(base):
+        pieces = [base] if base else []
+        for suffix in (older[len(base) :], newer[len(base) :]):
+            suffix = suffix.strip("\n")
+            if suffix:
+                pieces.append(suffix)
+        separator = "\n" if all(p.lstrip().startswith(("-", "*")) for p in pieces) else "\n\n"
+        return separator.join(pieces)
+
+    return newer
+
+
+def _merge_card_texts(base_text: str, older_text: str, newer_text: str) -> str:
+    """3-way merge a card at section granularity.
+
+    Sections changed on one side only are taken as-is; a section deleted
+    on one side and edited on the other follows the newer side's action;
+    bodies changed on both sides go through _merge_bodies. Section order
+    follows the newer side, with the older side's additions appended.
+    """
+    base_sections, base_meta = parse_sections(base_text)
+    older_sections, older_meta = parse_sections(older_text)
+    newer_sections, newer_meta = parse_sections(newer_text)
+
+    meta = _merge_meta(base_meta or {}, older_meta or {}, newer_meta or {})
+
+    base_map = dict(base_sections)
+    older_map = dict(older_sections)
+    newer_map = dict(newer_sections)
+
+    titles = [t for t, _ in newer_sections]
+    titles += [t for t, _ in older_sections if t not in newer_map]
+
+    merged_sections: list[tuple[str, str]] = []
+    for title in titles:
+        base_body = base_map.get(title)
+        older_body = older_map.get(title)
+        newer_body = newer_map.get(title)
+
+        if older_body == newer_body:
+            body = older_body
+        elif older_body == base_body:
+            body = newer_body
+        elif newer_body == base_body:
+            body = older_body
+        elif newer_body is None or older_body is None:
+            body = newer_body  # delete vs edit: the newer side's action wins
+        else:
+            body = _merge_bodies(base_body or "", older_body, newer_body)
+
+        if body is not None:
+            merged_sections.append((title, body))
+
+    return serialize_sections(merged_sections, meta or None)
+
+
+def _merge_card_conflicts(
+    repo_path: Path,
+    merge_info: MergeRequired,
+    merged_tree: str,
+    paths: list[str],
+    ours_newer: bool,
+) -> tuple[str, list[str]]:
+    """Resolve edit/edit conflicts on card files by section-level merging.
+
+    Returns (new_tree, leftover_paths); leftovers are card conflicts this
+    can't handle (e.g. modify/delete) for most-recent-wins to resolve.
+    """
+    repo = Repo(repo_path)
+    base_paths = _tree_paths(repo_path, merge_info.base)
+    ours_paths = _tree_paths(repo_path, merge_info.ours)
+    theirs_paths = _tree_paths(repo_path, merge_info.theirs)
+
+    updates: dict[str, tuple[str, str]] = {}
+    leftovers: list[str] = []
+    for path in paths:
+        base_entry = base_paths.get(path)
+        ours_entry = ours_paths.get(path)
+        theirs_entry = theirs_paths.get(path)
+        if not (base_entry and ours_entry and theirs_entry):
+            leftovers.append(path)
+            continue
+        base_text = _read_blob(repo, base_entry[1])
+        ours_text = _read_blob(repo, ours_entry[1])
+        theirs_text = _read_blob(repo, theirs_entry[1])
+        older_text, newer_text = (theirs_text, ours_text) if ours_newer else (ours_text, theirs_text)
+        merged_text = _merge_card_texts(base_text, older_text, newer_text)
+        updates[path] = ("100644", _write_blob(repo, merged_text))
+
+    return _update_tree(repo_path, merged_tree, updates), leftovers
 
 
 # --- Board tree building ---
@@ -662,16 +822,26 @@ def try_auto_merge(
         # cards survive, instead of letting one clobber the other.
         collisions = _find_id_collisions(repo_path, merge_info, conflict_paths)
         collision_paths = {c.path for c in collisions}
-        edit_conflicts = [p for p in conflict_paths if p not in collision_paths]
+        remaining = [p for p in conflict_paths if p not in collision_paths]
 
-        if edit_conflicts:
+        # Newer side by (committer ts, sha) — the sha tiebreak keeps the
+        # outcome identical no matter which replica performs the merge
+        ours_key = (_commit_timestamp(repo_path, merge_info.ours), merge_info.ours)
+        theirs_key = (_commit_timestamp(repo_path, merge_info.theirs), merge_info.theirs)
+        ours_newer = ours_key >= theirs_key
+
+        # Cards edited on both sides merge at section granularity
+        card_paths = [p for p in remaining if _CARD_PATH_RE.match(p)]
+        other_paths = [p for p in remaining if not _CARD_PATH_RE.match(p)]
+        if card_paths:
+            merged_tree, leftovers = _merge_card_conflicts(repo_path, merge_info, merged_tree, card_paths, ours_newer)
+            other_paths += leftovers
+
+        if other_paths:
             # Most-recent-commit-wins: replace only the conflicted files.
             # Non-conflicting changes from both sides are preserved in merged_tree.
-            # TODO: revisit with UI-assisted resolution.
-            ours_ts = _commit_timestamp(repo_path, merge_info.ours)
-            theirs_ts = _commit_timestamp(repo_path, merge_info.theirs)
-            winner = merge_info.theirs if theirs_ts >= ours_ts else merge_info.ours
-            merged_tree = _resolve_conflicts(repo_path, merged_tree, winner, edit_conflicts)
+            winner = merge_info.ours if ours_newer else merge_info.theirs
+            merged_tree = _resolve_conflicts(repo_path, merged_tree, winner, other_paths)
 
         if collisions:
             merged_tree = _resolve_id_collisions(repo_path, merge_info, merged_tree, collisions)
