@@ -4,7 +4,11 @@ import os
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
+
+from git import Repo
+from gitdb.base import IStream
 
 from ganban.ids import pad_id
 from ganban.model.column import slugify
@@ -45,16 +49,15 @@ def _git(repo_path: Path, args: list[str]) -> str:
     return result.stdout.decode("utf-8").strip()
 
 
-def _hash_object(repo_path: Path, content: str) -> str:
-    """Write content to git object store and return the blob hash."""
-    result = subprocess.run(
-        ["git", "hash-object", "-w", "--stdin"],
-        cwd=repo_path,
-        input=content.encode("utf-8"),
-        capture_output=True,
-        check=True,
-    )
-    return result.stdout.decode("utf-8").strip()
+def _write_blob(repo: Repo, content: str) -> str:
+    """Write content to the git object store in-process and return the blob hash.
+
+    Uses gitdb directly instead of spawning `git hash-object` — saves fan
+    out to one blob per card/symlink/index, so per-blob subprocesses
+    dominate save time on real boards.
+    """
+    data = content.encode("utf-8")
+    return repo.odb.store(IStream("blob", len(data), BytesIO(data))).hexsha.decode("ascii")
 
 
 def _mktree(repo_path: Path, entries: list[tuple[str, str, str, str]]) -> str:
@@ -221,12 +224,14 @@ def _resolve_conflicts(repo_path: Path, merged_tree: str, winner_commit: str, co
 
 def _build_board_tree(repo_path: Path, board: Node) -> str:
     """Build the complete git tree for a board and return its hash."""
+    repo = Repo(repo_path)
+
     # Build card blobs and .all tree
     width = max(max((len(cid) for cid in board.cards.keys()), default=1), 3)
     card_entries = []
     for card_id, card in board.cards.items():
         text = sections_to_text(card.sections, card.meta)
-        blob = _hash_object(repo_path, text)
+        blob = _write_blob(repo, text)
         card_entries.append(("100644", "blob", blob, f"{pad_id(card_id, width)}.md"))
 
     all_tree = _mktree(repo_path, card_entries)
@@ -234,7 +239,7 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
     # Build column trees
     column_trees = []
     for col in board.columns:
-        col_tree = _build_column_tree(repo_path, col, board, width)
+        col_tree = _build_column_tree(repo_path, repo, col, board, width)
         column_trees.append((col.dir_path, col_tree))
 
     # Build root tree entries
@@ -243,17 +248,17 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
     for dir_path, tree_sha in column_trees:
         root_entries.append(("040000", "tree", tree_sha, dir_path))
 
-    index_blob = _hash_object(repo_path, sections_to_text(board.sections, board.meta))
+    index_blob = _write_blob(repo, sections_to_text(board.sections, board.meta))
     root_entries.append(("100644", "blob", index_blob, "index.md"))
 
     return _mktree(repo_path, root_entries)
 
 
-def _build_column_tree(repo_path: Path, col: Node, board: Node, width: int = 3) -> str:
+def _build_column_tree(repo_path: Path, repo: Repo, col: Node, board: Node, width: int = 3) -> str:
     """Build a git tree for a column directory."""
     entries = []
 
-    index_blob = _hash_object(repo_path, sections_to_text(col.sections, col.meta))
+    index_blob = _write_blob(repo, sections_to_text(col.sections, col.meta))
     entries.append(("100644", "blob", index_blob, "index.md"))
 
     # Add symlinks for card links
@@ -263,7 +268,7 @@ def _build_column_tree(repo_path: Path, col: Node, board: Node, width: int = 3) 
         slug = slugify(title)
         position = f"{i + 1:02d}"
         target = f"../.all/{pad_id(card_id, width)}.md"
-        symlink_blob = _hash_object(repo_path, target)
+        symlink_blob = _write_blob(repo, target)
         filename = f"{position}.{slug}.md"
         entries.append(("120000", "blob", symlink_blob, filename))
 

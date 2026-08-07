@@ -924,3 +924,29 @@ def test_auto_merge_missing_object_returns_none(repo_with_ganban):
     (repo_with_ganban / ".git" / "objects" / external[:2] / external[2:]).unlink()
 
     assert try_auto_merge(board, merge_info) is None
+
+
+def test_write_blob_matches_git_hash_object(empty_repo):
+    """In-process blob writes produce the same hashes and readable objects."""
+    import subprocess as sp
+
+    from ganban.model.writer import _write_blob
+
+    repo = Repo(empty_repo)
+    content = "# A card\n\nWith unicode: héllo ✓\n"
+    sha = _write_blob(repo, content)
+
+    expected = (
+        sp.run(
+            ["git", "hash-object", "--stdin"],
+            cwd=empty_repo,
+            input=content.encode("utf-8"),
+            capture_output=True,
+            check=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
+
+    assert sha == expected
+    assert repo.git.cat_file("-p", sha) == content.rstrip("\n")
