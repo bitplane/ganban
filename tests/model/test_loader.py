@@ -546,3 +546,33 @@ def test_preamble_card_round_trips_without_retitle(repo_with_ganban):
 
     reloaded = load_board(str(repo_with_ganban))
     assert reloaded.cards["1"].sections.keys() == ["", "Fix login bug"]
+
+
+def test_archived_tracks_runtime_created_column(sample_board):
+    """Columns created after load participate in archived tracking."""
+    from ganban.model.column import create_column
+
+    board = load_board(str(sample_board))
+    new_col = create_column(board, "Review", order="9")
+
+    archive_card(board, "1")
+    assert board.cards["1"].archived is True
+
+    move_card(board, "1", new_col)
+    assert board.cards["1"].archived is False
+
+    # Removing it from its only (runtime-created) column archives it again
+    archive_card(board, "1")
+    assert board.cards["1"].archived is True
+
+
+def test_cards_archived_when_column_removed(sample_board):
+    """Removing a whole column archives the cards that were only in it."""
+    board = load_board(str(sample_board))
+    assert board.cards["2"].archived is False
+    assert board.cards["3"].archived is False
+
+    board.columns["2"] = None
+
+    assert board.cards["2"].archived is True
+    assert board.cards["3"].archived is True

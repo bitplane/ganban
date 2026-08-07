@@ -258,14 +258,26 @@ def _on_board_card_ids(board: Node) -> set[str]:
 
 
 def _setup_archived(board: Node) -> None:
-    """Set card.archived for each card and watch columns to keep it in sync."""
+    """Set card.archived for each card and watch columns to keep it in sync.
+
+    Watching at the board level (bubbled events) covers columns created
+    after load and whole columns being added or removed, which per-column
+    links watchers would miss.
+    """
     on_board = _on_board_card_ids(board)
     for card_id, card in board.cards.items():
         card.archived = card_id not in on_board
 
-    def on_links_changed(source_node, key, old, new):
-        old_set = set(old) if old else set()
-        new_set = set(new) if new else set()
+    def on_columns_changed(source_node, key, old, new):
+        if key == "links" and source_node._parent is board.columns:
+            old_set = set(old) if old else set()
+            new_set = set(new) if new else set()
+        elif source_node is board.columns and key != "*":
+            # A column was added, removed or replaced wholesale
+            old_set = set(old.links) if old is not None and old.links else set()
+            new_set = set(new.links) if new is not None and new.links else set()
+        else:
+            return
         for card_id in old_set - new_set:
             card = board.cards[card_id]
             if card is not None:
@@ -275,8 +287,7 @@ def _setup_archived(board: Node) -> None:
             if card is not None:
                 card.archived = False
 
-    for col in board.columns:
-        col.watch("links", on_links_changed)
+    board.watch("columns", on_columns_changed)
 
 
 def _is_ready(card: Node) -> bool:
