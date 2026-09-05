@@ -3,12 +3,17 @@
 import os
 import re
 import subprocess
-import tempfile
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import Path
 
-from git import Repo
+from git import Actor, Commit, Repo
+from git.db import GitDB
+from git.objects.fun import tree_to_stream
+from git.objects.util import parse_date
+from git.refs import SymbolicReference
 from gitdb.base import IStream
 
 from ganban.ids import max_id, next_id, normalize_id, pad_id
@@ -39,17 +44,6 @@ def sections_to_text(sections: ListNode, meta) -> str:
 # --- Git plumbing ---
 
 
-def _git(repo_path: Path, args: list[str]) -> str:
-    """Run a git command and return stdout."""
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo_path,
-        capture_output=True,
-        check=True,
-    )
-    return result.stdout.decode("utf-8").strip()
-
-
 def _write_blob(repo: Repo, content: str) -> str:
     """Write content to the git object store in-process and return the blob hash.
 
@@ -61,22 +55,97 @@ def _write_blob(repo: Repo, content: str) -> str:
     return repo.odb.store(IStream("blob", len(data), BytesIO(data))).hexsha.decode("ascii")
 
 
-def _mktree(repo_path: Path, entries: list[tuple[str, str, str, str]]) -> str:
+def _mktree(repo: Repo, entries: list[tuple[str, str, str, str]]) -> str:
     """Create a tree object from entries and return its hash.
 
     Each entry is (mode, type, sha, name).
     """
-    lines = [f"{mode} {typ} {sha}\t{name}" for mode, typ, sha, name in entries]
-    content = "\n".join(lines) + "\n" if lines else ""
+    for _, _, _, name in entries:
+        if not name or "/" in name or "\0" in name:
+            raise ValueError(f"Invalid tree entry name: {name!r}")
+    # Git sorts raw filename bytes, treating directories as ending in '/'.
+    entries = sorted(entries, key=lambda e: (e[3] + ("/" if e[1] == "tree" else "")).encode("utf-8"))
+    stream = BytesIO()
+    tree_to_stream([(bytes.fromhex(sha), int(mode, 8), name) for mode, _, sha, name in entries], stream.write)
+    size = stream.tell()
+    stream.seek(0)
+    return repo.odb.store(IStream("tree", size, stream)).hexsha.decode("ascii")
 
-    result = subprocess.run(
-        ["git", "mktree"],
-        cwd=repo_path,
-        input=content.encode("utf-8"),
-        capture_output=True,
-        check=True,
+
+def _commit_date(env_name: str) -> str | datetime | None:
+    """Normalize Git dates before passing them to GitPython.
+
+    GitPython's string parser records ISO/RFC offsets without applying them
+    to the timestamp. Aware datetimes preserve both the instant and offset.
+    """
+    value = os.environ.get(env_name)
+    if not value or re.fullmatch(r"@?\d+ [+-]\d{4}", value):
+        return value or None
+    try:
+        date = datetime.fromisoformat(value)
+    except ValueError:
+        try:
+            date = parsedate_to_datetime(value)
+        except ValueError:
+            # Git also accepts YYYY.MM.DD, MM/DD/YYYY, and DD.MM.YYYY.
+            timestamp, offset = parse_date(value)
+            date = datetime.fromtimestamp(timestamp, timezone.utc).replace(tzinfo=None)
+            if re.search(r"[+-]\d{4}$", value):
+                date = date.replace(tzinfo=timezone(timedelta(seconds=-offset)))
+    return date.astimezone() if date.tzinfo is None else date
+
+
+def _write_commit(repo: Repo, tree: str, parents: list[str], message: str) -> str:
+    """Create a commit object without updating any refs or the worktree."""
+    # GitPython's config reader ignores Git's config environment overrides
+    # and does not fully handle linked-worktree configuration. Let Git
+    # resolve identity/encoding in those cases instead of writing a commit
+    # under the wrong identity. Trees and object reads remain in-process.
+    config_overrides = (
+        "GIT_CONFIG",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_CONFIG_NOSYSTEM",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_PARAMETERS",
     )
-    return result.stdout.decode("utf-8").strip()
+    if repo.common_dir != repo.git_dir or any(key in os.environ for key in config_overrides):
+        parent_args = [arg for parent in parents if parent for arg in ("-p", parent)]
+        return subprocess.run(
+            ["git", "commit-tree", tree, *parent_args, "-m", message],
+            cwd=repo.working_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    # Match commit-tree -m's terminating newline; an empty message stays empty.
+    if message and not message.endswith("\n"):
+        message += "\n"
+    with repo.config_reader() as config:
+        author = Actor.author(config)
+        committer = Actor.committer(config)
+        config_only = config.get_value("user", "useConfigOnly", False)
+        # GitPython reads user.* but not Git's role-specific overrides.
+        for role, actor in (("author", author), ("committer", committer)):
+            for field in ("name", "email"):
+                explicit_env = f"GIT_{role.upper()}_{field.upper()}" in os.environ
+                if config_only and not (
+                    explicit_env or config.has_option(role, field) or config.has_option("user", field)
+                ):
+                    raise ValueError(f"{role}.{field} must be configured when user.useConfigOnly is enabled")
+                if not explicit_env and config.has_option(role, field):
+                    setattr(actor, field, config.get(role, field))
+    return Commit.create_from_tree(
+        repo,
+        repo.tree(tree),
+        message,
+        parent_commits=[repo.commit(parent) for parent in dict.fromkeys(parents) if parent],
+        head=False,
+        author=author,
+        committer=committer,
+        author_date=_commit_date("GIT_AUTHOR_DATE"),
+        commit_date=_commit_date("GIT_COMMITTER_DATE"),
+    ).hexsha
 
 
 def _get_branch_tip(repo_path: Path, branch: str) -> str | None:
@@ -86,14 +155,11 @@ def _get_branch_tip(repo_path: Path, branch: str) -> str | None:
 
 def _get_ref(repo_path: Path, ref: str) -> str | None:
     """Get the commit hash for any ref, or None if it doesn't exist."""
-    result = subprocess.run(
-        ["git", "rev-parse", "--verify", ref],
-        cwd=repo_path,
-        capture_output=True,
-    )
-    if result.returncode != 0:
+    repo = Repo(repo_path, odbt=GitDB)
+    try:
+        return SymbolicReference.dereference_recursive(repo, ref)
+    except ValueError:
         return None
-    return result.stdout.decode("utf-8").strip()
 
 
 def _update_ref_cas(repo_path: Path, branch: str, new_commit: str, expected_old: str | None) -> bool:
@@ -112,7 +178,7 @@ def _update_ref_cas(repo_path: Path, branch: str, new_commit: str, expected_old:
 
 def _commit_timestamp(repo_path: Path, commit: str) -> int:
     """Get the committer timestamp of a commit as epoch seconds."""
-    return int(_git(repo_path, ["log", "-1", "--format=%ct", commit]))
+    return Repo(repo_path, odbt=GitDB).commit(commit).committed_date
 
 
 def _get_merge_base(repo_path: Path, commit1: str, commit2: str) -> str | None:
@@ -140,7 +206,8 @@ def _merge_trees(
         conflict_paths is empty on a clean merge; merged_tree_hash is ""
         if merge-tree failed entirely (exit status above 1).
     """
-    our_temp_commit = _git(repo_path, ["commit-tree", our_tree, "-p", base_commit, "-m", "temp merge commit"])
+    repo = Repo(repo_path, odbt=GitDB)
+    our_temp_commit = _write_commit(repo, our_tree, [base_commit], "temp merge commit")
 
     result = subprocess.run(
         ["git", "merge-tree", "--write-tree", f"--merge-base={base_commit}", our_temp_commit, their_commit],
@@ -172,52 +239,18 @@ def _merge_trees(
 
 
 def _resolve_conflicts(repo_path: Path, merged_tree: str, winner_commit: str, conflict_paths: list[str]) -> str:
-    """Replace conflicted paths in merged_tree with the winner's versions.
-
-    Uses a temporary index to surgically swap only the conflicted blobs,
-    preserving the cleanly-merged content for everything else.
-    """
-    fd, idx = tempfile.mkstemp(prefix="ganban_idx_")
-    os.close(fd)
-    try:
-        env = {**os.environ, "GIT_INDEX_FILE": idx}
-        subprocess.run(["git", "read-tree", merged_tree], cwd=repo_path, env=env, check=True)
-        for path in conflict_paths:
-            # Get the entry (mode + blob) from the winner's tree
-            entry = subprocess.run(
-                ["git", "ls-tree", winner_commit, path],
-                cwd=repo_path,
-                capture_output=True,
-            )
-            entry_line = entry.stdout.decode("utf-8").strip()
-            if entry_line:
-                # File exists in winner: replace the blob
-                mode, _, blob = entry_line.split(None, 2)
-                blob = blob.split("\t")[0]
-                subprocess.run(
-                    ["git", "update-index", "--cacheinfo", f"{mode},{blob},{path}"],
-                    cwd=repo_path,
-                    env=env,
-                    check=True,
-                )
-            else:
-                # File deleted in winner: remove from index
-                subprocess.run(
-                    ["git", "update-index", "--force-remove", path],
-                    cwd=repo_path,
-                    env=env,
-                    check=True,
-                )
-        result = subprocess.run(
-            ["git", "write-tree"],
-            cwd=repo_path,
-            env=env,
-            capture_output=True,
-            check=True,
-        )
-        return result.stdout.decode("utf-8").strip()
-    finally:
-        os.unlink(idx)
+    """Replace conflicted paths with the winner's versions, preserving clean edits."""
+    repo = Repo(repo_path, odbt=GitDB)
+    winner = repo.tree(winner_commit)
+    updates = {}
+    for path in conflict_paths:
+        try:
+            entry = winner[path]
+        except KeyError:
+            updates[path] = None
+        else:
+            updates[path] = (f"{entry.mode:06o}", entry.hexsha)
+    return _update_tree(repo_path, merged_tree, updates)
 
 
 # --- Card id collision resolution ---
@@ -249,15 +282,10 @@ class IdCollision:
 
 def _tree_paths(repo_path: Path, treeish: str) -> dict[str, tuple[str, str]]:
     """Map path -> (mode, blob_sha) for every blob in a tree, recursively."""
-    output = _git(repo_path, ["ls-tree", "-r", treeish])
-    entries: dict[str, tuple[str, str]] = {}
-    for line in output.split("\n"):
-        if not line:
-            continue
-        meta, path = line.split("\t", 1)
-        mode, _typ, sha = meta.split()
-        entries[path] = (mode, sha)
-    return entries
+    repo = Repo(repo_path, odbt=GitDB)
+    tree = repo.tree(treeish)
+    tree.path = ""
+    return {obj.path: (f"{obj.mode:06o}", obj.hexsha) for obj in tree.traverse() if obj.type == "blob"}
 
 
 def _read_blob(repo: Repo, sha: str) -> str:
@@ -344,7 +372,7 @@ def _resolve_id_collisions(
     the next free id; its side's symlinks, deps entries and #id reference
     tokens are rewritten, attributed by comparing blobs against the base.
     """
-    repo = Repo(repo_path)
+    repo = Repo(repo_path, odbt=GitDB)
     base_paths = _tree_paths(repo_path, merge_info.base)
     ours_paths = _tree_paths(repo_path, merge_info.ours)
     theirs_paths = _tree_paths(repo_path, merge_info.theirs)
@@ -422,33 +450,43 @@ def _resolve_id_collisions(
     return _update_tree(repo_path, merged_tree, updates)
 
 
-def _update_tree(repo_path: Path, tree: str, updates: dict[str, tuple[str, str]]) -> str:
-    """Apply blob updates to a tree via a temporary index; return the new tree."""
+def _update_tree(repo_path: Path, tree: str, updates: dict[str, tuple[str, str] | None]) -> str:
+    """Apply path updates in-process, rebuilding only affected subtrees.
+
+    None removes a path. Untouched entries keep their object IDs and modes;
+    directories emptied by a deletion disappear as they do in a Git index.
+    """
     if not updates:
         return tree
+    repo = Repo(repo_path, odbt=GitDB)
 
-    fd, idx = tempfile.mkstemp(prefix="ganban_idx_")
-    os.close(fd)
-    try:
-        env = {**os.environ, "GIT_INDEX_FILE": idx}
-        subprocess.run(["git", "read-tree", tree], cwd=repo_path, env=env, check=True)
-        for path, (mode, sha) in updates.items():
-            subprocess.run(
-                ["git", "update-index", "--add", "--cacheinfo", f"{mode},{sha},{path}"],
-                cwd=repo_path,
-                env=env,
-                check=True,
-            )
-        result = subprocess.run(
-            ["git", "write-tree"],
-            cwd=repo_path,
-            env=env,
-            capture_output=True,
-            check=True,
-        )
-        return result.stdout.decode("utf-8").strip()
-    finally:
-        os.unlink(idx)
+    def rebuild(tree_sha, changes):
+        entries = {}
+        if tree_sha:
+            old_tree = repo.tree(tree_sha)
+            old_tree.path = ""
+            entries = {entry.name: (f"{entry.mode:06o}", entry.type, entry.hexsha, entry.name) for entry in old_tree}
+        subtrees = {}
+        for path, value in changes.items():
+            name, separator, rest = path.partition("/")
+            if separator:
+                subtrees.setdefault(name, {})[rest] = value
+            elif value is None:
+                entries.pop(name, None)
+            else:
+                mode, sha = value
+                kind = "tree" if int(mode, 8) == 0o40000 else "commit" if int(mode, 8) == 0o160000 else "blob"
+                entries[name] = (mode, kind, sha, name)
+        for name, children in subtrees.items():
+            old = entries.get(name)
+            child_sha, empty = rebuild(old[2] if old and old[1] == "tree" else None, children)
+            if empty:
+                entries.pop(name, None)
+            else:
+                entries[name] = ("040000", "tree", child_sha, name)
+        return _mktree(repo, list(entries.values())), not entries
+
+    return rebuild(tree, updates)[0]
 
 
 # --- Section-level card merging ---
@@ -582,7 +620,7 @@ def _merge_card_conflicts(
     Returns (new_tree, leftover_paths); leftovers are card conflicts this
     can't handle (e.g. modify/delete) for most-recent-wins to resolve.
     """
-    repo = Repo(repo_path)
+    repo = Repo(repo_path, odbt=GitDB)
     base_paths = _tree_paths(repo_path, merge_info.base)
     ours_paths = _tree_paths(repo_path, merge_info.ours)
     theirs_paths = _tree_paths(repo_path, merge_info.theirs)
@@ -609,10 +647,8 @@ def _merge_card_conflicts(
 # --- Board tree building ---
 
 
-def _build_board_tree(repo_path: Path, board: Node) -> str:
+def _build_board_tree(repo: Repo, board: Node) -> str:
     """Build the complete git tree for a board and return its hash."""
-    repo = Repo(repo_path)
-
     # Build card blobs and .all tree
     width = max(max((len(cid) for cid in board.cards.keys()), default=1), 3)
     card_entries = []
@@ -621,12 +657,12 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
         blob = _write_blob(repo, text)
         card_entries.append(("100644", "blob", blob, f"{pad_id(card_id, width)}.md"))
 
-    all_tree = _mktree(repo_path, card_entries)
+    all_tree = _mktree(repo, card_entries)
 
     # Build column trees
     column_trees = []
     for col in board.columns:
-        col_tree = _build_column_tree(repo_path, repo, col, board, width)
+        col_tree = _build_column_tree(repo, col, board, width)
         column_trees.append((col.dir_path, col_tree))
 
     # Build root tree entries
@@ -638,10 +674,10 @@ def _build_board_tree(repo_path: Path, board: Node) -> str:
     index_blob = _write_blob(repo, sections_to_text(board.sections, board.meta))
     root_entries.append(("100644", "blob", index_blob, "index.md"))
 
-    return _mktree(repo_path, root_entries)
+    return _mktree(repo, root_entries)
 
 
-def _build_column_tree(repo_path: Path, repo: Repo, col: Node, board: Node, width: int = 3) -> str:
+def _build_column_tree(repo: Repo, col: Node, board: Node, width: int = 3) -> str:
     """Build a git tree for a column directory."""
     entries = []
 
@@ -659,7 +695,7 @@ def _build_column_tree(repo_path: Path, repo: Repo, col: Node, board: Node, widt
         filename = f"{position}.{slug}.md"
         entries.append(("120000", "blob", symlink_blob, filename))
 
-    return _mktree(repo_path, entries)
+    return _mktree(repo, entries)
 
 
 # --- Public API ---
@@ -673,8 +709,9 @@ def save_board(
 ) -> str:
     """Save a board to git and return the new commit hash."""
     repo_path = Path(board.repo_path)
+    repo = Repo(repo_path, odbt=GitDB)
 
-    tree = _build_board_tree(repo_path, board)
+    tree = _build_board_tree(repo, board)
 
     if parents is None:
         if board.commit:
@@ -685,19 +722,11 @@ def save_board(
 
     # Skip commit if tree is unchanged from parent
     if len(parents) == 1 and parents[0]:
-        parent_tree = _git(repo_path, ["rev-parse", f"{parents[0]}^{{tree}}"])
+        parent_tree = repo.commit(parents[0]).tree.hexsha
         if parent_tree == tree:
             return board.commit
 
-    parent_args = []
-    for parent in parents:
-        if parent:
-            parent_args.extend(["-p", parent])
-
-    new_commit = _git(
-        repo_path,
-        ["commit-tree", tree, *parent_args, "-m", message],
-    )
+    new_commit = _write_commit(repo, tree, parents, message)
 
     # The ref may only advance from a commit this save builds on. A tip
     # moved by another process is left in place — the commit still exists
@@ -801,10 +830,11 @@ def try_auto_merge(
     if tip is not None and tip not in (merge_info.ours, merge_info.theirs):
         return None
 
-    our_tree = _build_board_tree(repo_path, board)
+    repo = Repo(repo_path, odbt=GitDB)
+    our_tree = _build_board_tree(repo, board)
 
     # Fast-forward: our tree matches the merge base, so we're just behind
-    base_tree = _git(repo_path, ["rev-parse", f"{merge_info.base}^{{tree}}"])
+    base_tree = repo.commit(merge_info.base).tree.hexsha
     if our_tree == base_tree:
         if tip == merge_info.theirs:
             return merge_info.theirs
@@ -846,11 +876,7 @@ def try_auto_merge(
         if collisions:
             merged_tree = _resolve_id_collisions(repo_path, merge_info, merged_tree, collisions)
 
-    parent_args = ["-p", merge_info.ours, "-p", merge_info.theirs]
-    new_commit = _git(
-        repo_path,
-        ["commit-tree", merged_tree, *parent_args, "-m", message],
-    )
+    new_commit = _write_commit(repo, merged_tree, [merge_info.ours, merge_info.theirs], message)
 
     if not _update_ref_cas(repo_path, branch, new_commit, tip):
         return None

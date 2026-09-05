@@ -82,9 +82,14 @@ All paths follow: **load → mutate → save**
   `committers=False` for one-shot CLI use)
 - Mutation helpers in `model/card.py` and `model/column.py` operate on the tree
 - `writer.save_board()` writes back using git plumbing — never touches the
-  working tree. Blobs are written in-process via gitdb; the branch ref only
-  advances by compare-and-swap, so concurrent writers are merged, never
-  clobbered. Callers without their own merge step use `save_and_merge()`.
+  working tree. Blobs, trees, and commits are written in-process via
+  GitPython/gitdb with the pure `GitDB` object backend (the default backend
+  can launch `cat-file` for reads). Standard changed saves only spawn
+  `git update-ref` for compare-and-swap; unchanged saves spawn nothing.
+  Linked worktrees and Git config environment overrides also use
+  `commit-tree` to preserve Git's identity/configuration handling.
+  Merges retain Git's merge engine and ancestry queries. Callers without
+  their own merge step use `save_and_merge()` so concurrent writes are merged.
 - The TUI's background sync (`sync.py`) snapshots the board with
   `board.clone()` before handing it to a worker thread, and reloads the board
   after every merge.

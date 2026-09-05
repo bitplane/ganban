@@ -118,10 +118,14 @@ Default digits: 3 for `.all/`, 1 for columns, 2 for symlinks.
 
 ### Reading/Writing Without Checkout
 
-Operates on the `ganban` branch without checking it out, using git plumbing:
-- `git show ganban:path` to read
-- `git hash-object`, `git mktree`, `git commit-tree` to write
-- Or GitPython equivalents
+Operates on the `ganban` branch without checking it out. The writer reads
+objects and builds blobs, trees, and commits in-process using GitPython/gitdb.
+With standard configuration, a changed save launches only `git update-ref`,
+whose compare-and-swap check protects concurrent writers. An unchanged save
+launches no processes.
+Merges retain Git's merge engine and ancestry queries.
+Linked worktrees and Git configuration overrides supplied through environment
+variables also use `commit-tree` to preserve Git's identity and encoding rules.
 
 ### Multi-Remote Sync
 
