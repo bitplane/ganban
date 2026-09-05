@@ -3,10 +3,12 @@
 import pytest
 from textual.app import App
 
+from ganban.model.card import create_card
 from ganban.model.column import create_column
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title
 from ganban.ui.board import BoardScreen
+from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
 
 from .conftest import GANBAN_CSS_PATH
@@ -92,3 +94,30 @@ async def test_archive_request_unmounts_column_widget():
 
         widgets = list(app.screen.query(ColumnWidget))
         assert [first_title(w.column.sections) for w in widgets] == ["Backlog"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", [CardWidget, AddCard])
+async def test_horizontal_navigation_stops_at_column_edges(target):
+    """The add-column control is not a column navigation target."""
+    board = _make_board()
+    for column in board.columns:
+        create_card(board, "Card", column=column)
+    app = BoardApp(board)
+    async with app.run_test(size=(120, 30)) as pilot:
+        first, last = app.screen.query(ColumnWidget)
+        focused = last.query_one(target)
+        focused.focus()
+        await pilot.pause()
+
+        await pilot.press("right")
+        assert app.screen.focused is focused
+
+        await pilot.press("left")
+        assert app.screen.focused is first.query_one(target)
+
+        await pilot.press("left")
+        assert app.screen.focused is first.query_one(target)
+
+        await pilot.press("right")
+        assert app.screen.focused is focused

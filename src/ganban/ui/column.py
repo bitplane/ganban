@@ -245,7 +245,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
             focusable[idx + 1].focus()
         elif event.key in ("left", "right"):
             direction = -1 if event.key == "left" else 1
-            siblings = list(self.parent.children)
+            siblings = [child for child in self.parent.children if isinstance(child, ColumnWidget)]
             my_idx = siblings.index(self)
             new_idx = my_idx + direction
             if 0 <= new_idx < len(siblings):
