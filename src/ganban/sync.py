@@ -15,6 +15,7 @@ from ganban.git import (
     resolve_upstream,
 )
 from ganban.model.loader import load_board
+from ganban.model.node import ListNode, Node
 from ganban.model.writer import (
     check_for_merge,
     check_remote_for_merge,
@@ -34,22 +35,32 @@ def apply_reload(board, new_board) -> None:
     board.git.config = config_node
 
 
-async def _merge_and_reload(board, board_view, merge_info, message):
-    """Run one auto-merge, then reload the board from the merge result.
+def _same_data(left, right) -> bool:
+    """Compare snapshot contents, including order and mutable metadata lists."""
+    if isinstance(left, (Node, ListNode, dict)):
+        if not isinstance(right, type(left)) or list(left.keys()) != list(right.keys()):
+            return False
+        return all(_same_data(a, b) for (_, a), (_, b) in zip(left.items(), right.items()))
+    if isinstance(left, (list, tuple)):
+        return (
+            isinstance(right, type(left))
+            and len(left) == len(right)
+            and all(_same_data(a, b) for a, b in zip(left, right))
+        )
+    return left == right
 
-    The merge runs against board_view — a snapshot the worker thread can
-    iterate safely while the UI keeps mutating the live board — and every
-    merge must be applied back before another runs, otherwise the next
-    one is computed from a stale tree and discards this one's changes.
-    Returns a fresh snapshot of the reloaded board, or None on failure.
+
+async def _merge_snapshot(board_view, merge_info, message):
+    """Merge and reload a worker snapshot without replacing live UI state.
+
+    Each subsequent merge must use the reloaded snapshot so it preserves
+    the previous merge's changes. The live board is reconciled only after
+    all merges finish and only if it still matches the saved snapshot.
     """
     new_commit = await asyncio.to_thread(try_auto_merge, board_view, merge_info, message)
     if new_commit is None:
         return None
-    board.commit = new_commit
-    new_board = await asyncio.to_thread(load_board, board.repo_path)
-    apply_reload(board, new_board)
-    return board.clone()
+    return await asyncio.to_thread(load_board, board_view.repo_path)
 
 
 async def run_sync_cycle(board):
@@ -91,6 +102,7 @@ async def run_sync_cycle(board):
             new_commit = await asyncio.to_thread(save_board, board_view)
             board.commit = new_commit
             board_view.commit = new_commit
+            saved_view = board_view
 
         # --- MERGE (local divergence + remote branches) ---
         # The board is only reloaded when a merge brought in external
@@ -102,7 +114,7 @@ async def run_sync_cycle(board):
             # Local merge (another process may have committed)
             merge_info = await asyncio.to_thread(check_for_merge, board_view)
             if merge_info is not None:
-                board_view = await _merge_and_reload(board, board_view, merge_info, "Auto-merge local changes")
+                board_view = await _merge_snapshot(board_view, merge_info, "Auto-merge local changes")
                 if board_view is None:
                     sync.status = "conflict"
                     return
@@ -116,10 +128,20 @@ async def run_sync_cycle(board):
                     merge_info = await asyncio.to_thread(check_remote_for_merge, board_view, remote)
                     if merge_info is None:
                         continue
-                    board_view = await _merge_and_reload(board, board_view, merge_info, f"Merge {remote}/ganban")
+                    board_view = await _merge_snapshot(board_view, merge_info, f"Merge {remote}/ganban")
                     if board_view is None:
                         sync.status = "conflict"
                         return
+
+            if board_view is not saved_view and all(
+                _same_data(getattr(board, key), getattr(saved_view, key))
+                for key in ("sections", "meta", "cards", "columns")
+            ):
+                apply_reload(board, board_view)
+            # Otherwise leave both the live edits and their saved commit
+            # base intact. The next cycle saves them against that base and
+            # merges the external changes again, instead of overwriting
+            # either side with a tree that never contained its changes.
 
         # --- PUSH ---
         if do_remote and upstream_remote:

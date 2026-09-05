@@ -205,11 +205,90 @@ async def test_sync_picks_up_external_changes(local_repo):
     assert len(board.cards) == original_card_count + 1
 
 
+@pytest.mark.asyncio
+async def test_sync_preserves_edits_after_save_snapshot(local_repo):
+    """A merge reload must not replace edits made after the save snapshot."""
+    board = load_board(str(local_repo))
+    _init_sync_state(board, local=True, remote=False)
+
+    external = load_board(str(local_repo))
+    external.cards["1"].sections["External notes"] = "Keep this too."
+    save_board(external, message="External edit")
+
+    def edit_after_snapshot(node, key, old, new):
+        if new == "load":
+            board.cards["1"].sections["First card"] = "Unsaved live edit."
+
+    unwatch = board.git.sync.watch("status", edit_after_snapshot)
+    await run_sync_cycle(board)
+    unwatch()
+
+    assert board.cards["1"].sections["First card"] == "Unsaved live edit."
+    assert board.git.sync.status == "idle"
+
+    # The next cycle must save the live edit and incorporate the external
+    # change, rather than claiming the stale live tree includes the merge.
+    await run_sync_cycle(board)
+    reloaded = load_board(str(local_repo))
+    for result in (board, reloaded):
+        assert result.cards["1"].sections["First card"] == "Unsaved live edit."
+        assert result.cards["1"].sections["External notes"] == "Keep this too."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("edit_kind", ["board", "column", "labels", "new_card"])
+async def test_sync_preserves_other_live_changes(local_repo, edit_kind):
+    """Reload protection covers structure and metadata, not just card text."""
+    initial = load_board(str(local_repo))
+    initial.cards["1"].meta.labels = ["existing"]
+    save_board(initial)
+    board = load_board(str(local_repo))
+    _init_sync_state(board, local=True, remote=False)
+
+    external = load_board(str(local_repo))
+    external.cards["1"].sections["External notes"] = "Keep this too."
+    save_board(external)
+
+    def edit_after_snapshot(node, key, old, new):
+        if new != "load":
+            return
+        if edit_kind == "board":
+            board.sections.rename_first_key("Renamed board")
+        elif edit_kind == "column":
+            board.columns["1"].links = ()
+        elif edit_kind == "labels":
+            # In-place metadata mutations do not emit Node notifications.
+            board.cards["1"].meta.labels.append("late")
+        else:
+            create_card(board, "Late card", "Created after snapshot.")
+
+    def assert_edit(result):
+        if edit_kind == "board":
+            assert result.sections.keys() == ["Renamed board"]
+        elif edit_kind == "column":
+            assert result.columns["1"].links == ()
+        elif edit_kind == "labels":
+            assert result.cards["1"].meta.labels == ["existing", "late"]
+        else:
+            assert result.cards["2"].sections["Late card"] == "Created after snapshot."
+
+    unwatch = board.git.sync.watch("status", edit_after_snapshot)
+    await run_sync_cycle(board)
+    unwatch()
+    assert_edit(board)
+
+    await run_sync_cycle(board)
+    for result in (board, load_board(str(local_repo))):
+        assert_edit(result)
+        assert result.cards["1"].sections["External notes"] == "Keep this too."
+
+
 # --- multiple remotes ---
 
 
 @pytest.mark.asyncio
-async def test_sync_two_remotes_preserves_both(tmp_path):
+@pytest.mark.parametrize("late_edit", [False, True])
+async def test_sync_two_remotes_preserves_both(tmp_path, late_edit):
     """Merging a second remote must not discard the first remote's changes."""
     remote_a = tmp_path / "a.git"
     remote_b = tmp_path / "b.git"
@@ -246,10 +325,22 @@ async def test_sync_two_remotes_preserves_both(tmp_path):
     board = load_board(str(local_path))
     _init_sync_state(board, local=True, remote=True)
 
+    def edit_after_snapshot(node, key, old, new):
+        if late_edit and new == "load":
+            board.cards["1"].sections["First card"] = "Late edit with two remotes."
+
+    unwatch = board.git.sync.watch("status", edit_after_snapshot)
     await run_sync_cycle(board)
+    unwatch()
+
+    if late_edit:
+        assert board.cards["1"].sections["First card"] == "Late edit with two remotes."
+        await run_sync_cycle(board)
 
     assert board.git.sync.status == "idle"
     # Both remotes' cards survived the double merge
     reloaded = load_board(str(local_path))
     assert len(reloaded.cards) == 3
     assert len(board.cards) == 3
+    if late_edit:
+        assert reloaded.cards["1"].sections["First card"] == "Late edit with two remotes."
