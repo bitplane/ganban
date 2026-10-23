@@ -93,7 +93,9 @@ def _get_committers(repo: Repo, max_count: int = MAX_COMMITS) -> list[str]:
     Returns a sorted list of "Name <email>" strings.
     """
     seen: set[str] = set()
-    for commit in repo.iter_commits(max_count=max_count, all=True):
+    # An explicit revision avoids GitPython resolving an unborn HEAD before
+    # it applies --all (new boards may be the repository's only commits).
+    for commit in repo.iter_commits("--all", max_count=max_count):
         seen.add(f"{commit.author.name} <{commit.author.email}>")
     return sorted(seen)
 

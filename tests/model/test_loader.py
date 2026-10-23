@@ -9,8 +9,25 @@ from git import Repo
 from git.util import Actor
 
 from ganban.model.card import archive_card, move_card
+from ganban.model.board import create_default_board
 from ganban.model.loader import _activate, _get_committers, _load_tree, load_board
 from ganban.model.node import ListNode, Node
+from ganban.model.writer import save_board
+
+
+def test_committers_without_any_commits(tmp_path):
+    assert _get_committers(Repo.init(tmp_path)) == []
+
+
+def test_load_board_with_unborn_head(tmp_path):
+    repo = Repo.init(tmp_path)
+    commit = save_board(create_default_board(tmp_path))
+    assert not repo.head.is_valid()
+    board = load_board(str(tmp_path))
+    assert board.commit == commit
+    assert len(board.columns) == 3
+    author = repo.commit(commit).author
+    assert f"{author.name} <{author.email}>" in board.git.committers
 
 
 @pytest.fixture
