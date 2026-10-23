@@ -76,5 +76,5 @@ def archive_column(board: Node, column_order: str) -> None:
 
 def rename_column(board: Node, column: Node, new_name: str) -> None:
     """Rename a column: update its sections title and dir_path."""
-    column.sections.rename_first_key(new_name)
+    column.sections.rename_key(first_title(column.sections), new_name)
     column.dir_path = build_column_path(column.order, new_name, column.hidden)

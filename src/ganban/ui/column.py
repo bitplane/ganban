@@ -369,7 +369,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         keys = self.column.sections.keys()
         if not keys:
             return  # transient empty state during rename_first_key rebuild
-        new_name = keys[0]
+        new_name = first_title(self.column.sections)
         title_widget = self.query_one("#column-title", EditableText)
         if title_widget.value != new_name:
             title_widget.value = new_name

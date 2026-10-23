@@ -45,7 +45,12 @@ MarkdownDocEditor #doc-editor-right {
     padding-left: 1;
 }
 MarkdownDocEditor #main-section {
-    height: 100%;
+    height: 1fr;
+}
+MarkdownDocEditor #preamble-section {
+    height: auto;
+    max-height: 40%;
+    overflow-y: auto;
 }
 MarkdownDocEditor #main-section > .section-body {
     height: 100%;

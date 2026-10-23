@@ -68,7 +68,7 @@ class DocHeader(NodeWatcherMixin, Container):
         keys = self.sections.keys()
         if not keys:
             return
-        new_title = keys[0]
+        new_title = first_title(self.sections)
         title_widget = self.query_one("#doc-title", EditableText)
         if title_widget.value != new_title:
             title_widget.value = new_title
@@ -78,7 +78,7 @@ class DocHeader(NodeWatcherMixin, Container):
         if event.new_value == first_title(self.sections):
             return
         with self.suppressing():
-            self.sections.rename_first_key(event.new_value)
+            self.sections.rename_key(first_title(self.sections), event.new_value)
         self.post_message(self.TitleChanged(event.new_value))
 
 
@@ -124,14 +124,18 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
     def compose(self) -> ComposeResult:
         if self._include_header:
             yield DocHeader(self.sections)
-        items = self.sections.items()
-        body = items[0][1]
-        subsections = items[1:]
+        title = first_title(self.sections)
+        body = self.sections[title] or ""
+        subsections = [(key, value) for key, value in self.sections.items() if key and key != title]
         pf = self._parser_factory
         et = self.editor_types
         cs = self._completion_sources
         with Horizontal(id="doc-editor-container"):
             with Vertical(id="doc-editor-left"):
+                if title and "" in self.sections:
+                    yield SectionEditor(
+                        None, self.sections[""], parser_factory=pf, completion_sources=cs, id="preamble-section"
+                    )
                 yield SectionEditor(None, body, parser_factory=pf, completion_sources=cs, id="main-section")
             with VerticalScroll(id="doc-editor-right"):
                 for heading, content in subsections:
@@ -188,6 +192,8 @@ class MarkdownDocEditor(NodeWatcherMixin, Container):
         with self.suppressing():
             if editor.id == "main-section":
                 self.sections[first_title(self.sections)] = event.new_value
+            elif editor.id == "preamble-section":
+                self.sections[""] = event.new_value
             else:
                 self.sections[editor.heading] = event.new_value
         self.post_message(self.Changed())

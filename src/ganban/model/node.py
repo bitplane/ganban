@@ -294,16 +294,19 @@ class ListNode(_Watchable):
 
     def rename_first_key(self, new_title: str) -> None:
         """Rename the first key by rebuilding the list."""
+        if self._by_id:
+            self.rename_key(next(iter(self._by_id)), new_title)
+
+    def rename_key(self, old_key: str, new_key: str) -> None:
+        """Rename an item without changing its position or losing siblings."""
+        if old_key not in self._by_id:
+            return
         items = self.items()
-        if items:
-            other_keys = set(self._by_id.keys()) - {items[0][0]}
-            new_title = _unique_key(new_title, other_keys)
+        new_key = _unique_key(new_key, set(self._by_id) - {old_key})
         for key, _ in items:
             self[key] = None
-        if items:
-            items[0] = (new_title, items[0][1])
         for key, val in items:
-            self[key] = val
+            self[new_key if key == old_key else key] = val
 
     def __repr__(self) -> str:
         p = self.path
