@@ -108,6 +108,16 @@ def test_rename_column(tmp_path):
     assert col.dir_path == "1.archive"
 
 
+def test_rename_column_to_existing_section_title(tmp_path):
+    board = _make_board(tmp_path, columns=[_make_column("1", "Backlog")])
+    col = board.columns["1"]
+    col.sections["Notes"] = "Keep this section"
+    rename_column(board, col, "Notes")
+    assert first_title(col.sections) == "Notes (1)"
+    assert col.dir_path == "1.notes-1"
+    assert col.sections["Notes"] == "Keep this section"
+
+
 def test_slugify_basic():
     assert slugify("Hello World") == "hello-world"
 

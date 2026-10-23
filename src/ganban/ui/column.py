@@ -189,6 +189,7 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
         if event.new_value and event.new_value != first_title(self.column.sections):
             with self.suppressing():
                 rename_column(self.board, self.column, event.new_value)
+            event.control.value = first_title(self.column.sections)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click."""

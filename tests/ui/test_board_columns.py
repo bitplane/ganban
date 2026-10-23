@@ -42,7 +42,8 @@ class BoardApp(App):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("target", ["board", "column"])
-async def test_preamble_title_rename_settles(target):
+@pytest.mark.parametrize("requested,stored", [("New", "New"), ("Notes", "Notes (1)")])
+async def test_preamble_title_rename_settles(target, requested, stored):
     board = _make_board()
     document = board if target == "board" else board.columns["1"]
     document.sections, _ = build_sections_list("Intro\n\n# Old\n\nBody\n\n## Notes\n\nDetails\n")
@@ -53,11 +54,13 @@ async def test_preamble_title_rename_settles(target):
         title = container.query_one(selector, EditableText)
         title.focus()
         await pilot.pause()
-        title.query_one("#edit").text = "New"
+        title.query_one("#edit").text = requested
         await pilot.press("enter")
         await pilot.pause()
-        assert document.sections.items() == [("", "Intro"), ("New", "Body"), ("Notes", "Details")]
-        assert title.value == "New"
+        assert document.sections.items() == [("", "Intro"), (stored, "Body"), ("Notes", "Details")]
+        assert title.value == stored
+        if target == "column":
+            assert document.dir_path == ("1.new" if requested == "New" else "1.notes-1")
 
 
 @pytest.mark.asyncio

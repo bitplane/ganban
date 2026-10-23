@@ -66,7 +66,8 @@ async def test_preamble_and_body_edit_independently(section_id, key):
 
 
 @pytest.mark.asyncio
-async def test_title_rename_keeps_preamble_and_reacts_to_body_changes():
+@pytest.mark.parametrize("requested,stored", [("Renamed", "Renamed"), ("Notes", "Notes (1)")])
+async def test_title_rename_keeps_preamble_and_reacts_to_body_changes(requested, stored):
     app = DocEditorApp()
     app.sections, _ = build_sections_list("Intro\n\n# Title\n\nBody\n\n## Notes\n\nNotes body\n")
     document = Node(sections=app.sections)
@@ -77,7 +78,8 @@ async def test_title_rename_keeps_preamble_and_reacts_to_body_changes():
         assert title.value == "Title"
         title.focus()
         await pilot.pause()
-        title.query_one("#edit").text = "Renamed"
+        title.query_one("#edit").text = requested
         await pilot.press("enter")
         await pilot.pause()
-        assert app.sections.items() == [("", "Intro"), ("Renamed", "External body"), ("Notes", "Notes body")]
+        assert app.sections.items() == [("", "Intro"), (stored, "External body"), ("Notes", "Notes body")]
+        assert app.query_one("#doc-title", EditableText).value == stored
