@@ -388,6 +388,47 @@ async def test_list_of_dicts_renders_nested():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["edit", "add", "delete", "rename", "nested"])
+async def test_list_dictionary_changes_persist(operation):
+    node = Node(people=[{"name": "Alice", "details": {"city": "York"}}])
+    app = DictEditorApp(node)
+    async with app.run_test() as pilot:
+        item = app.query_one(ListItemRow)
+        editor = item.query_one(DictEditor)
+        row = next(row for row in editor.children if isinstance(row, KeyValueRow) and row.key == "name")
+        if operation == "edit":
+            value = row.query_one(".kv-value", EditableText)
+            value.focus()
+            await pilot.pause()
+            value.query_one("#edit", TextEditor).text = "Bob"
+            await pilot.press("enter")
+        elif operation == "add":
+            next(child for child in editor.children if isinstance(child, AddKeyRow)).post_message(
+                AddKeyRow.KeyAdded("active", True)
+            )
+        elif operation == "delete":
+            row.post_message(KeyValueRow.DeleteRequested("name"))
+        elif operation == "rename":
+            row.post_message(KeyValueRow.KeyRenamed("name", "display"))
+        else:
+            city = next(row for row in item.query(KeyValueRow) if row.key == "city")
+            city.post_message(KeyValueRow.ValueChanged("city", "Leeds"))
+        await pilot.pause()
+        expected = {"name": "Alice", "details": {"city": "York"}}
+        if operation == "edit":
+            expected["name"] = "Bob"
+        elif operation == "add":
+            expected["active"] = True
+        elif operation == "delete":
+            del expected["name"]
+        elif operation == "rename":
+            expected["display"] = expected.pop("name")
+        else:
+            expected["details"]["city"] = "Leeds"
+        assert node.people == [expected]
+
+
+@pytest.mark.asyncio
 async def test_dict_editor_reacts_to_external_change():
     """DictEditor adds a row when an external change adds a key to the node."""
     node = Node(color="red")

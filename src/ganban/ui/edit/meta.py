@@ -186,20 +186,11 @@ class ListItemRow(Vertical):
         self._value = event.value
         self.post_message(self.ValueChanged(self.index, event.value))
 
-    def on_key_value_row_value_changed(self, event) -> None:
-        """Propagate changes from nested DictEditor."""
+    def on_dict_editor_changed(self, event: DictEditor.Changed) -> None:
+        """Commit the detached dictionary back to its containing list."""
         event.stop()
         if self._node is not None:
             self.post_message(self.ValueChanged(self.index, meta_to_dict(self._node)))
-
-    def on_key_value_row_key_renamed(self, event) -> None:
-        event.stop()
-        if self._node is not None:
-            self.post_message(self.ValueChanged(self.index, meta_to_dict(self._node)))
-
-    def on_key_value_row_delete_requested(self, event) -> None:
-        # Let it bubble to the DictEditor inside us, don't intercept
-        pass
 
     def on_list_editor_changed(self, event) -> None:
         event.stop()
@@ -401,6 +392,9 @@ class AddKeyRow(AddValueMixin, Container):
 class DictEditor(NodeWatcherMixin, Vertical):
     """Renders a Node's children as KeyValueRows + AddKeyRow."""
 
+    class Changed(Message):
+        """A dictionary mutation has been applied to the model."""
+
     def __init__(self, node: Node, **kwargs) -> None:
         self._init_watcher()
         super().__init__(**kwargs)
@@ -424,7 +418,7 @@ class DictEditor(NodeWatcherMixin, Vertical):
     def _sync_row(self, key: str, new_value: Any) -> None:
         """Add, remove, or replace a single row to match the node."""
         existing = None
-        for row in self.query(KeyValueRow):
+        for row in self._rows():
             if row.key == key:
                 existing = row
                 break
@@ -435,19 +429,26 @@ class DictEditor(NodeWatcherMixin, Vertical):
             return
 
         if existing:
-            rows = list(self.query(KeyValueRow))
+            rows = self._rows()
             idx = rows.index(existing)
-            insert_before = rows[idx + 1] if idx + 1 < len(rows) else self.query_one(AddKeyRow)
+            insert_before = rows[idx + 1] if idx + 1 < len(rows) else self._add_row()
             existing.remove()
         else:
-            insert_before = self.query_one(AddKeyRow)
+            insert_before = self._add_row()
 
         self.mount(KeyValueRow(key, new_value), before=insert_before)
+
+    def _rows(self) -> list[KeyValueRow]:
+        return [child for child in self.children if isinstance(child, KeyValueRow)]
+
+    def _add_row(self) -> AddKeyRow:
+        return next(child for child in self.children if isinstance(child, AddKeyRow))
 
     def _set_node(self, key: str, value: Any) -> None:
         """Set a value on the node with change suppression."""
         with self.suppressing():
             setattr(self.node, key, value)
+        self.post_message(self.Changed())
 
     def on_key_value_row_value_changed(self, event: KeyValueRow.ValueChanged) -> None:
         event.stop()
@@ -457,11 +458,12 @@ class DictEditor(NodeWatcherMixin, Vertical):
         event.stop()
         with self.suppressing():
             self.node.rename_key(event.old_key, event.new_key)
+        self.post_message(self.Changed())
 
     def on_key_value_row_delete_requested(self, event: KeyValueRow.DeleteRequested) -> None:
         event.stop()
         self._set_node(event.key, None)
-        for row in self.query(KeyValueRow):
+        for row in self._rows():
             if row.key == event.key:
                 row.remove()
                 break
@@ -470,7 +472,7 @@ class DictEditor(NodeWatcherMixin, Vertical):
         event.stop()
         self._set_node(event.key, event.value)
         row = KeyValueRow(event.key, event.value)
-        self.mount(row, before=self.query_one(AddKeyRow))
+        self.mount(row, before=self._add_row())
 
 
 # --- Top-level wrapper ---
