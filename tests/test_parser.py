@@ -1,7 +1,31 @@
 """Tests for markdown parser."""
 
+import pytest
+
 from ganban.model.node import ListNode
 from ganban.parser import first_title, parse_sections, serialize_sections
+
+
+@pytest.mark.parametrize("marker", ["~~~", "~~~~", "````"])
+@pytest.mark.parametrize("indent", ["", "   "])
+def test_fenced_headings_round_trip(marker, indent):
+    body = f"Example:\n\n{indent}{marker}python\n# comment\n```\n## still code\n{indent}{marker}{marker[0]}\n"
+    text = f"# Card\n\n{body}\n## Notes\n\nOutside\n"
+    sections, meta = parse_sections(text)
+    assert sections == [("Card", body.rstrip("\n")), ("Notes", "Outside")]
+    assert serialize_sections(sections, meta) == text
+
+
+def test_serialization_only_demotes_headings_outside_fences():
+    body = "Example:\n\n~~~python\n# comment\n~~~\n\n# body heading"
+    text = serialize_sections([("Card", body)])
+    assert "\n# comment\n" in text
+    assert "\n### body heading\n" in text
+
+
+def test_fence_with_text_is_not_a_closing_fence():
+    body = "```python\n```not a close\n# comment\n```"
+    assert parse_sections(f"# Card\n\n{body}\n")[0] == [("Card", body)]
 
 
 def test_parse_sections_title_and_body():

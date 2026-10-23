@@ -1,10 +1,29 @@
 """Parse markdown documents with front-matter."""
 
 import re
+from collections.abc import Iterator
 
 import yaml
 
 _H1_OR_H2 = re.compile(r"^(#{1,2}) ", re.MULTILINE)
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+def _fenced_lines(text: str) -> Iterator[tuple[str, bool]]:
+    """Yield lines with fence membership, including opening/closing lines."""
+    closing = None
+    for line in text.split("\n"):
+        if closing is not None:
+            yield line, True
+            if closing.fullmatch(line):
+                closing = None
+            continue
+        match = _FENCE.match(line)
+        if match:
+            marker, info = match.groups()
+            if marker[0] == "~" or "`" not in info:
+                closing = re.compile(rf" {{0,3}}{marker[0]}{{{len(marker)},}}[ \t]*")
+        yield line, closing is not None
 
 
 def _demote_headings(text: str) -> str:
@@ -13,10 +32,7 @@ def _demote_headings(text: str) -> str:
     Skips lines inside fenced code blocks.
     """
     result = []
-    in_fence = False
-    for line in text.split("\n"):
-        if line.startswith("```"):
-            in_fence = not in_fence
+    for line, in_fence in _fenced_lines(text):
         if not in_fence:
             line = _H1_OR_H2.sub("### ", line)
         result.append(line)
@@ -33,18 +49,13 @@ def parse_sections(text: str) -> tuple[list[tuple[str, str]], dict]:
     - meta is the front-matter dict (or {})
     """
     text, meta = _extract_front_matter(text)
-    lines = text.split("\n")
 
     sections: list[tuple[str, str]] = []
     current_title: str | None = None
     current_lines: list[str] = []
     preamble_lines: list[str] = []
     in_heading = False
-    in_code_fence = False
-
-    for line in lines:
-        if line.startswith("```"):
-            in_code_fence = not in_code_fence
+    for line, in_code_fence in _fenced_lines(text):
         if not in_code_fence and (line.startswith("# ") or line.startswith("## ")):
             if in_heading:
                 sections.append((current_title or "", "\n".join(current_lines).strip()))
