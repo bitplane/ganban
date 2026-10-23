@@ -29,10 +29,12 @@ def _current_icon(sync: Node | None, config: Node | None) -> str:
     """Return the icon for the current sync state."""
     if sync is None:
         return ICON_SYNC_IDLE
-    if sync.status in ("conflict", "error"):
+    if sync.status == "conflict":
         return ICON_SYNC_CONFLICT
     if config and not config.sync_local and not config.sync_remote:
         return ICON_SYNC_PAUSED
+    if sync.status == "error":
+        return ICON_SYNC_CONFLICT
     if sync.status and sync.status != "idle":
         return ICON_SYNC_ACTIVE
     return ICON_SYNC_IDLE
@@ -66,7 +68,7 @@ class SyncWidget(NodeWatcherMixin, Container):
         icon_widget = self.query_one(".sync-icon", Static)
         icon = _current_icon(self.board.git.sync, self.board.git.config.ganban)
         icon_widget.update(icon)
-        self.tooltip = self.board.git.sync.error
+        self.tooltip = None if icon == ICON_SYNC_PAUSED else self.board.git.sync.error
 
     def on_click(self, event) -> None:
         event.stop()
@@ -92,6 +94,9 @@ class SyncWidget(NodeWatcherMixin, Container):
         if sync.status == "conflict":
             items.append(MenuSeparator())
             items.append(MenuItem("Dismiss conflict", "dismiss_conflict"))
+        elif sync.status == "error":
+            items.append(MenuSeparator())
+            items.append(MenuItem("Dismiss error", "dismiss_error"))
 
         self.app.push_screen(ContextMenu(items, x, y), self._on_menu_closed)
 
@@ -105,7 +110,8 @@ class SyncWidget(NodeWatcherMixin, Container):
                 config.sync_local = not config.sync_local
             elif item.item_id == "toggle_remote":
                 config.sync_remote = not config.sync_remote
-            elif item.item_id == "dismiss_conflict":
+            elif item.item_id in ("dismiss_conflict", "dismiss_error"):
+                sync.error = None
                 sync.status = "idle"
             elif item.item_id and item.item_id.startswith("interval_"):
                 config.sync_interval = int(item.item_id.split("_")[1])
