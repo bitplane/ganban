@@ -93,13 +93,9 @@ def rename_label(board: Node, old_name: str, new_name: str) -> None:
         labels = card.meta.labels if card.meta else None
         if not isinstance(labels, list):
             continue
-        changed = False
-        for i, raw in enumerate(labels):
-            if normalise_label(raw) == old_norm:
-                labels[i] = new_norm
-                changed = True
-        if changed:
-            card.meta.labels = labels
+        renamed = [new_norm if normalise_label(raw) == old_norm else raw for raw in labels]
+        if renamed != labels:
+            card.meta.labels = renamed
     meta_labels = board.meta.labels
     if meta_labels and isinstance(meta_labels, Node) and old_norm in meta_labels:
         meta_labels.rename_key(old_norm, new_norm)

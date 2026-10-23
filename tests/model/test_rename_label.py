@@ -42,6 +42,17 @@ def test_rename_label_updates_cards():
     assert board.cards["002"].meta.labels == ["defect"]
 
 
+def test_rename_label_updates_index_and_notifies_card_watchers():
+    board = _board_with_labels({"1": ["Bug", "feature"], "2": ["bug"]})
+    changes = []
+    board.cards["1"].meta.watch("labels", lambda node, key, old, new: changes.append((old, new)))
+    rename_label(board, "bug", "defect")
+    assert board.labels.bug is None
+    assert board.labels.defect.cards == ["1", "2"]
+    assert board.labels.feature.cards == ["1"]
+    assert changes == [(["Bug", "feature"], ["defect", "feature"])]
+
+
 def test_rename_label_updates_board_meta():
     """Board.meta.labels key is renamed."""
     board = _board_with_labels(
