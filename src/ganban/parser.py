@@ -9,7 +9,7 @@ _H1_OR_H2 = re.compile(r"^(#{1,2}) ", re.MULTILINE)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 
 
-def _fenced_lines(text: str) -> Iterator[tuple[str, bool]]:
+def _fenced_lines(text: str, *, close_unfinished: bool = False) -> Iterator[tuple[str, bool]]:
     """Yield lines with fence membership, including opening/closing lines."""
     closing = None
     for line in text.split("\n"):
@@ -24,15 +24,17 @@ def _fenced_lines(text: str) -> Iterator[tuple[str, bool]]:
             if marker[0] == "~" or "`" not in info:
                 closing = re.compile(rf" {{0,3}}{marker[0]}{{{len(marker)},}}[ \t]*")
         yield line, closing is not None
+    if close_unfinished and closing is not None:
+        yield marker, True
 
 
-def _demote_headings(text: str) -> str:
+def _demote_headings(text: str, *, close_unfinished: bool = False) -> str:
     """Convert # and ## at start of lines to ### to prevent structural conflicts.
 
     Skips lines inside fenced code blocks.
     """
     result = []
-    for line, in_fence in _fenced_lines(text):
+    for line, in_fence in _fenced_lines(text, close_unfinished=close_unfinished):
         if not in_fence:
             line = _H1_OR_H2.sub("### ", line)
         result.append(line)
@@ -96,14 +98,15 @@ def serialize_sections(sections: list[tuple[str, str]], meta: dict | None = None
         parts.append("")
 
     h1_emitted = False
-    for title, body in sections:
+    for index, (title, body) in enumerate(sections):
         if title:
             prefix = "##" if h1_emitted else "#"
             h1_emitted = True
             parts.append(f"{prefix} {title}")
             parts.append("")
         if body:
-            parts.append(_demote_headings(body))
+            # A body fence must not consume the next structural section.
+            parts.append(_demote_headings(body, close_unfinished=index < len(sections) - 1))
             parts.append("")
 
     return "\n".join(parts).rstrip() + "\n"

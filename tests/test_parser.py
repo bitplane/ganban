@@ -6,6 +6,21 @@ from ganban.model.node import ListNode
 from ganban.parser import first_title, parse_sections, serialize_sections
 
 
+@pytest.mark.parametrize("marker", ["```", "````", "~~~", "~~~~"])
+@pytest.mark.parametrize("title", ["", "Card"])
+def test_unfinished_fence_cannot_swallow_later_section(marker, title):
+    body = f"Example:\n   {marker}python\n# code heading"
+    text = serialize_sections([(title, body), ("Notes", "Keep me")])
+    sections, _ = parse_sections(text)
+    assert sections == [(title, body + "\n" + marker), ("Notes", "Keep me")]
+    assert serialize_sections(sections) == text
+
+
+def test_last_section_keeps_unfinished_fence():
+    sections = [("Card", "~~~python\n# code heading")]
+    assert parse_sections(serialize_sections(sections))[0] == sections
+
+
 @pytest.mark.parametrize("marker", ["~~~", "~~~~", "````"])
 @pytest.mark.parametrize("indent", ["", "   "])
 def test_fenced_headings_round_trip(marker, indent):
