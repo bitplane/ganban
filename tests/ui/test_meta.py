@@ -245,6 +245,25 @@ async def test_add_key_creates_entry():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("inside_list", [False, True])
+async def test_new_dictionary_edits_persist(inside_list):
+    node = Node(people=[{}]) if inside_list else Node()
+    app = DictEditorApp(node)
+    async with app.run_test() as pilot:
+        parent = app.query_one(ListItemRow) if inside_list else app
+        editor = parent.query_one(DictEditor)
+        editor.query_one(AddKeyRow).post_message(AddKeyRow.KeyAdded("details", {}))
+        await pilot.pause()
+        details = next(row for row in editor.query(KeyValueRow) if row.key == "details")
+        details.query_one(AddKeyRow).post_message(AddKeyRow.KeyAdded("city", "York"))
+        await pilot.pause()
+        if inside_list:
+            assert node.people == [{"details": {"city": "York"}}]
+        else:
+            assert node.details.city == "York"
+
+
+@pytest.mark.asyncio
 async def test_meta_editor_wraps_dict_editor():
     """MetaEditor renders a DictEditor for the given node."""
     meta = Node(foo="bar", num=1)

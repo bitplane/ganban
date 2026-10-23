@@ -475,7 +475,7 @@ class DictEditor(NodeWatcherMixin, Vertical):
     def on_add_key_row_key_added(self, event: AddKeyRow.KeyAdded) -> None:
         event.stop()
         self._set_node(event.key, event.value)
-        row = KeyValueRow(event.key, event.value)
+        row = KeyValueRow(event.key, getattr(self.node, event.key))
         self.mount(row, before=self._add_row())
 
 
