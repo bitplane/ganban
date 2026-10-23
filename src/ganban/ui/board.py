@@ -229,7 +229,10 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         header = self.query_one("#board-title", EditableText)
         if event.control is header:
             event.stop()
-            self.board.sections.rename_key(first_title(self.board.sections), event.new_value)
+            title = first_title(self.board.sections)
+            if event.new_value != title:
+                with self.suppressing():
+                    self.board.sections.rename_key(title, event.new_value)
 
     def on_click(self, event) -> None:
         """Handle clicks on board header area."""

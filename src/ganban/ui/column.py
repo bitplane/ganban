@@ -186,8 +186,9 @@ class ColumnWidget(NodeWatcherMixin, DraggableMixin, DropTarget, Vertical):
     def on_editable_text_changed(self, event: EditableText.Changed) -> None:
         """Update column name when header is edited."""
         event.stop()
-        if event.new_value:
-            rename_column(self.board, self.column, event.new_value)
+        if event.new_value and event.new_value != first_title(self.column.sections):
+            with self.suppressing():
+                rename_column(self.board, self.column, event.new_value)
 
     def on_click(self, event) -> None:
         """Show context menu on right-click."""

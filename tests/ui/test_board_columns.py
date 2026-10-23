@@ -6,10 +6,12 @@ from textual.app import App
 from ganban.model.card import create_card
 from ganban.model.column import create_column
 from ganban.model.node import ListNode, Node
+from ganban.model.loader import build_sections_list
 from ganban.parser import first_title
 from ganban.ui.board import BoardScreen
 from ganban.ui.card import AddCard, CardWidget
 from ganban.ui.column import AddColumn, ColumnWidget
+from ganban.ui.edit import EditableText
 
 from .conftest import GANBAN_CSS_PATH
 
@@ -36,6 +38,26 @@ class BoardApp(App):
 
     def on_mount(self):
         self.push_screen(BoardScreen(self.board))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", ["board", "column"])
+async def test_preamble_title_rename_settles(target):
+    board = _make_board()
+    document = board if target == "board" else board.columns["1"]
+    document.sections, _ = build_sections_list("Intro\n\n# Old\n\nBody\n\n## Notes\n\nDetails\n")
+    app = BoardApp(board)
+    async with app.run_test(size=(120, 30)) as pilot:
+        container = app.screen if target == "board" else app.screen.query(ColumnWidget).first()
+        selector = "#board-title" if target == "board" else "#column-title"
+        title = container.query_one(selector, EditableText)
+        title.focus()
+        await pilot.pause()
+        title.query_one("#edit").text = "New"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert document.sections.items() == [("", "Intro"), ("New", "Body"), ("Notes", "Details")]
+        assert title.value == "New"
 
 
 @pytest.mark.asyncio

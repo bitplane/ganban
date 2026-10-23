@@ -301,12 +301,15 @@ class ListNode(_Watchable):
         """Rename an item without changing its position or losing siblings."""
         if old_key not in self._by_id:
             return
-        items = self.items()
         new_key = _unique_key(new_key, set(self._by_id) - {old_key})
-        for key, _ in items:
-            self[key] = None
-        for key, val in items:
-            self[new_key if key == old_key else key] = val
+        if new_key == old_key:
+            return
+        value = self._by_id[old_key]
+        self._by_id = {new_key if key == old_key else key: val for key, val in self._by_id.items()}
+        if isinstance(value, (Node, ListNode)):
+            object.__setattr__(value, "_key", new_key)
+        _emit(self, old_key, value, None)
+        _emit(self, new_key, None, value)
 
     def __repr__(self) -> str:
         p = self.path

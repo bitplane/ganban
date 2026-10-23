@@ -597,6 +597,20 @@ def test_node_rename_key_conflict_multiple():
 # --- ListNode.rename_first_key ---
 
 
+def test_list_node_rename_key_publishes_only_complete_snapshots():
+    sections = ListNode()
+    sections[""] = "Intro"
+    sections["Old"] = "Body"
+    sections["Notes"] = "Details"
+    root = Node(sections=sections)
+    snapshots = []
+    root.watch("sections", lambda *args: snapshots.append(sections.items()))
+    sections.rename_key("Old", "New")
+    expected = [("", "Intro"), ("New", "Body"), ("Notes", "Details")]
+    assert snapshots
+    assert all(snapshot == expected for snapshot in snapshots)
+
+
 def test_list_node_rename_first_key():
     lst = ListNode()
     lst["Title"] = "body"
