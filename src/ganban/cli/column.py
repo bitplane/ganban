@@ -138,17 +138,18 @@ def column_rename(args) -> int:
 
     old_name = first_title(col.sections)
     rename_column(board, col, args.new_name)
+    new_name = first_title(col.sections)
 
-    commit = save(board, f'Rename column "{old_name}" to "{args.new_name}"')
+    commit = save(board, f'Rename column "{old_name}" to "{new_name}"')
 
     output_result(
         {
             "id": col.order,
             "old_name": old_name,
-            "new_name": args.new_name,
+            "new_name": new_name,
             "commit": commit,
         },
-        f'Renamed column "{old_name}" to "{args.new_name}" ({commit[:7]})',
+        f'Renamed column "{old_name}" to "{new_name}" ({commit[:7]})',
         args.json,
     )
 

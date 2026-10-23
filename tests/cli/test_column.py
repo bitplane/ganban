@@ -4,6 +4,9 @@ import json
 from argparse import Namespace
 from io import StringIO
 
+import pytest
+from git import Repo
+
 from ganban.cli.column import (
     column_add,
     column_archive,
@@ -14,6 +17,7 @@ from ganban.cli.column import (
     column_set,
 )
 from ganban.model.loader import load_board
+from ganban.model.writer import save_board
 
 
 def test_column_list(initialized_repo, capsys):
@@ -146,6 +150,23 @@ def test_column_rename_json(initialized_repo, capsys):
     assert data["old_name"] == "Doing"
     assert data["new_name"] == "In Progress"
     assert "commit" in data
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+def test_column_rename_reports_stored_title(initialized_repo, capsys, as_json):
+    board = load_board(initialized_repo, committers=False)
+    board.columns["1"].sections["Notes"] = "Keep this section"
+    save_board(board)
+    args = Namespace(repo=str(initialized_repo), json=as_json, id="1", new_name="Notes")
+    assert column_rename(args) == 0
+    out = capsys.readouterr().out
+    if as_json:
+        assert json.loads(out)["new_name"] == "Notes (1)"
+    else:
+        assert 'Renamed column "Backlog" to "Notes (1)"' in out
+    assert Repo(initialized_repo).commit("ganban").message.strip() == 'Rename column "Backlog" to "Notes (1)"'
+    reloaded = load_board(initialized_repo, committers=False)
+    assert reloaded.columns["1"].sections.keys() == ["Notes (1)", "Notes"]
 
 
 def test_column_archive(initialized_repo, capsys):
