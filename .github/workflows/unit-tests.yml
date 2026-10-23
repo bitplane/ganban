@@ -20,3 +20,5 @@ jobs:
         run: make dev
       - name: Unit tests
         run: make test
+      - name: Lint
+        run: .venv/bin/ruff check src tests
