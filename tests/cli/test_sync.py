@@ -79,6 +79,27 @@ def _clone_and_push_card(remote_path, card_title="Remote card", card_body="Added
         return other_repo.head.commit.hexsha
 
 
+@pytest.mark.parametrize("failure", ["rejected", "transport"])
+def test_sync_reports_failed_push(synced_repos, failure):
+    local_path, remote_path = synced_repos
+    old_tip = Repo(remote_path).commit("ganban").hexsha
+    board = load_board(str(local_path))
+    create_card(board, "Local only")
+    save_board(board)
+    if failure == "rejected":
+        hook = remote_path / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+    else:
+        Repo(local_path).git.config("remote.origin.pushurl", str(remote_path / "missing"))
+
+    code, result = _do_sync(str(local_path))
+    assert code == 1
+    assert result["pushed"] is None
+    assert result["error"]
+    assert Repo(remote_path).commit("ganban").hexsha == old_tip
+
+
 # --- no remotes ---
 
 

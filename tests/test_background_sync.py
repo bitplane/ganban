@@ -73,6 +73,28 @@ def synced_repos(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_sync_reports_rejected_push_and_recovers(synced_repos):
+    local_path, remote_path = synced_repos
+    hook = remote_path / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
+    board = load_board(str(local_path))
+    _init_sync_state(board)
+    create_card(board, "Pending push")
+
+    await run_sync_cycle(board)
+    assert board.git.sync.status == "error"
+    assert board.git.sync.error
+    assert Repo(remote_path).commit("ganban").hexsha != board.commit
+
+    hook.unlink()
+    await run_sync_cycle(board)
+    assert board.git.sync.status == "idle"
+    assert board.git.sync.error is None
+    assert Repo(remote_path).commit("ganban").hexsha == board.commit
+
+
+@pytest.mark.asyncio
 async def test_sync_both_off_noop(local_repo):
     """Both toggles off, nothing happens."""
     board = load_board(str(local_repo))

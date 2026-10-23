@@ -115,7 +115,7 @@ def push_sync(repo_path: str | Path, remote_name: str, branch: str = "ganban") -
     """Push a branch to a remote."""
     repo = _get_repo(repo_path)
     remote = repo.remote(remote_name)
-    remote.push(branch)
+    remote.push(branch).raise_if_error()
 
 
 def get_upstream(repo_path: str | Path, branch: str = "ganban") -> tuple[str, str] | None:

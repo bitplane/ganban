@@ -121,7 +121,7 @@ class BoardScreen(NodeWatcherMixin, DropTarget, Screen):
         """Called every 1s. Starts a sync cycle if interval has elapsed."""
         sync = self.board.git.sync
         config = self.board.git.config.ganban
-        if sync.status != "idle":
+        if sync.status not in ("idle", "error"):
             return
         if not config.sync_local and not config.sync_remote:
             return

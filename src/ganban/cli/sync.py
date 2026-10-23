@@ -70,6 +70,8 @@ def _do_sync(repo_path: str) -> tuple[int, dict]:
         result["pushed"] = upstream_remote
     except Exception as e:
         logger.warning("push to %s failed: %s", upstream_remote, e)
+        result["error"] = f"push to {upstream_remote} failed: {e}"
+        return 1, result
 
     return 0, result
 

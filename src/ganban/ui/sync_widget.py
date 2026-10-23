@@ -29,7 +29,7 @@ def _current_icon(sync: Node | None, config: Node | None) -> str:
     """Return the icon for the current sync state."""
     if sync is None:
         return ICON_SYNC_IDLE
-    if sync.status == "conflict":
+    if sync.status in ("conflict", "error"):
         return ICON_SYNC_CONFLICT
     if config and not config.sync_local and not config.sync_remote:
         return ICON_SYNC_PAUSED
@@ -66,6 +66,7 @@ class SyncWidget(NodeWatcherMixin, Container):
         icon_widget = self.query_one(".sync-icon", Static)
         icon = _current_icon(self.board.git.sync, self.board.git.config.ganban)
         icon_widget.update(icon)
+        self.tooltip = self.board.git.sync.error
 
     def on_click(self, event) -> None:
         event.stop()

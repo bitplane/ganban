@@ -28,6 +28,10 @@ def test_conflict_icon():
     assert _current_icon(*_make_state("conflict")) == ICON_SYNC_CONFLICT
 
 
+def test_error_icon():
+    assert _current_icon(*_make_state("error")) == ICON_SYNC_CONFLICT
+
+
 def test_pull_icon():
     assert _current_icon(*_make_state("pull")) == ICON_SYNC_ACTIVE
 

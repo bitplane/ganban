@@ -75,6 +75,8 @@ async def run_sync_cycle(board):
     repo_path = board.repo_path
     do_local = config.sync_local
     do_remote = config.sync_remote
+    sync.error = None
+    sync.status = "idle"
 
     try:
         # --- PULL (fetch from all remotes) ---
@@ -150,11 +152,15 @@ async def run_sync_cycle(board):
                 await asyncio.to_thread(push_sync, repo_path, upstream_remote)
             except Exception as exc:
                 logger.warning("push to %s failed: %s", upstream_remote, exc)
+                sync.error = f"push to {upstream_remote} failed: {exc}"
+                sync.status = "error"
 
     except asyncio.CancelledError:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("sync cycle failed")
+        sync.error = str(exc)
+        sync.status = "error"
     finally:
-        if sync.status != "conflict":
+        if sync.status not in ("conflict", "error"):
             sync.status = "idle"
