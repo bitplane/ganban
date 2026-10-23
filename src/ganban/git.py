@@ -115,7 +115,19 @@ def push_sync(repo_path: str | Path, remote_name: str, branch: str = "ganban") -
     """Push a branch to a remote."""
     repo = _get_repo(repo_path)
     remote = repo.remote(remote_name)
-    remote.push(branch).raise_if_error()
+    _check_push_result(remote.push(branch))
+
+
+def _check_push_result(result) -> None:
+    """Check both current PushInfoList and older plain-list push results."""
+    error = getattr(result, "error", None)
+    if error is not None:
+        raise error
+    if not result:
+        raise RuntimeError("Push returned no ref results")
+    for info in result:
+        if info.flags & (info.ERROR | info.REJECTED | info.REMOTE_REJECTED | info.REMOTE_FAILURE | info.NO_MATCH):
+            raise RuntimeError(info.summary.strip() or "Push rejected")
 
 
 def get_upstream(repo_path: str | Path, branch: str = "ganban") -> tuple[str, str] | None:

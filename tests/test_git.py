@@ -1,9 +1,13 @@
 """Tests for git module."""
 
+from pathlib import Path
+
 import pytest
 from git import Repo
+from git.exc import GitCommandError
 
 from ganban.git import (
+    _check_push_result,
     create_orphan_branch,
     fetch,
     get_remotes,
@@ -89,6 +93,29 @@ async def test_push(temp_repo_with_remote):
     remote_repo = repo.remotes.origin
     remote_repo.fetch()
     assert "origin/ganban" in [ref.name for ref in repo.refs]
+
+
+@pytest.mark.parametrize("legacy_list", [True, False])
+@pytest.mark.parametrize("outcome", ["success", "up_to_date", "rejected"])
+def test_check_real_push_results(temp_repo_with_remote, legacy_list, outcome):
+    repo = Repo(temp_repo_with_remote)
+    repo.create_head("ganban")
+    if outcome == "up_to_date":
+        repo.remote("origin").push("ganban")
+    elif outcome == "rejected":
+        hook = Path(repo.remote("origin").url) / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+    result = repo.remote("origin").push("ganban")
+    assert result
+    # Older supported GitPython versions return a plain list of PushInfo.
+    if legacy_list:
+        result = list(result)
+    if outcome == "rejected":
+        with pytest.raises((RuntimeError, GitCommandError)):
+            _check_push_result(result)
+    else:
+        _check_push_result(result)
 
 
 @pytest.mark.asyncio
