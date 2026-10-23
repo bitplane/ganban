@@ -1063,6 +1063,33 @@ def test_id_collision_theirs_side_renumbered(repo_with_ganban, monkeypatch):
 # --- Section-level merge tests ---
 
 
+@pytest.mark.parametrize("titles", [("Same title", "Same title"), ("Same title!", "Same title?")])
+def test_id_collision_shared_link_survives_both_merge_directions(repo_with_ganban, titles):
+    path = repo_with_ganban
+    repo = Repo(path)
+    boards = [load_board(str(path)), load_board(str(path))]
+    commits = []
+    for index, board in enumerate(boards):
+        create_card(board, titles[index], f"Body {index}")
+        commits.append(save_board(board, message=f"Writer {index}"))
+        board.commit = commits[-1]
+
+    trees = []
+    for ours, theirs in ((0, 1), (1, 0)):
+        repo.git.update_ref("refs/heads/ganban", commits[theirs])
+        info = check_for_merge(boards[ours])
+        merged = try_auto_merge(boards[ours], info)
+        loaded = load_board(str(path))
+        assert set(loaded.columns["1"].links) == {"1", "2", "3"}
+        assert len(loaded.columns["1"].links) == 3
+        assert all(not card.archived for card in loaded.cards)
+        assert {dict(loaded.cards[cid].sections.items()).popitem()[1] for cid in ("2", "3")} == {"Body 0", "Body 1"}
+        trees.append(repo.commit(merged).tree.hexsha)
+        save_and_merge(loaded)
+        assert set(load_board(str(path)).columns["1"].links) == {"1", "2", "3"}
+    assert trees[0] == trees[1]
+
+
 def _prepare_card(repo_path, sections):
     """Set up card 1 with extra sections, then return two board copies."""
     board = load_board(str(repo_path))

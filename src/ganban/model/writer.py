@@ -422,11 +422,39 @@ def _resolve_id_collisions(
             return "theirs"
         return None
 
+    # Identical links from both replicas represent two independent cards
+    # when their target ID collided. Keep the original ID's membership and
+    # add a second link for the relocated card, regardless of merge direction.
+    shared_links = set()
+    remapped_ids = {old: new for mapping in side_mapping.values() for old, new in mapping.items()}
+    for path, (mode, sha) in merged_paths.items():
+        if mode != "120000" or ours_paths.get(path) != (mode, sha) or theirs_paths.get(path) != (mode, sha):
+            continue
+        match = _LINK_TARGET_RE.match(_read_blob(repo, sha))
+        new_id = remapped_ids.get(normalize_id(match.group(1))) if match else None
+        if new_id is None:
+            continue
+        directory, filename = path.rsplit("/", 1)
+        _, separator, slug = filename.partition(".")
+        if not separator:
+            continue
+        positions = [
+            name.rsplit("/", 1)[1].split(".", 1)[0]
+            for name in merged_paths.keys() | updates.keys()
+            if name.rsplit("/", 1)[0] == directory and name.rsplit("/", 1)[1] != "index.md"
+        ]
+        position = pad_id(next_id(max_id(positions)), 2)
+        target = f"../.all/{pad_id(new_id, width)}.md"
+        updates[f"{directory}/{position}.{slug}"] = (mode, _write_blob(repo, target))
+        shared_links.add(path)
+
     # Rewrite pass: every merged blob plus the relocated loser cards, each
     # attributed to the side that authored it so only that side's ids remap.
     # Collision paths use the winner's blob, not merge-tree's marker blob.
     candidates = [
-        (path, mode, sha, side_of(path, sha)) for path, (mode, sha) in merged_paths.items() if path not in winners
+        (path, mode, sha, side_of(path, sha))
+        for path, (mode, sha) in merged_paths.items()
+        if path not in winners and path not in shared_links
     ]
     for path, side in winners.items():
         candidates.append((path, "100644", updates[path][1], side))
