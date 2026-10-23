@@ -334,6 +334,27 @@ async def test_list_delete_item():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("first", ["a", ["nested"], {"nested": ["value"]}])
+async def test_list_delete_then_edit_and_delete_remaining(first):
+    node = Node(entries=[first, "b", "c"])
+    app = DictEditorApp(node)
+    async with app.run_test() as pilot:
+        editor = app.query_one(ListEditor)
+        rows = [child for child in editor.children if isinstance(child, ListItemRow)]
+        rows[1].post_message(ListItemRow.DeleteRequested(1))
+        await pilot.pause()
+        rows = [child for child in editor.children if isinstance(child, ListItemRow)]
+        assert [row.index for row in rows] == [0, 1]
+        assert node.entries == [first, "c"]
+        rows[1].post_message(ListItemRow.ValueChanged(rows[1].index, "updated"))
+        await pilot.pause()
+        assert node.entries == [first, "updated"]
+        rows[1].post_message(ListItemRow.DeleteRequested(rows[1].index))
+        await pilot.pause()
+        assert node.entries == [first]
+
+
+@pytest.mark.asyncio
 async def test_list_add_item():
     """Adding an item via AddListItemRow appends to the list."""
     app = ListEditorApp(["existing"])

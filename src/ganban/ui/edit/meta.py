@@ -246,8 +246,11 @@ class ListEditor(Vertical):
 
     def _reindex(self) -> None:
         """Update indices on all item rows after a change."""
-        for i, row in enumerate(self.query(ListItemRow)):
+        for i, row in enumerate(self._rows()):
             row.index = i
+
+    def _rows(self) -> list[ListItemRow]:
+        return [child for child in self.children if isinstance(child, ListItemRow)]
 
     def _emit_changed(self) -> None:
         """Post a Changed message with a snapshot of the current items."""
@@ -258,11 +261,11 @@ class ListEditor(Vertical):
         self.items[event.index] = event.value
         self._emit_changed()
 
-    def on_list_item_row_delete_requested(self, event: ListItemRow.DeleteRequested) -> None:
+    async def on_list_item_row_delete_requested(self, event: ListItemRow.DeleteRequested) -> None:
         event.stop()
         del self.items[event.index]
-        rows = list(self.query(ListItemRow))
-        rows[event.index].remove()
+        rows = self._rows()
+        await rows[event.index].remove()
         self._reindex()
         self._emit_changed()
 
@@ -270,7 +273,8 @@ class ListEditor(Vertical):
         event.stop()
         self.items.append(event.value)
         row = ListItemRow(len(self.items) - 1, event.value)
-        self.mount(row, before=self.query_one(AddListItemRow))
+        add_row = next(child for child in self.children if isinstance(child, AddListItemRow))
+        self.mount(row, before=add_row)
         self._emit_changed()
 
 
