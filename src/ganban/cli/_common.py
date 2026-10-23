@@ -2,6 +2,7 @@
 
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 from ganban.model.loader import load_board
@@ -45,7 +46,14 @@ def save(board: Node, message: str) -> str:
 
 def output_json(data: dict | list) -> None:
     """Write JSON to stdout."""
-    print(json.dumps(data, indent=2))
+    print(json.dumps(data, indent=2, default=_json_value))
+
+
+def _json_value(value):
+    """Encode YAML dates/timestamps without stringifying unsupported objects."""
+    if isinstance(value, date):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def output_result(data: dict, text: str, json_mode: bool) -> None:
