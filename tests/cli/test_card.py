@@ -1,11 +1,14 @@
 """Tests for 'ganban card' commands."""
 
 import json
+import subprocess
+import sys
 from argparse import Namespace
 from io import StringIO
 
 from ganban.cli.card import card_add, card_archive, card_get, card_list, card_move, card_set
 from ganban.model.loader import load_board
+from ganban.model.writer import save_board
 
 
 def test_card_list(initialized_repo, capsys):
@@ -93,6 +96,27 @@ def test_card_set_round_trip(initialized_repo, capsys, monkeypatch):
     # Verify unchanged
     board = load_board(str(initialized_repo))
     assert board.cards["1"].sections.keys()[0] == "First card"
+
+
+def test_card_set_rejects_non_string_labels_and_can_repair_existing_data(initialized_repo):
+    command = [sys.executable, "-m", "ganban", "card", "set", "1", "--repo", str(initialized_repo), "--json"]
+    original = load_board(str(initialized_repo)).commit
+    invalid = "---\nlabels: [bug, 123, yes]\n---\n# Card\n"
+    result = subprocess.run(command, input=invalid, text=True, capture_output=True)
+    assert result.returncode == 1
+    assert "labels" in json.loads(result.stderr)["error"]
+    assert load_board(str(initialized_repo)).commit == original
+
+    # Hand-edited data must remain readable and repairable through the CLI.
+    board = load_board(str(initialized_repo))
+    board.cards["1"].meta = {"labels": ["bug", 123, True, None]}
+    save_board(board)
+    loaded = load_board(str(initialized_repo))
+    assert loaded.cards["1"].meta.labels == ["bug", 123, True, None]
+    assert list(loaded.labels.keys()) == ["bug"]
+    result = subprocess.run(command, input="---\nlabels: [fixed]\n---\n# Card\n", text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert load_board(str(initialized_repo)).cards["1"].meta.labels == ["fixed"]
 
 
 def test_card_add(initialized_repo, capsys):

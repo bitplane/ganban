@@ -292,9 +292,9 @@ def _setup_blocked(board: Node) -> None:
     board.watch("cards", on_cards_changed)
 
 
-def normalise_label(raw: str) -> str:
-    """Normalise a label name to lowercase, stripped."""
-    return raw.strip().lower()
+def normalise_label(raw: object) -> str:
+    """Normalise a string label; ignore malformed hand-edited values."""
+    return raw.strip().lower() if isinstance(raw, str) else ""
 
 
 def _build_labels_index(board: Node) -> dict[str, Node]:

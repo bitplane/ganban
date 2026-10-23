@@ -121,3 +121,10 @@ def test_normalise_label():
     assert normalise_label("  Bug ") == "bug"
     assert normalise_label("URGENT") == "urgent"
     assert normalise_label("feature") == "feature"
+
+
+def test_non_string_labels_are_preserved_but_not_indexed():
+    values = ["bug", 123, True, None, {"unexpected": "mapping"}]
+    board = _board_with_labels({"1": values})
+    assert list(board.labels.keys()) == ["bug"]
+    assert board.cards["1"].meta.labels == values

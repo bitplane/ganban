@@ -52,7 +52,9 @@ class LabelsWidget(TagListWidget):
     tags_id = "labels-tags"
 
     def display_for(self, value: str) -> Text:
-        return _label_display(value, self.board)
+        # Keep malformed values visible and editable without changing the
+        # stored YAML merely by opening the board.
+        return _label_display(str(value), self.board)
 
     def options_for(self, current: list[str]) -> list[tuple[str, str]]:
         return build_label_options(self.board, current)

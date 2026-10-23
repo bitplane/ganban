@@ -3,6 +3,7 @@
 import sys
 
 from ganban.cli._common import (
+    error,
     find_card,
     find_column,
     load_board_or_die,
@@ -82,6 +83,12 @@ def card_set(args) -> int:
 
     text = sys.stdin.read()
     new_sections, new_meta = build_sections_list(text, fallback_title=args.id)
+
+    if not isinstance(new_meta, dict):
+        error("Card metadata must be a mapping.", args.json)
+    labels = new_meta.get("labels")
+    if labels is not None and (not isinstance(labels, list) or any(not isinstance(label, str) for label in labels)):
+        error("Card labels must be a list of strings; quote numeric or boolean labels.", args.json)
 
     card.sections = new_sections
     card.meta = new_meta
