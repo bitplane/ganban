@@ -18,6 +18,7 @@ from gitdb.base import IStream
 
 from ganban.ids import max_id, next_id, normalize_id, pad_id
 from ganban.model.column import slugify
+from ganban.model.loader import load_board
 from ganban.constants import BRANCH_NAME
 from ganban.model.node import ListNode, Node
 from ganban.parser import first_title, parse_sections, serialize_sections
@@ -762,15 +763,19 @@ def save_and_merge(
     commit = save_board(board, message, branch)
     board.commit = commit
     merged = False
+    merge_board = board
     for _ in range(max_attempts):
-        merge_info = check_for_merge(board, branch)
+        merge_info = check_for_merge(merge_board, branch)
         if merge_info is None:
             return commit, merged
-        new_commit = try_auto_merge(board, merge_info, branch=branch)
+        new_commit = try_auto_merge(merge_board, merge_info, branch=branch)
         if new_commit is not None:
             commit = new_commit
             board.commit = new_commit
             merged = True
+            # Load this exact commit, not the branch which another writer
+            # may already have advanced. Retry with all merged-in data.
+            merge_board = load_board(board.repo_path, branch=new_commit, committers=False)
     raise RuntimeError(f"branch {branch} diverged and auto-merge failed; local changes saved as {commit}")
 
 

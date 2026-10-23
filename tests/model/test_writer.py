@@ -832,6 +832,36 @@ def test_save_and_merge_no_divergence(repo_with_ganban):
     assert repo.commit("ganban").hexsha == commit
 
 
+def test_save_and_merge_retries_preserve_previous_merge(repo_with_ganban):
+    """A writer arriving after a successful merge must not undo that merge."""
+    original = load_board(str(repo_with_ganban))
+    create_card(original, "Second", "Base")
+    create_card(original, "Third", "Base")
+    save_and_merge(original)
+    ours = load_board(str(repo_with_ganban))
+    external = load_board(str(repo_with_ganban))
+    external.cards["1"].sections["First card"] = "External A"
+    save_and_merge(external)
+    ours.cards["2"].sections["Second"] = "Local B"
+    injected = []
+
+    def write_after_merge(node, key, old, new):
+        if not injected and len(Repo(repo_with_ganban).commit(new).parents) == 2:
+            injected.append(new)
+            third = load_board(str(repo_with_ganban))
+            third.cards["3"].sections["Third"] = "External C"
+            save_and_merge(third)
+
+    ours.watch("commit", write_after_merge)
+    commit, merged = save_and_merge(ours)
+    loaded = load_board(str(repo_with_ganban))
+    assert injected and merged
+    assert loaded.commit == commit == ours.commit
+    assert loaded.cards["1"].sections["First card"] == "External A"
+    assert loaded.cards["2"].sections["Second"] == "Local B"
+    assert loaded.cards["3"].sections["Third"] == "External C"
+
+
 def test_auto_merge_stale_merge_info_returns_none(repo_with_ganban):
     """try_auto_merge bails out when the branch moved past merge_info."""
     board = load_board(str(repo_with_ganban))
